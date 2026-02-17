@@ -1,9 +1,20 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import "../../styles/Welcome.css";
 import Mainheader from "../../components/Mainheader";
 import shield from "../../assets/shield.png";
 
 const Welcome = () => {
+  const navigate = useNavigate();
+
+  const handleInstructorClick = () => {
+    navigate("/login", { state: { role: "Instructor" } });
+  };
+
+  const handleStudentClick = () => {
+    navigate("/login", { state: { role: "Student" } });
+  };
+
   return (
     <>
  
@@ -24,8 +35,9 @@ const Welcome = () => {
             </p>
 
             <div className="welcome-buttons">
-              <button className="btn-primary">Instructor</button>
-              <button className="btn-outline">Student</button>
+              <button className="btn-primary" onClick={handleInstructorClick}>Instructor</button>
+              <button className="btn-outline" onClick={handleStudentClick}>Student</button>
+              
             </div>
           </div>
 
@@ -38,7 +50,7 @@ const Welcome = () => {
         </div>
       </section>
 
-      {/* STATS SECTION */}
+      {/* STATS SECTION
       <section className="stats-section">
         <div className="stats-container">
           <div className="stat">
@@ -56,7 +68,7 @@ const Welcome = () => {
             <p>Secured</p>
           </div>
         </div>
-      </section>
+      </section> */}
     </>
   );
 };
