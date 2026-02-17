@@ -1,3 +1,200 @@
-.welcome {
-  padding: 40px;
+.welcome-hero {
+  background-color: #000;
+  color: white;
+  padding: 80px 0;
+}
+
+.welcome-container {
+  width: 85%;
+  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.welcome-left {
+  width: 50%;
+}
+
+.line {
+  width: 40px;
+  height: 2px;
+  background: #00bcd4;
+  margin-bottom: 20px;
+}
+
+.welcome-left h1 {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0%;
+}
+
+.welcome-left span {
+  background: linear-gradient(90deg, #186EB4 0%, #54F4FC 87%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.welcome-left p {
+  margin-top: 20px;
+  color: #aaa;
+  font-size: 16px;
+  width: 80%;
+}
+
+.welcome-buttons {
+  margin-top: 30px;
+}
+
+.welcome-buttons button {
+  padding: 14px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+/* ================= PRIMARY (Instructor) ================= */
+
+.btn-primary {
+  background: linear-gradient(90deg, #186EB4 0%, #54F4FC 87%);
+  border: none;
+  color: black;
+  margin-right: 15px;
+}
+
+.btn-primary:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(84, 244, 252, 0.35);
+}
+
+
+
+.btn-outline {
+  background: transparent;
+  border: 2px solid #54F4FC;
+  color: #54F4FC;
+}
+
+.btn-outline:hover {
+  background: linear-gradient(90deg, #186EB4 0%, #54F4FC 87%);
+  color: white;
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(84, 244, 252, 0.35);
+}
+
+
+.welcome-right {
+  width: 45%;
+  text-align: right;
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.image-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 550px;
+}
+
+.image-wrapper::before,
+.image-wrapper::after {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 2px solid #00bcd4;
+}
+
+/* Top-right corner */
+.image-wrapper::before {
+  top: -15px;
+  right: -15px;
+  border-left: none;
+  border-bottom: none;
+  z-index: 2;
+}
+
+/* Bottom-right corner */
+.image-wrapper::after {
+  bottom: -15px;
+  right: -15px;
+  border-left: none;
+  border-top: none;
+  z-index: 2;
+}
+
+.welcome-right img {
+  width: 100%;
+  max-width: 550px;
+  height: auto;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+
+/* Add left side corners by creating elements in CSS */
+.welcome-container .welcome-right::before {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 2px solid #00bcd4;
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+  pointer-events: none;
+}
+
+.welcome-container .welcome-right::after {
+  content: "";
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 2px solid #00bcd4;
+  bottom: 0;
+  left: 0;
+  border-right: none;
+  border-top: none;
+  pointer-events: none;
+}
+
+/* ========================= */
+/* STATS SECTION */
+/* ========================= */
+
+.stats-section {
+  background: #000;
+  padding: 80px 0;
+}
+
+.stats-container {
+  width: 80%;
+  margin: auto;
+  display: flex;
+  justify-content: space-between;
+  background: linear-gradient(90deg, #1f4e79, #39c6d6);
+  padding: 50px 40px;
+  border-radius: 40px;
+  color: black;
+}
+
+.stat {
+  text-align: center;
+}
+
+.stat h2 {
+  font-size: 60px;
+  font-weight: bold;
+}
+
+.stat p {
+  font-size: 18px;
+  margin-top: 10px;
 }
