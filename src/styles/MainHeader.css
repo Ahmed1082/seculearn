@@ -1,0 +1,34 @@
+
+.header-nav {
+  display: flex;
+  gap: 40px;
+}
+
+.header-nav a {
+  text-decoration: none;
+  color: #ccc;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.header-nav a:hover {
+  color: #00e5ff;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.user-name {
+  color: #00e5ff;
+  font-size: 14px;
+}
+
+.avatar {
+  width: 35px;
+  height: 35px;
+  background-color: #ccc;
+  border-radius: 50%;
+}
