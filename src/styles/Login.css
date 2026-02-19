@@ -138,7 +138,7 @@
 /* ================= RIGHT SIDE ================= */
 
 .login-right {
-  width: 42%;
+  width: 48%;
   display: flex;
   justify-content: flex-end;
   position: relative;
@@ -147,7 +147,7 @@
 /* Image Wrapper */
 .image-wrapper {
   position: relative;
-  max-width: 420px;
+  max-width: 520px;
 }
 
 .image-wrapper img {
@@ -161,21 +161,21 @@
 .image-wrapper::after {
   content: "";
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border: 2px solid #00bcd4;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #54F4FC;
 }
 
 .image-wrapper::before {
-  top: -15px;
-  right: -15px;
+  top: -12px;
+  right: -12px;
   border-left: none;
   border-bottom: none;
 }
 
 .image-wrapper::after {
-  bottom: -15px;
-  right: -15px;
+  bottom: -12px;
+  right: -12px;
   border-left: none;
   border-top: none;
 }
@@ -184,21 +184,22 @@
 .login-right::after {
   content: "";
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border: 2px solid #00bcd4;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #54F4FC;
+  pointer-events: none;
 }
 
 .login-right::before {
-  top: 0;
-  left: 0;
+  top: -12px;
+  left: -12px;
   border-right: none;
   border-bottom: none;
 }
 
 .login-right::after {
-  bottom: 0;
-  left: 0;
+  bottom: -12px;
+  left: -12px;
   border-right: none;
   border-top: none;
 }

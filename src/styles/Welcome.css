@@ -83,13 +83,14 @@
 .btn-outline:hover {
   background: linear-gradient(90deg, #186EB4 0%, #54F4FC 87%);
   color: white;
+  font-weight: 600;
   transform: translateY(-4px);
   box-shadow: 0 10px 25px rgba(84, 244, 252, 0.35);
 }
 
 
 .welcome-right {
-  width: 45%;
+  width: 50%;
   text-align: right;
   position: relative;
   display: flex;
@@ -99,22 +100,22 @@
 .image-wrapper {
   position: relative;
   display: inline-block;
-  max-width: 550px;
+  max-width: 700px;
 }
 
 .image-wrapper::before,
 .image-wrapper::after {
   content: "";
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border: 2px solid #00bcd4;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #54F4FC;
 }
 
 /* Top-right corner */
 .image-wrapper::before {
-  top: -15px;
-  right: -15px;
+  top: -12px;
+  right: -12px;
   border-left: none;
   border-bottom: none;
   z-index: 2;
@@ -122,8 +123,8 @@
 
 /* Bottom-right corner */
 .image-wrapper::after {
-  bottom: -15px;
-  right: -15px;
+  bottom: -12px;
+  right: -12px;
   border-left: none;
   border-top: none;
   z-index: 2;
@@ -131,7 +132,7 @@
 
 .welcome-right img {
   width: 100%;
-  max-width: 550px;
+  max-width: 700px;
   height: auto;
   display: block;
   position: relative;
@@ -142,11 +143,11 @@
 .welcome-container .welcome-right::before {
   content: "";
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border: 2px solid #00bcd4;
-  top: 0;
-  left: 0;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #54F4FC;
+  top: -12px;
+  left: -12px;
   border-right: none;
   border-bottom: none;
   pointer-events: none;
@@ -155,11 +156,11 @@
 .welcome-container .welcome-right::after {
   content: "";
   position: absolute;
-  width: 40px;
-  height: 40px;
-  border: 2px solid #00bcd4;
-  bottom: 0;
-  left: 0;
+  width: 24px;
+  height: 24px;
+  border: 3px solid #54F4FC;
+  bottom: -12px;
+  left: -12px;
   border-right: none;
   border-top: none;
   pointer-events: none;
