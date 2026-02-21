@@ -1,7 +1,7 @@
-import "../../styles/CourseDetails.css";
+import SharedCourseDetails from "../shared/CourseDetails";
 
 const CourseDetails = () => {
-  return <div className="course-details">TA Course Details</div>;
+  return <SharedCourseDetails role="ta" />;
 };
 
 export default CourseDetails;

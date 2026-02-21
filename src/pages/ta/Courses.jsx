@@ -1,8 +1,7 @@
-import "../../styles/Courses.css";
+import SharedCourses from "../shared/Courses";
 
 const Courses = () => {
-  
-  return <div className="courses">  Instructor Courses</div>;
+  return <SharedCourses role="ta" />;
 };
 
 export default Courses;

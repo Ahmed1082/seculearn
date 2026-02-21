@@ -1,3 +1,145 @@
 .course-details {
-  padding: 40px;
+  padding: 23px 65px;
+}
+
+.course-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.course-header h1 {
+  font-size: 25px;
+  font-weight: 800;
+  background: linear-gradient(180deg, #186EB4, #54F4FC);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.add-btn {
+  width: 150px;
+  height: 45px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(90deg, #186EB4, #54F4FC);
+  transition: 0.25s ease;
+}
+
+.plus {
+  font-weight: 700;
+  font-size: 20px;
+  color: #0A0A0A;
+}
+
+.btn-text {
+  font-weight: 700;
+  font-size: 16px;
+  color: #0A0A0A;
+}
+
+.add-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(24,110,180,0.4);
+}
+
+.section-block {
+  margin-top: 25px;
+}
+
+.block-title {
+  /* border: 2px solid #00e5ff; */
+  width: 160px;
+  height: 60px;
+  border-radius: 8px;
+  background: linear-gradient(#0A0A0A, #0A0A0A) padding-box,
+              linear-gradient(180deg, #186EB4, #54F4FC) border-box;
+  border: 3px solid transparent;
+  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.block-txt {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800; /* ExtraBold */
+  font-size: 22px;
+  letter-spacing: 0.05em; 
+  background: linear-gradient(180deg, #186EB4, #54F4FC);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.circle-grid {
+  display: flex;
+  gap: 25px;
+  flex-wrap: wrap;
+  margin-left: 20px;
+}
+
+.circle-card {
+  width: 85px;
+  height: 85px;
+  border-radius: 50%;
+  /* background: linear-gradient(180deg, #186EB4, #54F4FC); */
+  background: linear-gradient(180deg, #1e5675, #3aa6c6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s ease;
+}
+
+.circle-card:hover {
+  transform: translateY(-6px);
+}
+
+
+.circle-card span {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: 5%;
+  color: #0A0A0A;
+}
+
+.members-counter {
+  display: flex;
+  justify-content: flex-end;  
+  margin-right: 40px;
+  margin-top: 40px;
+}
+
+.members-circle {
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background:
+    linear-gradient(#0A0A0A, #0A0A0A) padding-box,
+    linear-gradient(180deg, #186EB4, #54F4FC) border-box;
+
+  border: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+}
+
+.members-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 0.05em;
+  background: linear-gradient(90deg, #186EB4, #54F4FC);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }

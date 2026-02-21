@@ -1,8 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import "../../styles/Welcome.css";
-import Mainheader from "../../components/Mainheader";
-import shield from "../../assets/shield.png";
+import shield from "../../images/shield.png";
 
 const Welcome = () => {
   const navigate = useNavigate();

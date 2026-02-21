@@ -6,7 +6,7 @@
 
 .header-nav a {
   text-decoration: none;
-  color: #ccc;
+  color: #FFFFFF;
   font-size: 16px;
   transition: 0.3s;
 }
@@ -22,13 +22,27 @@
 }
 
 .user-name {
+  padding: 8px 22px;
+  border: 2px solid #00e5ff;
+  border-radius: 50px; 
   color: #00e5ff;
-  font-size: 14px;
+  font-size: px;
+  display: inline-block;
 }
 
 .avatar {
   width: 35px;
   height: 35px;
-  background-color: #ccc;
   border-radius: 50%;
+  /* background: linear-gradient(135deg, #0077ff, #00e5ff); */
+  /* background: linear-gradient(180deg, #10374b, #0b1e28); */
+  border: 2px solid #00e5ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* color: #0A0A0A; */
+  /* color: #FFFFFF; */
+  color: #00e5ff;
+  font-weight: bold;
+  font-size: 18px;
 }

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../../styles/Login.css";
-import shield from "../../assets/shield.png";
+import shield from "../../images/shield.png";
 import { FaChevronDown, FaEye, FaEyeSlash } from "react-icons/fa";
 
 const API_URL = "/api/login";
@@ -152,11 +152,11 @@ const Login = () => {
       if (roleSlugFromResponse === "instructor") {
         navigate("/instructor/dashboard");
       } else if (roleSlugFromResponse === "student") {
-        navigate("/student/dashboard");
+        navigate("/student/Courses");
       } else if (roleSlugFromResponse === "ta") {
         navigate("/ta/dashboard");
       } else {
-        navigate("/student/dashboard"); // fallback
+        navigate("/student/Courses"); // fallback
       }
     } catch (err) {
       // Detailed error logging

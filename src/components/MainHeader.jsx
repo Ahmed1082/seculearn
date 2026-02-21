@@ -21,7 +21,7 @@ const MainHeader = ({ role }) => {
             <>
               <Link to="/instructor">Overview</Link>
               <Link to="/instructor/courses">Courses</Link>
-              <Link to="/instructor/section">Members</Link>
+              <Link to="/instructor/members">Members</Link>
             </>
           )}
 
@@ -29,15 +29,15 @@ const MainHeader = ({ role }) => {
             <>
               <Link to="/ta">Overview</Link>
               <Link to="/ta/courses">Courses</Link>
-              <Link to="/ta/section">Sections</Link>
+              <Link to="/ta/members">Members</Link>
             </>
           )}
 
           {role === "student" && (
             <>
-              <Link to="/student/assignments">Assignments</Link>
+              <Link to="/student/allAssignments">Assignments</Link>
               <Link to="/student/courses">Courses</Link>
-              <Link to="/student/quizzes">Quizzes</Link>
+              <Link to="/student/allQuizzes">Quizzes</Link>
               <Link to="/student/members">Members</Link>
             </>
           )}
@@ -51,9 +51,16 @@ const MainHeader = ({ role }) => {
               ? "Student"
               : role === "ta"
               ? "TA"
-              : "Instructor X"}
+              : "Instructor"}
           </span>
-          <div className="avatar"></div>
+          <div className="avatar">
+            {(role === "student"
+              ? "Student"
+              : role === "ta"
+              ? "TA"
+              : "Instructor"
+            ).charAt(0)}
+          </div>
         </div>
 
       </div>
