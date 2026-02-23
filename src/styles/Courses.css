@@ -20,6 +20,7 @@
   font-size: 24px;
   font-weight: 800;
   background: linear-gradient(180deg, #186EB4, #54F4FC);
+  background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -36,6 +37,7 @@
   font-family: 'Inter', sans-serif;
   font-weight: 800;
   background: linear-gradient(90deg, #8ccbff, #7ff9ff);
+  background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
@@ -55,13 +57,13 @@
   transition: 0.25s ease;
 }
 
-.plus {
+.btn-plus {
   font-weight: 700;
   font-size: 20px;
   color: #0A0A0A;
 }
 
-.btn-text {
+.btn-txt {
   font-weight: 700;
   font-size: 18px;
   color: #0A0A0A;
@@ -108,6 +110,7 @@
   font-size: 17px;
   padding: 20px;
   background: linear-gradient(90deg, #186EB4, rgba(84,244,252,0.87));
+  background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
@@ -150,4 +153,128 @@
 .icon-btn.delete:hover {
   background: red;
   color: white;
+}
+
+/* ================= CONFIRM BOX ================= */
+
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.confirm-box {
+  width: 400px;
+  padding: 30px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #0f1c2e, #0c1624);
+  text-align: center;
+  color: white;
+}
+
+.confirm-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.cancel-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #444;
+  color: white;
+  cursor: pointer;
+}
+
+.confirm-delete-btn {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: none;
+  background: #d32f2f;
+  color: white;
+  cursor: pointer;
+}
+/* ================= COURSE DELETE POPUP ================= */
+
+.course-delete-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(1px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.course-delete-box {
+  width: 400px;
+  padding: 30px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #0f1c2d, #142a44);
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+
+.course-delete-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 8px;
+}
+
+.course-delete-highlight {
+  background: linear-gradient(90deg, #186EB4, #54F4FC);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.course-delete-sub {
+  color: #aaa;
+  font-size: 14px;
+  margin-bottom: 25px;
+}
+
+.course-delete-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+/* الشكل العادي */
+
+.course-cancel-btn,
+.course-delete-btn {
+  width: 110px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid #444;
+  background: transparent;
+  color: #ccc;
+  cursor: pointer;
+  transition: 0.25s ease;
+  font-weight: 600;
+}
+
+/* Hover Cancel */
+
+.course-cancel-btn:hover {
+  background: #00e5ff;
+  color: black;
+  border: none;
+}
+
+/* Hover Delete */
+
+.course-delete-btn:hover {
+  background: red;
+  color: white;
+  border: none;
 }

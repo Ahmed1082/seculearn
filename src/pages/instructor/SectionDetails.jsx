@@ -1,7 +1,7 @@
-import "../../styles/SectionDetails.css";
+import SharedMembers from "../shared/SectionDetails";
 
 const SectionDetails = () => {
-  return <div className="sectiondetails">Instructor Section Details</div>;
+  return <SharedMembers role="instructor" />;
 };
 
 export default SectionDetails;

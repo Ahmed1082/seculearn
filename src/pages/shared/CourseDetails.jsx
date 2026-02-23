@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { FaTrash, FaEdit } from "react-icons/fa";
 import "../../styles/CourseDetails.css";
 import AddItemModal from "../../components/AddItemModal";
 
@@ -10,8 +11,6 @@ const CourseDetails = ({ role }) => {
   const isInstructor = role === "instructor";
   const isTA = role === "ta";
 
-  /* ================= COURSE TITLE ================= */
-
   const courseTitles = {
     1: "Introduction to Cybersecurity",
     2: "Introduction to Cryptography",
@@ -19,8 +18,6 @@ const CourseDetails = ({ role }) => {
   };
 
   const courseTitle = courseTitles[courseId] || "Course";
-
-  /* ================= STATE (SAME FOR ALL) ================= */
 
   const [lectures, setLectures] = useState([
     { id: 1, title: "Lec 1" },
@@ -38,40 +35,80 @@ const CourseDetails = ({ role }) => {
 
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
+  const [editingItem, setEditingItem] = useState(null);
+  const [confirmData, setConfirmData] = useState(null);
 
   /* ================= SMART NUMBER ================= */
 
-  const getNextLectureNumber = () => {
-    const numbers = lectures.map(l =>
-      parseInt(l.title.replace(/\D/g, "")) || 0
-    );
+  const getNextNumber = (items) => {
+    if (items.length === 0) return 1;
+
+    const numbers = items.map(item => {
+      const match = item.title.match(/\d+/);
+      return match ? parseInt(match[0]) : 0;
+    });
+
     return Math.max(...numbers) + 1;
   };
 
-  const getNextSectionNumber = () => {
-    const numbers = sections.map(s =>
-      parseInt(s.title.replace(/\D/g, "")) || 0
-    );
-    return Math.max(...numbers) + 1;
-  };
+  /* ================= ADD / EDIT ================= */
 
-  /* ================= ADD HANDLER ================= */
-
-  const handleAdd = (newTitle) => {
+  const handleAddOrEdit = (title) => {
 
     if (modalType === "lecture") {
-      setLectures([
-        ...lectures,
-        { id: Date.now(), title: newTitle }
-      ]);
+
+      if (editingItem) {
+        setLectures(prev =>
+          prev.map(l =>
+            l.id === editingItem.id ? { ...l, title } : l
+          )
+        );
+      } else {
+        setLectures(prev => [
+          ...prev,
+          { id: Date.now(), title }
+        ]);
+      }
     }
 
     if (modalType === "section") {
-      setSections([
-        ...sections,
-        { id: Date.now(), title: newTitle }
-      ]);
+
+      if (editingItem) {
+        setSections(prev =>
+          prev.map(s =>
+            s.id === editingItem.id ? { ...s, title } : s
+          )
+        );
+      } else {
+        setSections(prev => [
+          ...prev,
+          { id: Date.now(), title }
+        ]);
+      }
     }
+
+    setShowModal(false);
+    setEditingItem(null);
+  };
+
+  /* ================= DELETE ================= */
+
+  const handleDelete = () => {
+    if (!confirmData) return;
+
+    if (confirmData.type === "lecture") {
+      setLectures(prev =>
+        prev.filter(l => l.id !== confirmData.id)
+      );
+    }
+
+    if (confirmData.type === "section") {
+      setSections(prev =>
+        prev.filter(s => s.id !== confirmData.id)
+      );
+    }
+
+    setConfirmData(null);
   };
 
   return (
@@ -86,6 +123,7 @@ const CourseDetails = ({ role }) => {
             className="add-btn"
             onClick={() => {
               setModalType("lecture");
+              setEditingItem(null);
               setShowModal(true);
             }}
           >
@@ -99,6 +137,7 @@ const CourseDetails = ({ role }) => {
             className="add-btn"
             onClick={() => {
               setModalType("section");
+              setEditingItem(null);
               setShowModal(true);
             }}
           >
@@ -108,7 +147,7 @@ const CourseDetails = ({ role }) => {
         )}
       </div>
 
-      {/* LECTURES */}
+      {/* ================= LECTURES ================= */}
       <div className="section-block">
         <div className="block-title">
           <h2 className="block-txt">Lectures</h2>
@@ -117,13 +156,44 @@ const CourseDetails = ({ role }) => {
         <div className="circle-grid">
           {lectures.map((lecture) => (
             <div className="circle-card" key={lecture.id}>
+
+              {isInstructor && (
+                <div className="circle-actions">
+                  <button
+                    className="icon-btn edit"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalType("lecture");
+                      setEditingItem(lecture);
+                      setShowModal(true);
+                    }}
+                  >
+                    <FaEdit />
+                  </button>
+
+                  <button
+                    className="icon-btn delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmData({
+                        id: lecture.id,
+                        type: "lecture",
+                        title: lecture.title
+                      });
+                    }}
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              )}
+
               <span>{lecture.title}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* SECTIONS */}
+      {/* ================= SECTIONS ================= */}
       <div className="section-block">
         <div className="block-title">
           <h2 className="block-txt">Sections</h2>
@@ -132,36 +202,94 @@ const CourseDetails = ({ role }) => {
         <div className="circle-grid">
           {sections.map((section) => (
             <div className="circle-card" key={section.id}>
+
+              {isTA && (
+                <div className="circle-actions">
+                  <button
+                    className="icon-btn edit"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalType("section");
+                      setEditingItem(section);
+                      setShowModal(true);
+                    }}
+                  >
+                    <FaEdit />
+                  </button>
+
+                  <button
+                    className="icon-btn delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmData({
+                        id: section.id,
+                        type: "section",
+                        title: section.title
+                      });
+                    }}
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              )}
+
               <span>{section.title}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* MEMBERS */}
-      <div className="members-counter">
-        <div className="members-circle">
-          <div className="members-icon">
-            <span>10</span>
-            <p>Members</p>
+      {/* ================= CONFIRM DELETE BOX ================= */}
+      {confirmData && (
+        <div className="confirm-overlay">
+          <div className="confirm-box">
+
+            <h3 className="confirm-title">
+              Delete
+              <span className="highlight"> {confirmData.title} </span>?
+            </h3>
+
+            <p className="confirm-sub">
+              This action cannot be undone.
+            </p>
+
+            <div className="confirm-buttons">
+
+              <button
+                className="cancel-btn"
+                onClick={() => setConfirmData(null)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="confirm-delete-btn"
+                onClick={handleDelete}
+              >
+                Delete
+              </button>
+
+            </div>
+
           </div>
         </div>
-      </div>
+      )}
 
-      {/* MODAL */}
+      {/* ================= MODAL ================= */}
       {showModal && (
         <AddItemModal
           type={modalType}
-          defaultTitle={
+          editingItem={editingItem}
+          nextNumber={
             modalType === "lecture"
-              ? `Lec ${getNextLectureNumber()}`
-              : `Sec ${getNextSectionNumber()}`
+              ? getNextNumber(lectures)
+              : getNextNumber(sections)
           }
-          existingItems={
-            modalType === "lecture" ? lectures : sections
-          }
-          onClose={() => setShowModal(false)}
-          onAdd={handleAdd}
+          onClose={() => {
+            setShowModal(false);
+            setEditingItem(null);
+          }}
+          onAdd={handleAddOrEdit}
         />
       )}
 

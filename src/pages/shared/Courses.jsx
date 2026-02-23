@@ -21,11 +21,24 @@ const Courses = ({ role }) => {
   const [showModal, setShowModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
 
+  // 🔥 Confirm Delete State (باسم مختلف)
+  const [deletePopupData, setDeletePopupData] = useState(null);
+
   const isInstructor = role === "instructor";
 
-  const handleDelete = (id) => {
-    setCourses(courses.filter(course => course.id !== id));
+  /* ================= DELETE ================= */
+
+  const confirmCourseDelete = () => {
+    if (!deletePopupData) return;
+
+    setCourses(prev =>
+      prev.filter(course => course.id !== deletePopupData.id)
+    );
+
+    setDeletePopupData(null);
   };
+
+  /* ================= SAVE ================= */
 
   const handleSaveCourse = (courseData) => {
     if (editingCourse) {
@@ -41,7 +54,8 @@ const Courses = ({ role }) => {
     }
   };
 
-  /* 🔥 Navigate To Course Details */
+  /* ================= NAVIGATE ================= */
+
   const handleOpenCourse = (id) => {
     navigate(`/${role}/courses/${id}`);
   };
@@ -63,8 +77,8 @@ const Courses = ({ role }) => {
               setShowModal(true);
             }}
           >
-            <span className="plus">+</span>
-            <span className="btn-text">Add Course</span>
+            <span className="btn-plus">+</span>
+            <span className="btn-txt">Add Course</span>
           </button>
         )}
       </div>
@@ -94,7 +108,12 @@ const Courses = ({ role }) => {
 
                 <button
                   className="icon-btn delete"
-                  onClick={() => handleDelete(course.id)}
+                  onClick={() =>
+                    setDeletePopupData({
+                      id: course.id,
+                      title: course.title
+                    })
+                  }
                 >
                   <FaTrash />
                 </button>
@@ -107,6 +126,7 @@ const Courses = ({ role }) => {
         ))}
       </div>
 
+      {/* ================= ADD COURSE MODAL ================= */}
       {isInstructor && showModal && (
         <AddCourse
           onClose={() => {
@@ -116,6 +136,44 @@ const Courses = ({ role }) => {
           onSave={handleSaveCourse}
           editingCourse={editingCourse}
         />
+      )}
+
+      {/* ================= DELETE POPUP ================= */}
+      {deletePopupData && (
+        <div className="course-delete-overlay">
+          <div className="course-delete-box">
+
+            <h3 className="course-delete-title">
+              Delete
+              <span className="course-delete-highlight">
+                {" "}{deletePopupData.title}
+              </span>?
+            </h3>
+
+            <p className="course-delete-sub">
+              This action cannot be undone.
+            </p>
+
+            <div className="course-delete-actions">
+
+              <button
+                className="course-cancel-btn"
+                onClick={() => setDeletePopupData(null)}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="course-delete-btn"
+                onClick={confirmCourseDelete}
+              >
+                Delete
+              </button>
+
+            </div>
+
+          </div>
+        </div>
       )}
 
     </div>

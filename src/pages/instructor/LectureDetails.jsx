@@ -1,7 +1,7 @@
-import "../../styles/LectureDetails.css";
+import SharedMembers from "../shared/LectureDetails";
 
 const LectureDetails = () => {
-  return <div className="LectureDetails">Instructor Lecture Details</div>;
+  return <SharedMembers role="instructor" />;
 };
 
 export default LectureDetails;

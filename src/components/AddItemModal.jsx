@@ -1,36 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../styles/AddItemModal.css";
 
 const AddItemModal = ({
   type,
-  defaultTitle,
-  existingItems,
+  editingItem,
+  nextNumber,
   onClose,
   onAdd
 }) => {
 
-  const [title, setTitle] = useState(defaultTitle || "");
+  const isLecture = type === "lecture";
+
+  const [title, setTitle] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (editingItem) {
+      setTitle(editingItem.title);
+    } else {
+      setTitle(
+        isLecture
+          ? `Lec ${nextNumber}`
+          : `Sec ${nextNumber}`
+      );
+    }
+  }, [editingItem, nextNumber, isLecture]);
 
   const handleSubmit = () => {
 
     if (!title.trim()) {
-      setError("Title cannot be empty");
+      setError("This field cannot be empty");
       return;
     }
 
-    const alreadyExists = existingItems.some(
-      item => item.title.toLowerCase() === title.trim().toLowerCase()
-    );
-
-    if (alreadyExists) {
-      setError("This title already exists");
-      return;
-    }
-
-    setError("");
     onAdd(title.trim());
-    onClose();
   };
 
   return (
@@ -39,7 +42,10 @@ const AddItemModal = ({
 
         <div className="modal-header">
           <h2>
-            Add New {type === "lecture" ? "Lecture" : "Section"}
+            {editingItem
+              ? `Edit ${isLecture ? "Lecture" : "Section"}`
+              : `Add New ${isLecture ? "Lecture" : "Section"}`
+            }
           </h2>
 
           <span className="close-btn" onClick={onClose}>
@@ -50,13 +56,13 @@ const AddItemModal = ({
         <div className="modal-body">
 
           {error && (
-            <div className="modal-error">
+            <div className="error-message">
               {error}
             </div>
           )}
 
           <label>
-            {type === "lecture" ? "Lecture Title" : "Section Title"}
+            {isLecture ? "Lecture Title" : "Section Title"}
           </label>
 
           <input
@@ -64,7 +70,7 @@ const AddItemModal = ({
             value={title}
             onChange={(e) => {
               setTitle(e.target.value);
-              if (error) setError("");
+              setError("");
             }}
           />
 
@@ -76,7 +82,12 @@ const AddItemModal = ({
           </button>
 
           <button className="add-btn-modal" onClick={handleSubmit}>
-            Add {type === "lecture" ? "Lecture" : "Section"}
+            {editingItem
+              ? "Save Changes"
+              : isLecture
+                ? "Add Lecture"
+                : "Add Section"
+            }
           </button>
         </div>
 
