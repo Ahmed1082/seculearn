@@ -150,7 +150,7 @@ const Login = () => {
 
       // Redirect based on normalized role
       if (roleSlugFromResponse === "instructor") {
-        navigate("/instructor/dashboard");
+        navigate("/instructor");
       } else if (roleSlugFromResponse === "student") {
         navigate("/student/Courses");
       } else if (roleSlugFromResponse === "ta") {
