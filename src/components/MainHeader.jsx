@@ -1,9 +1,40 @@
 import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
 import "../styles/MainHeader.css";
 import logo from "../images/logo.png";
 import secuText from "../images/SecuLearn.png";
 
 const MainHeader = ({ role }) => {
+  const [userName, setUserName] = useState("");
+  const [userInitial, setUserInitial] = useState("");
+
+  useEffect(() => {
+    // Fetch user data from localStorage
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        // Try multiple possible name properties from the API
+        const name = user.name || user.full_name || user.username || 
+                     (user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : "") ||
+                     user.first_name || "User";
+        setUserName(name);
+        setUserInitial(name.charAt(0).toUpperCase());
+      } catch (error) {
+        console.error("Error parsing user data:", error);
+        // Fallback to role if name unavailable
+        const fallbackName = role === "student" ? "Student" : role === "ta" ? "TA" : "Instructor";
+        setUserName(fallbackName);
+        setUserInitial(fallbackName.charAt(0));
+      }
+    } else {
+      // Fallback to role if no user data
+      const fallbackName = role === "student" ? "Student" : role === "ta" ? "TA" : "Instructor";
+      setUserName(fallbackName);
+      setUserInitial(fallbackName.charAt(0));
+    }
+  }, [role]);
+
   return (
     <header className="main-header">
       <div className="header-container">
@@ -46,21 +77,8 @@ const MainHeader = ({ role }) => {
 
         {/* Profile */}
         <div className="profile">
-          <span className="user-name">
-            {role === "student"
-              ? "Student"
-              : role === "ta"
-              ? "TA"
-              : "Instructor"}
-          </span>
-          <div className="avatar">
-            {(role === "student"
-              ? "Student"
-              : role === "ta"
-              ? "TA"
-              : "Instructor"
-            ).charAt(0)}
-          </div>
+          <span className="user-name">{userName}</span>
+          <div className="avatar">{userInitial}</div>
         </div>
 
       </div>
