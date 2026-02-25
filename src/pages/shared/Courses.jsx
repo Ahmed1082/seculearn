@@ -1,60 +1,116 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import "../../styles/Courses.css";
 import AddCourse from "../instructor/AddCourse";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
-import course1 from "../../images/course1.png";
-import course2 from "../../images/course2.png";
-import course3 from "../../images/course3.png";
-
 const Courses = ({ role }) => {
-
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
-  const [courses, setCourses] = useState([
-    { id: 1, title: "Introduction to Cybersecurity", image: course1 },
-    { id: 2, title: "Introduction to Cryptography", image: course2 },
-    { id: 3, title: "Ethical Hacking", image: course3 },
-  ]);
-
+  const [courses, setCourses] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [editingCourse, setEditingCourse] = useState(null);
-
-  // 🔥 Confirm Delete State (باسم مختلف)
   const [deletePopupData, setDeletePopupData] = useState(null);
 
   const isInstructor = role === "instructor";
 
-  /* ================= DELETE ================= */
+  /* ================= GET COURSES ================= */
+  useEffect(() => {
+    const fetchCourses = async () => {
+      try {
+        const res = await axios.get("/api/get-courses", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-  const confirmCourseDelete = () => {
-    if (!deletePopupData) return;
+        setCourses(res.data.courses || []);
+      } catch (err) {
+        console.error("Error fetching courses:", err);
+      }
+    };
 
-    setCourses(prev =>
-      prev.filter(course => course.id !== deletePopupData.id)
-    );
+    if (token) fetchCourses();
+  }, [token]);
 
-    setDeletePopupData(null);
-  };
+  /* ================= ADD / EDIT COURSE ================= */
+  const handleSaveCourse = async (courseData) => {
+    try {
+      const formData = new FormData();
+      formData.append("title", courseData.title);
 
-  /* ================= SAVE ================= */
+      if (courseData.image) {
+        formData.append("cover_image", courseData.image);
+      }
 
-  const handleSaveCourse = (courseData) => {
-    if (editingCourse) {
-      setCourses(
-        courses.map(c =>
-          c.id === editingCourse.id
-            ? { ...courseData, id: editingCourse.id }
-            : c
-        )
-      );
-    } else {
-      setCourses([...courses, { ...courseData, id: Date.now() }]);
+      let res;
+
+      if (editingCourse) {
+        // EDIT
+        res = await axios.post(
+          `/api/edit-course/${editingCourse.id}`,
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        setCourses((prev) =>
+          prev.map((c) =>
+            c.id === editingCourse.id ? res.data.course : c
+          )
+        );
+
+      } else {
+        // ADD
+        res = await axios.post(
+          "/api/add-courses",
+          formData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        setCourses((prev) => [...prev, res.data.course]);
+      }
+
+      setShowModal(false);
+      setEditingCourse(null);
+
+    } catch (err) {
+      console.error("Save error:", err.response?.data || err);
     }
   };
 
-  /* ================= NAVIGATE ================= */
+  /* ================= DELETE COURSE ================= */
+  const confirmCourseDelete = async () => {
+    if (!deletePopupData) return;
+
+    try {
+      await axios.delete(
+        `/api/delete-course/${deletePopupData.id}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      setCourses((prev) =>
+        prev.filter((course) => course.id !== deletePopupData.id)
+      );
+
+      setDeletePopupData(null);
+    } catch (err) {
+      console.error("Delete error:", err);
+    }
+  };
 
   const handleOpenCourse = (id) => {
     navigate(`/${role}/courses/${id}`);
@@ -62,7 +118,6 @@ const Courses = ({ role }) => {
 
   return (
     <div className="courses-content">
-
       <div className="courses-header">
         <h2 className="courses-title">
           <span className="title-text">Courses</span>
@@ -90,7 +145,6 @@ const Courses = ({ role }) => {
             key={course.id}
             onClick={() => handleOpenCourse(course.id)}
           >
-
             {isInstructor && (
               <div
                 className="card-actions"
@@ -111,7 +165,7 @@ const Courses = ({ role }) => {
                   onClick={() =>
                     setDeletePopupData({
                       id: course.id,
-                      title: course.title
+                      title: course.title,
                     })
                   }
                 >
@@ -120,13 +174,16 @@ const Courses = ({ role }) => {
               </div>
             )}
 
-            <img src={course.image} alt={course.title} />
+            <img
+              src={course.image_url} 
+              alt={course.title}
+            />
+
             <h3>{course.title}</h3>
           </div>
         ))}
       </div>
 
-      {/* ================= ADD COURSE MODAL ================= */}
       {isInstructor && showModal && (
         <AddCourse
           onClose={() => {
@@ -138,7 +195,6 @@ const Courses = ({ role }) => {
         />
       )}
 
-      {/* ================= DELETE POPUP ================= */}
       {deletePopupData && (
         <div className="course-delete-overlay">
           <div className="course-delete-box">
@@ -146,8 +202,9 @@ const Courses = ({ role }) => {
             <h3 className="course-delete-title">
               Delete
               <span className="course-delete-highlight">
-                {" "}{deletePopupData.title}
-              </span>?
+                {" "}{deletePopupData.title}{" "}
+              </span>
+              ?
             </h3>
 
             <p className="course-delete-sub">
@@ -175,7 +232,6 @@ const Courses = ({ role }) => {
           </div>
         </div>
       )}
-
     </div>
   );
 };

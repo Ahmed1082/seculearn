@@ -6,7 +6,8 @@ const AddItemModal = ({
   editingItem,
   nextNumber,
   onClose,
-  onAdd
+  onAdd,
+  serverError
 }) => {
 
   const isLecture = type === "lecture";
@@ -55,9 +56,9 @@ const AddItemModal = ({
 
         <div className="modal-body">
 
-          {error && (
+          {(error || serverError) && (
             <div className="error-message">
-              {error}
+              {error || serverError}
             </div>
           )}
 

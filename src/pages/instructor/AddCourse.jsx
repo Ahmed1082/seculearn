@@ -2,59 +2,58 @@ import { useState, useEffect } from "react";
 import "../../styles/AddCourse.css";
 
 const AddCourse = ({ onClose, onSave, editingCourse }) => {
-
   const [courseName, setCourseName] = useState("");
+  const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (editingCourse) {
       setCourseName(editingCourse.title);
-      setPreview(editingCourse.image);
+      setPreview(editingCourse.image_url);
     }
   }, [editingCourse]);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setImageFile(file);
       setPreview(URL.createObjectURL(file));
       setError("");
     }
   };
 
   const handleSubmit = () => {
-    if (!courseName || !preview) {
-      setError("Please fill all fields");
+    if (!courseName.trim()) {
+      setError("Title is required");
       return;
     }
 
-    setError("");
+    if (!editingCourse && !imageFile) {
+      setError("Image is required");
+      return;
+    }
 
     onSave({
       title: courseName,
-      image: preview,
+      image: imageFile,
     });
-
-    onClose();
   };
 
   return (
     <div className="modal-overlay">
       <div className="modal-box">
-
         <div className="modal-header">
           <h2>{editingCourse ? "Edit Course" : "Add New Course"}</h2>
           <span className="close-btn" onClick={onClose}>×</span>
         </div>
 
         <div className="modal-body">
-
           {error && <div className="error-message">{error}</div>}
 
           <label>Course Name *</label>
           <input
             type="text"
-            placeholder="e.g. Introduction to Cybersecurity"
             value={courseName}
             onChange={(e) => {
               setCourseName(e.target.value);
@@ -62,15 +61,15 @@ const AddCourse = ({ onClose, onSave, editingCourse }) => {
             }}
           />
 
-          <label>Cover Image *</label>
+          <label>Cover Image {editingCourse ? "" : "*"}</label>
 
           <label className="upload-box">
             Click to Upload Image
             <input
               type="file"
               accept="image/*"
-              onChange={handleImageChange}
               hidden
+              onChange={handleImageChange}
             />
           </label>
 
@@ -79,7 +78,6 @@ const AddCourse = ({ onClose, onSave, editingCourse }) => {
               <img src={preview} alt="Preview" />
             </div>
           )}
-
         </div>
 
         <div className="modal-footer">
@@ -90,7 +88,6 @@ const AddCourse = ({ onClose, onSave, editingCourse }) => {
             {editingCourse ? "Update Course" : "Create Course"}
           </button>
         </div>
-
       </div>
     </div>
   );
