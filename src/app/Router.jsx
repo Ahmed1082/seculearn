@@ -9,7 +9,7 @@ import Welcome from "../pages/public/Welcome";
 import Login from "../pages/public/Login";
 
 /* ================= Instructor ================= */
-import InstructorDashboard from "../pages/instructor/Dashboard";
+import InstructorOverview from "../pages/instructor/Overview";
 import InstructorCourses from "../pages/instructor/Courses";
 import InstructorCourseDetails from "../pages/instructor/CourseDetails";
 import InstructorLectureDetails from "../pages/instructor/LectureDetails";
@@ -17,7 +17,7 @@ import InstructorSectionDetails from "../pages/instructor/SectionDetails";
 import InstructorMembers from "../pages/instructor/Members";
 
 /* ================= TA ================= */
-import TADashboard from "../pages/ta/Dashboard";
+import TAOverview from "../pages/ta/Overview";
 import TACourses from "../pages/ta/Courses";
 import TACourseDetails from "../pages/ta/CourseDetails";
 import TALectureDetails from "../pages/ta/LectureDetails";
@@ -25,7 +25,6 @@ import TASectionDetails from "../pages/ta/SectionDetails";
 import TAMembers from "../pages/ta/Members";
 
 /* ================= Student ================= */
-import StudentDashboard from "../pages/student/Dashboard";
 import StudentCourses from "../pages/student/Courses";
 import StudentCourseDetails from "../pages/student/CourseDetails";
 import StudentLectureDetails from "../pages/student/LectureDetails";
@@ -49,7 +48,7 @@ const Router = () => (
 
     {/* ================= Instructor ================= */}
     <Route element={<InstructorLayout />}>
-      <Route path="/instructor" element={<InstructorDashboard />} />
+      <Route path="/instructor" element={<InstructorOverview />} />
       <Route path="/instructor/courses" element={<InstructorCourses />} />
       {/* 🔥 Dynamic Course ID */}
       <Route path="/instructor/courses/:courseId" element={<InstructorCourseDetails />} />
@@ -60,7 +59,7 @@ const Router = () => (
 
     {/* ================= TA ================= */}
     <Route element={<TALayout />}>
-      <Route path="/ta" element={<TADashboard />} />
+      <Route path="/ta" element={<TAOverview />} />
       <Route path="/ta/courses" element={<TACourses />} />
       {/* 🔥 Dynamic Course ID */}
       <Route path="/ta/courses/:courseId" element={<TACourseDetails />} />
@@ -71,7 +70,7 @@ const Router = () => (
 
     {/* ================= Student ================= */}
     <Route element={<StudentLayout />}>
-      <Route path="/student" element={<StudentDashboard />} />
+      <Route path="/student" element={<StudentCourses />} />
       <Route path="/student/courses" element={<StudentCourses />} />
       {/* 🔥 Dynamic Course ID */}
       <Route path="/student/courses/:courseId" element={<StudentCourseDetails />} />

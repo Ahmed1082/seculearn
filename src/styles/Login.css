@@ -159,7 +159,7 @@ html, body {
 .forgot {
   color: #54F4FC;
   font-size: 16px;
-  margin-top: -10px;
+  margin-top: 8px;
   margin-bottom: 40px;
   cursor: pointer;
 }
@@ -355,3 +355,5 @@ html, body {
     transform: translateY(0);
   }
 }
+
+
