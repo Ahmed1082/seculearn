@@ -1,20 +1,20 @@
 import { Routes, Route } from "react-router-dom";
 
 import PublicLayout from "../layouts/PublicLayout";
-import InstructorLayout from "../layouts/InstructorLayout";
+import LecturerLayout from "../layouts/lecturerLayout";
 import TALayout from "../layouts/TALayout";
 import StudentLayout from "../layouts/StudentLayout";
 
 import Welcome from "../pages/public/Welcome";
 import Login from "../pages/public/Login";
 
-/* ================= Instructor ================= */
-import InstructorOverview from "../pages/instructor/Overview";
-import InstructorCourses from "../pages/instructor/Courses";
-import InstructorCourseDetails from "../pages/instructor/CourseDetails";
-import InstructorLectureDetails from "../pages/instructor/LectureDetails";
-import InstructorSectionDetails from "../pages/instructor/SectionDetails";
-import InstructorMembers from "../pages/instructor/Members";
+/* ================= Lecturer ================= */
+import LecturerOverview from "../pages/lecturer/Overview";
+import LecturerCourses from "../pages/lecturer/Courses";
+import LecturerCourseDetails from "../pages/lecturer/CourseDetails";
+import LecturerLectureDetails from "../pages/lecturer/LectureDetails";
+import LecturerSectionDetails from "../pages/lecturer/SectionDetails";
+import LecturerMembers from "../pages/lecturer/Members";
 
 /* ================= TA ================= */
 import TAOverview from "../pages/ta/Overview";
@@ -46,15 +46,15 @@ const Router = () => (
       <Route path="/login" element={<Login />} />
     </Route>
 
-    {/* ================= Instructor ================= */}
-    <Route element={<InstructorLayout />}>
-      <Route path="/instructor" element={<InstructorOverview />} />
-      <Route path="/instructor/courses" element={<InstructorCourses />} />
+    {/* ================= Lecturer ================= */}
+    <Route element={<LecturerLayout />}>
+      <Route path="/lecturer" element={<LecturerOverview />} />
+      <Route path="/lecturer/courses" element={<LecturerCourses />} />
       {/* 🔥 Dynamic Course ID */}
-      <Route path="/instructor/courses/:courseId" element={<InstructorCourseDetails />} />
-      <Route path="/instructor/lectureDetails" element={<InstructorLectureDetails />} />
-      <Route path="/instructor/sectionDetails" element={<InstructorSectionDetails />} />
-      <Route path="/instructor/members" element={<InstructorMembers />} />
+      <Route path="/lecturer/courses/:courseId" element={<LecturerCourseDetails />} />
+      <Route path="/lecturer/lectureDetails" element={<LecturerLectureDetails />} />
+      <Route path="/lecturer/sectionDetails" element={<LecturerSectionDetails />} />
+      <Route path="/lecturer/members" element={<LecturerMembers />} />
     </Route>
 
     {/* ================= TA ================= */}

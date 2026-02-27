@@ -1,13 +1,8 @@
 /* ===== PAGE WRAPPER ===== */
 .sectionassignments {
-  background: #000;
-  min-height: calc(100vh - 130px); /* adjust if header+footer height differs */
-  color: #e6faff;
+  min-height: calc(100vh - 130px); 
   font-family: "Segoe UI", sans-serif;
-
-  /* Responsive side spacing */
   padding: 40px clamp(25px, 5vw, 80px);
-
   display: flex;
   flex-direction: column;
 }
@@ -15,15 +10,19 @@
 /* ===== CENTERED CONTAINER ===== */
 .assignment-container {
   width: 100%;
-  max-width: 1400px;   /* Prevents content from stretching too wide */
-  margin: 0 auto;     /* Centers content */
+  max-width: 1400px;   
+  margin: 0 auto;     
   display: flex;
   flex-direction: column;
 }
 
 /* ===== TITLE ===== */
 .course-title {
-  color: #00eaff;
+  font-weight: 800;
+  background: linear-gradient(180deg, #186EB4, #54F4FC);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   font-size: 26px;
   margin-bottom: 20px;
 }

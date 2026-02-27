@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "../../styles/Courses.css";
-import AddCourse from "../instructor/AddCourse";
+import AddCourse from "../lecturer/AddCourse";
 import { FaEdit, FaTrash } from "react-icons/fa";
 
 const Courses = ({ role }) => {
@@ -14,7 +14,7 @@ const Courses = ({ role }) => {
   const [editingCourse, setEditingCourse] = useState(null);
   const [deletePopupData, setDeletePopupData] = useState(null);
 
-  const isInstructor = role === "instructor";
+  const isLecturer = role === "lecturer";
 
   /* ================= GET COURSES ================= */
   useEffect(() => {
@@ -124,7 +124,7 @@ const Courses = ({ role }) => {
           <span className="course-count">{courses.length}</span>
         </h2>
 
-        {isInstructor && (
+        {isLecturer && (
           <button
             className="add-course-btn"
             onClick={() => {
@@ -145,7 +145,7 @@ const Courses = ({ role }) => {
             key={course.id}
             onClick={() => handleOpenCourse(course.id)}
           >
-            {isInstructor && (
+            {isLecturer && (
               <div
                 className="card-actions"
                 onClick={(e) => e.stopPropagation()}
@@ -184,7 +184,7 @@ const Courses = ({ role }) => {
         ))}
       </div>
 
-      {isInstructor && showModal && (
+      {isLecturer && showModal && (
         <AddCourse
           onClose={() => {
             setShowModal(false);

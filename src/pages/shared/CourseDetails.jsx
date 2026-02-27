@@ -9,7 +9,7 @@ const CourseDetails = ({ role }) => {
   const { courseId } = useParams();
   const token = localStorage.getItem("token");
 
-  const isInstructor = role === "instructor";
+  const isLecturer = role === "lecturer";
   const isTA = role === "ta";
   const isStudent = role === "student";
 
@@ -76,8 +76,8 @@ const CourseDetails = ({ role }) => {
     try {
       let res;
 
-      // ===== LECTURE (Instructor only) =====
-      if (modalType === "lecture" && isInstructor) {
+      // ===== LECTURE (Lecturer only) =====
+      if (modalType === "lecture" && isLecturer) {
         if (editingItem) {
           res = await axios.post(
             `/api/edit-lecture/${editingItem.id}`,
@@ -148,8 +148,8 @@ const CourseDetails = ({ role }) => {
     if (!confirmData) return;
 
     try {
-      // Lecture delete (Instructor only)
-      if (confirmData.type === "lecture" && isInstructor) {
+      // Lecture delete (Lecturer only)
+      if (confirmData.type === "lecture" && isLecturer) {
         await axios.delete(
           `/api/delete-lecture/${confirmData.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -184,7 +184,7 @@ const CourseDetails = ({ role }) => {
       <div className="course-header">
         <h1>{course?.title || "Course"}</h1>
 
-        {isInstructor && (
+        {isLecturer && (
           <button
             className="add-btn"
             onClick={() => {
@@ -225,7 +225,7 @@ const CourseDetails = ({ role }) => {
           {lectures.map((lecture) => (
             <div className="circle-card" key={lecture.id}>
 
-              {isInstructor && (
+              {isLecturer && (
                 <div className="circle-actions">
                   <button
                     className="icon-btn"
@@ -339,7 +339,7 @@ const CourseDetails = ({ role }) => {
 
       {/* ================= MODAL ================= */}
       {showModal &&
-        ((modalType === "lecture" && isInstructor) ||
+        ((modalType === "lecture" && isLecturer) ||
           (modalType === "section" && isTA)) && (
           <AddItemModal
             type={modalType}

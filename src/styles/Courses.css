@@ -116,7 +116,6 @@
   -webkit-text-fill-color: transparent;
 }
 
-/* 🔥 الأزرار فوق الصورة */
 .card-actions {
   position: absolute;
   top: 8px;
@@ -248,7 +247,6 @@
   gap: 20px;
 }
 
-/* الشكل العادي */
 
 .course-cancel-btn,
 .course-delete-btn {
