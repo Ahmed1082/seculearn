@@ -1,28 +1,19 @@
-/* =====================================================
-   MAIN WRAPPER
-   Full-page dark background + global layout spacing
-===================================================== */
 .sectionassignments {
   background: #000;
   min-height: 100vh;
-  padding: 60px 100px;
   color: #e6faff;
   font-family: "Segoe UI", sans-serif;
+  padding: 60px 100px;
 }
 
-/* =====================================================
-   PAGE TITLE
-   Course name at top
-===================================================== */
+/* ===== TITLE ===== */
 .course-title {
   color: #00eaff;
   font-size: 30px;
   margin-bottom: 25px;
 }
 
-/* =====================================================
-   BREADCRUMB / PATH NAVIGATION
-===================================================== */
+/* ===== PATH ===== */
 .assignment-path {
   display: flex;
   align-items: center;
@@ -30,7 +21,6 @@
   margin-bottom: 50px;
 }
 
-/* Breadcrumb buttons */
 .assignment-path button {
   background: transparent;
   border: 1.5px solid #00eaff;
@@ -41,25 +31,18 @@
   cursor: pointer;
 }
 
-/* Breadcrumb separator (›) */
 .assignment-path span {
   color: #00eaff;
 }
 
-/* =====================================================
-   GRID LAYOUT
-   Left: Assignment Details
-   Right: Submission + Comments
-===================================================== */
+/* ===== GRID ===== */
 .assignment-grid {
   display: grid;
   grid-template-columns: 1.3fr 1fr;
   gap: 50px;
 }
 
-/* =====================================================
-   CARD COMPONENT (Reusable UI block)
-===================================================== */
+/* ===== CARD ===== */
 .assignment-card {
   border: 2px solid #00eaff;
   border-radius: 22px;
@@ -68,12 +51,10 @@
   box-shadow: 0 0 20px rgba(0, 234, 255, 0.25);
 }
 
-/* Larger version for main assignment info */
 .assignment-card.large {
   min-height: 420px;
 }
 
-/* Card header (Title + status/date aligned) */
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -81,27 +62,23 @@
   margin-bottom: 18px;
 }
 
-/* Card titles */
 .assignment-card h2 {
   color: #00eaff;
   font-size: 20px;
 }
 
-/* Status + due date labels */
 .due-date,
 .status {
   color: #8dfbff;
   font-size: 14px;
 }
 
-/* Paragraph text inside cards */
 .assignment-card p {
   margin: 6px 0;
   font-size: 14px;
   color: #c8faff;
 }
 
-/* Divider line inside card */
 .divider {
   height: 1px;
   background: #00eaff;
@@ -109,7 +86,6 @@
   opacity: 0.6;
 }
 
-/* Download link */
 .file-link {
   color: #00eaff;
   text-decoration: none;
@@ -120,51 +96,34 @@
   text-decoration: underline;
 }
 
-/* =====================================================
-   RIGHT COLUMN LAYOUT
-   Stacks submission + comment cards vertically
-===================================================== */
+/* ===== RIGHT COLUMN ===== */
 .right-column {
   display: flex;
   flex-direction: column;
   gap: 40px;
 }
 
-/* =====================================================
-   BUTTON STYLES
-===================================================== */
+/* ===== BUTTONS (FIXED SIZE) ===== */
 .primary-btn {
   background: linear-gradient(90deg, #007cf0, #00dfd8);
   border: none;
   height: 45px;
   border-radius: 30px;
   font-weight: 600;
-  margin-top: 15px;
   cursor: pointer;
+  margin-top: 15px;
   transition: 0.3s;
 }
 
-/* Full width version */
 .primary-btn.full {
   width: 100%;
 }
 
-/* Hover animation */
 .primary-btn:hover {
   transform: scale(1.03);
 }
 
-/* =====================================================
-   INPUT STYLES
-===================================================== */
-
-/* File upload input */
-.file-input {
-  margin-top: 15px;
-  color: #e6faff;
-}
-
-/* Comment input field */
+/* ===== INPUT FIX ===== */
 .comment-input {
   width: 100%;
   height: 45px;
@@ -175,21 +134,11 @@
   margin-top: 20px;
   font-size: 14px;
   color: #e6faff;
+  font-family: "Segoe UI", sans-serif;
   outline: none;
 }
 
-/* Placeholder styling */
 .comment-input::placeholder {
   color: #8dfbff;
   opacity: 0.8;
-}
-
-/* =====================================================
-   LOADING STATE
-===================================================== */
-.loading {
-  color: #00eaff;
-  font-size: 20px;
-  text-align: center;
-  margin-top: 100px;
 }

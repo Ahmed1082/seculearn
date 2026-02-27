@@ -1,235 +1,92 @@
-// =============================
-// Imports
-// =============================
 import "../../styles/SubmitSectionAssignment.css";
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { FaPlus } from "react-icons/fa";
 
-// =============================
-// Component: SubmitSectionAssignment
-// Handles:
-// - Fetching assignment details
-// - Submitting assignment file
-// - Posting private comments
-// =============================
 const SubmitSectionAssignment = () => {
-
-  // =============================
-  // Route Parameters
-  // Extract dynamic IDs from URL
-  // =============================
-  const { courseId, sectionId, assignmentId } = useParams();
-
-  // =============================
-  // State Management
-  // =============================
-  const [assignment, setAssignment] = useState(null); // Assignment data
-  const [comment, setComment] = useState("");         // Private comment input
-  const [file, setFile] = useState(null);             // Selected file
-  const [loading, setLoading] = useState(true);       // Loading state
-
-  const token = localStorage.getItem("token"); // Auth token
-
-  // =============================
-  // Fetch Assignment Data
-  // Runs when component mounts
-  // =============================
-  useEffect(() => {
-    const fetchAssignment = async () => {
-      try {
-        const res = await axios.get(
-          `/api/courses/${courseId}/sections/${sectionId}/assignments/${assignmentId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-
-        setAssignment(res.data);
-        setLoading(false);
-      } catch (err) {
-        console.error(err);
-        setLoading(false);
-      }
-    };
-
-    fetchAssignment();
-  }, [courseId, sectionId, assignmentId, token]);
-
-  // =============================
-  // Submit Assignment File
-  // =============================
-  const handleSubmit = async () => {
-    if (!file) return alert("Please choose a file");
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      await axios.post(
-        `/api/assignments/${assignmentId}/submit`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      alert("Assignment submitted successfully!");
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // =============================
-  // Post Private Comment
-  // =============================
-  const handleCommentPost = async () => {
-    if (!comment.trim()) return;
-
-    try {
-      await axios.post(
-        `/api/assignments/${assignmentId}/comments`,
-        { comment },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      setComment("");
-      alert("Comment posted!");
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // =============================
-  // Conditional Rendering
-  // =============================
-  if (loading) return <div className="loading">Loading...</div>;
-  if (!assignment) return <div className="loading">Assignment not found</div>;
-
-  // =============================
-  // UI Layout
-  // =============================
   return (
     <div className="sectionassignments">
+
       <div className="assignment-container">
 
-        {/* =============================
-            Course Title Section
-        ============================== */}
+        {/* COURSE TITLE */}
         <h1 className="course-title">
-          {assignment.courseName}
+          Introduction to Cybersecurity
         </h1>
 
-        {/* =============================
-            Breadcrumb / Path Navigation
-        ============================== */}
+        {/* PATH */}
         <div className="assignment-path">
-          <button>{assignment.sectionName}</button>
+          <button>Section 1</button>
           <span>›</span>
           <button>Assignments</button>
           <span>›</span>
-          <button>{assignment.title}</button>
+          <button>Assignment 1</button>
         </div>
 
+        {/* GRID */}
         <div className="assignment-grid">
 
-          {/* =============================
-              LEFT SIDE
-              Assignment Details
-          ============================== */}
+          {/* LEFT SIDE */}
           <div className="assignment-card large">
+
             <div className="card-header">
-              <h2>{assignment.title}</h2>
-              <span className="due-date">
-                Due {assignment.dueDate}
-              </span>
+              <h2>Assignment_1</h2>
+              <span className="due-date">Due 20 Feb</span>
             </div>
 
-            <p>Assigned: {assignment.points} points</p>
-            <p>
-              Assignment last updated: {assignment.lastUpdated}
-            </p>
+            <p>Assigned: 100 points</p>
+            <p>Assignment last updated: 19 Feb</p>
 
             <div className="divider" />
 
-            {/* Downloadable File */}
-            {assignment.fileUrl && (
-              <a
-                href={assignment.fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="file-link"
-              >
-                Download Assignment
-              </a>
-            )}
+            <a href="#" className="file-link">
+              Assignment_1.pdf
+            </a>
 
-            <p>{assignment.description}</p>
+            <p>Please submit work as pdf</p>
+
+            <div className="divider" />
+
+            <a href="#" className="file-link">
+              Class Comments...
+            </a>
+
           </div>
 
-          {/* =============================
-              RIGHT SIDE
-              Submission + Comments
-          ============================== */}
+          {/* RIGHT SIDE */}
           <div className="right-column">
 
-            {/* ---------- Your Work Section ---------- */}
+            {/* YOUR WORK */}
             <div className="assignment-card">
               <div className="card-header">
                 <h2>Your Work</h2>
-                <span className="status">
-                  {assignment.status || "Assigned"}
-                </span>
+                <span className="status">Assigned</span>
               </div>
 
-              {/* File Upload Input */}
-              <input
-                type="file"
-                className="file-input"
-                onChange={(e) => setFile(e.target.files[0])}
-              />
+              <button className="primary-btn full">
+                <FaPlus /> Add or Create
+              </button>
 
-              {/* Submit Button */}
-              <button
-                className="primary-btn full"
-                onClick={handleSubmit}
-              >
+              <button className="primary-btn full">
                 Submit
               </button>
             </div>
 
-            {/* ---------- Private Comments Section ---------- */}
+            {/* PRIVATE COMMENTS */}
             <div className="assignment-card">
               <h2>Private Comments</h2>
 
-              {/* Comment Input */}
               <input
                 type="text"
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
                 placeholder="+ Add a private comment..."
                 className="comment-input"
               />
 
-              {/* Post Comment Button */}
-              <button
-                className="primary-btn full"
-                onClick={handleCommentPost}
-              >
+              <button className="primary-btn full">
                 Post
               </button>
             </div>
 
           </div>
+
         </div>
       </div>
     </div>
