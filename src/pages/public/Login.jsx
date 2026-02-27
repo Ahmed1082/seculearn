@@ -154,7 +154,7 @@ const Login = () => {
       } else if (roleSlugFromResponse === "student") {
         navigate("/student/Courses");
       } else if (roleSlugFromResponse === "ta") {
-        navigate("/ta/dashboard");
+        navigate("/ta");
       } else {
         navigate("/student/Courses"); // fallback
       }

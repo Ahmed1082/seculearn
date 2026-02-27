@@ -1,7 +1,12 @@
-import "../../styles/Overview.css";
+import OverviewDashboard from "../shared/OverviewDashboard";
 
 const Overview = () => {
-  return <div className="overview">TA Overview</div>;
+  return (
+    <OverviewDashboard
+      coursesPath="/ta/courses"
+      userFallbackName="TA X"
+    />
+  );
 };
 
 export default Overview;
