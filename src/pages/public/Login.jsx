@@ -80,6 +80,29 @@ const Login = () => {
 
     try {
       const selectedRoleMeta = ROLE_MAP[role] || ROLE_MAP.Student;
+      const normalizeRoleSlug = (value) => {
+        if (typeof value === "number") {
+          const found = Object.entries(ROLE_MAP).find(([, v]) => v.code === value);
+          return found ? found[1].slug : null;
+        }
+
+        if (typeof value !== "string") return null;
+
+        const r = value.toLowerCase().trim();
+        const NORMALIZE = {
+          student: "student",
+          learner: "student",
+          instructor: "instructor",
+          lecturer: "instructor",
+          "lecturer (instructor)": "instructor",
+          lectuer: "instructor",
+          ta: "ta",
+          "teaching assistant": "ta",
+          "teaching_assistant": "ta",
+        };
+
+        return NORMALIZE[r] || null;
+      };
 
       const response = await axios.post(
         API_URL,
@@ -95,41 +118,15 @@ const Login = () => {
         }
       );
 
-      // Backend may return role as slug (string) or as numeric code
-      const respRole = response.data.role;
-
-      const roleSlugFromResponse = (() => {
-        if (typeof respRole === "number") {
-          const found = Object.entries(ROLE_MAP).find(([, v]) => v.code === respRole);
-          return found ? found[1].slug : null;
-        }
-        if (typeof respRole === "string") {
-          const r = respRole.toLowerCase().trim();
-          // accept common variants from backend and normalize to our slugs
-          const NORMALIZE = {
-            student: "student",
-            learner: "student",
-            instructor: "instructor",
-            lecturer: "instructor",
-            lectuer: "instructor",
-            ta: "ta",
-            "teaching assistant": "ta",
-            "teaching_assistant": "ta",
-          };
-          return NORMALIZE[r] || r;
-        }
-        return null;
-      })();
-
       const selectedRoleSlug = selectedRoleMeta.slug;
+      const roleSlugFromResponse =
+        normalizeRoleSlug(response.data.role) ||
+        normalizeRoleSlug(response.data.user?.role) ||
+        normalizeRoleSlug(response.data.user?.role_slug) ||
+        normalizeRoleSlug(response.data.user?.role_id);
+      const effectiveRoleSlug = roleSlugFromResponse || selectedRoleSlug;
 
-      if (!roleSlugFromResponse) {
-        setError("Unable to determine role from server response.");
-        setLoading(false);
-        return;
-      }
-
-      if (selectedRoleSlug !== roleSlugFromResponse) {
+      if (roleSlugFromResponse && selectedRoleSlug !== roleSlugFromResponse) {
         setError(
           `Role mismatch! You selected "${role}" but your credentials are for "${roleSlugFromResponse.charAt(0).toUpperCase() + roleSlugFromResponse.slice(1)}". Please select the correct role.`
         );
@@ -141,23 +138,18 @@ const Login = () => {
       if (response.data.access_token) {
         localStorage.setItem("token", response.data.access_token);
       }
-      if (response.data.role) {
-        localStorage.setItem("role", roleSlugFromResponse);
-      }
+      localStorage.setItem("role", effectiveRoleSlug);
       if (response.data.user) {
         localStorage.setItem("user", JSON.stringify(response.data.user));
       }
 
-      // Redirect based on normalized role
-      if (roleSlugFromResponse === "instructor") {
-        navigate("/instructor");
-      } else if (roleSlugFromResponse === "student") {
-        navigate("/student/Courses");
-      } else if (roleSlugFromResponse === "ta") {
-        navigate("/ta");
-      } else {
-        navigate("/student/Courses"); // fallback
-      }
+      // Redirect to each role's home page (overview for instructor/TA)
+      const ROLE_HOME = {
+        instructor: "/instructor",
+        ta: "/ta",
+        student: "/student/courses",
+      };
+      navigate(ROLE_HOME[effectiveRoleSlug] || "/student/courses");
     } catch (err) {
       // Detailed error logging
       console.error("Full error object:", err);
