@@ -1,8 +1,6 @@
 /* ===== PAGE WRAPPER ===== */
-.sectionassignments {
-  min-height: calc(100vh - 130px); 
+.lectureassignments {
   font-family: "Segoe UI", sans-serif;
-  padding: 40px clamp(25px, 5vw, 80px);
   display: flex;
   flex-direction: column;
 }
@@ -10,20 +8,20 @@
 /* ===== CENTERED CONTAINER ===== */
 .assignment-container {
   width: 100%;
-  max-width: 1400px;   
-  margin: 0 auto;     
+  max-width: 1400px;   /* Prevents content from stretching too wide */
+  margin: 0 auto;     /* Centers content */
   display: flex;
   flex-direction: column;
 }
 
 /* ===== TITLE ===== */
 .course-title {
+  font-size: 28px;
   font-weight: 800;
   background: linear-gradient(180deg, #186EB4, #54F4FC);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  font-size: 26px;
   margin-bottom: 20px;
 }
 
@@ -37,7 +35,7 @@
 
 .assignment-path button {
   background: transparent;
-  border: 1.5px solid #00eaff;
+  border: 2px solid #54F4FC;
   color: #00eaff;
   padding: 6px 18px;
   border-radius: 12px;
@@ -60,12 +58,9 @@
 
 /* ===== CARD ===== */
 .assignment-card {
-  border: 2px solid #00eaff;
+  border: 2px solid #54F4FC;
   border-radius: 22px;
   padding: 25px;
-  background: #050505;
-  box-shadow: 0 0 20px rgba(0, 234, 255, 0.25);
-
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -84,14 +79,22 @@
 }
 
 .assignment-card h2 {
-  color: #00eaff;
-  font-size: 18px;
+  font-weight: 800;
+  background: linear-gradient(180deg, #186EB4, #54F4FC);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 20px;
 }
 
 .due-date,
 .status {
-  color: #8dfbff;
-  font-size: 13px;
+  font-weight: 800;
+  background: linear-gradient(90deg, #186EB4, #54F4FC);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;  
+  font-size: 15px;
 }
 
 .assignment-card p {
@@ -126,7 +129,7 @@
 
 /* ===== BUTTONS ===== */
 .primary-btn {
-  background: linear-gradient(90deg, #007cf0, #00dfd8);
+  background: linear-gradient(90deg, #186EB4, #54F4FC);
   border: none;
   height: 42px;
   border-radius: 30px;
@@ -139,10 +142,15 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .primary-btn.full {
-  width: 100%;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .primary-btn:hover {
@@ -151,7 +159,9 @@
 
 /* ===== INPUT ===== */
 .comment-input {
-  width: 100%;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
   height: 42px;
   border-radius: 25px;
   border: 1.5px solid #00eaff;
@@ -162,18 +172,20 @@
   color: #e6faff;
   font-family: "Segoe UI", sans-serif;
   outline: none;
-  box-sizing: border-box;
 }
 
 .uploaded-file {
   margin-top: 10px;
-  background: rgba(0, 234, 255, 0.08);
+  background: linear-gradient(180deg, #186EB4, #54F4FC);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   padding: 8px 12px;
   border-radius: 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 .remove-btn {
@@ -192,6 +204,7 @@
   color: black;
 }
 
+
 .comment-input::placeholder {
   color: #8dfbff;
   opacity: 0.8;
@@ -202,115 +215,113 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
 }
-
-/* ===== COMMENT ITEM WITH 3-DOT MENU ===== */
 .comment-item {
   background: rgba(0, 234, 255, 0.08);
   padding: 8px 12px;
   border-radius: 12px;
   font-size: 13px;
+  display: flex;          
+  justify-content: space-between;
+  align-items: center;
+  position: relative; 
+}
+
+.comment-item.editing {
+  background: transparent;
+  padding: 0;
+}
+
+.menu-btn {
+  background: transparent;
+  border: none;
+  color: #00eaff;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.menu-btn:hover {
+  transform: scale(1.1);
+}
+.menu-dropdown {
+  position: absolute;
+  top: 35px;
+  right: 0;
+  background: #0a0a0a;
+  border: 1px solid #00eaff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.menu-dropdown button {
+  background: transparent;
+  border: none;
+  color: #00eaff;
+  padding: 8px 15px;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
-  color: #c8faff;
+}
+
+.menu-dropdown button:hover {
+  background: rgba(0, 234, 255, 0.1);
+}
+
+/* ===== EDIT MODE ===== */
+
+.edit-area {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-area .comment-input {
+  flex: 1;
+  margin: 0;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.class-comment-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-icon {
+  font-size: 14px;
+}
+
+.comment-content {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
 }
 
 .comment-text {
-  flex: 1;
-  word-break: break-word;
+  font-weight: normal;
 }
 
-/* ===== 3-DOT BUTTON ===== */
-.comment-menu-wrapper {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.three-dot-btn {
-  background: transparent;
-  border: none;
-  color: #00eaff;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 2px 6px;
-  border-radius: 6px;
-  line-height: 1;
-  transition: background 0.2s;
-}
-
-.three-dot-btn:hover {
-  background: rgba(0, 234, 255, 0.15);
-}
-
-/* ===== DROPDOWN MENU ===== */
-.comment-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  background: #0d1f2d;
-  border: 1.5px solid #00eaff;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 234, 255, 0.25);
-  z-index: 100;
-  min-width: 130px;
-  overflow: hidden;
-}
-
-.comment-dropdown button {
-  display: block;
-  width: 100%;
-  background: transparent;
-  border: none;
-  color: #c8faff;
-  padding: 9px 16px;
+.dropdown-icon {
   font-size: 13px;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
 }
 
-.comment-dropdown button:hover {
-  background: rgba(0, 234, 255, 0.12);
-  color: #00eaff;
-}
-
-.comment-dropdown .delete-option:hover {
-  background: rgba(255, 80, 80, 0.15);
-  color: #ff6b6b;
-}
-
-/* ===== INLINE EDIT ROW ===== */
-.comment-edit-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.comment-edit-row .edit-inline {
-  margin-top: 0;
-  flex: 1;
-}
-
-.save-edit-btn {
-  background: linear-gradient(90deg, #007cf0, #00dfd8);
-  border: none;
-  color: white;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: transform 0.2s;
-}
-
-.save-edit-btn:hover {
-  transform: scale(1.05);
-}
-
-/* ===== GLOBAL FIX ===== */
+/* ===== GLOBAL FIX (Important) ===== */
 body {
   margin: 0;
 }
