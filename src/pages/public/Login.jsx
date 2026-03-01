@@ -13,7 +13,7 @@ const Login = () => {
   const rawStateRole = location.state?.role;
   const ROLE_MAP = {
     Student: { slug: "student", code: 1 },
-    "Lecturer (Instructor)": { slug: "instructor", code: 2 },
+    "Lecturer": { slug: "instructor", code: 2 },
     "Teaching Assistant": { slug: "ta", code: 3 },
   };
 
@@ -35,7 +35,7 @@ const Login = () => {
     if (foundSlug) return foundSlug[0];
 
     // Accept common variants
-    if (s.includes("lectur") || s.includes("instructor")) return "Lecturer (Instructor)";
+    if (s.includes("lectur") || s.includes("instructor")) return "Lecturer";
     if (s.includes("teaching") && s.includes("assistant")) return "Teaching Assistant";
     if (s === "ta") return "Teaching Assistant";
     if (s.includes("student") || s.includes("learner")) return "Student";
@@ -195,7 +195,7 @@ const Login = () => {
               {open && (
                 <div className="options">
                   <div onClick={() => handleSelect("Student")}>Student</div>
-                  <div onClick={() => handleSelect("Lecturer (Instructor)")}>Lecturer (Instructor)</div>
+                  <div onClick={() => handleSelect("Lecturer")}>Lecturer</div>
                   <div onClick={() => handleSelect("Teaching Assistant")}>Teaching Assistant</div>
                 </div>
               )}

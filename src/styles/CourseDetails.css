@@ -195,8 +195,8 @@
 .confirm-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);   /* قللنا التعتيم */
-  backdrop-filter: blur(1px);        /* blur خفيف */
+  background: rgba(0, 0, 0, 0.35);  
+  backdrop-filter: blur(1px);        
   display: flex;
   align-items: center;
   justify-content: center;
@@ -242,8 +242,6 @@
 
 /* ================= BUTTONS ================= */
 
-/* الشكل العادي */
-
 .cancel-btn,
 .confirm-delete-btn {
   width: 110px;
@@ -257,7 +255,6 @@
   font-weight: 600;
 }
 
-/* Hover Cancel → أزرق زي edit */
 
 .cancel-btn:hover {
   background: #00e5ff;
@@ -265,7 +262,6 @@
   border: none;
 }
 
-/* Hover Delete → أحمر */
 
 .confirm-delete-btn:hover {
   background: red;

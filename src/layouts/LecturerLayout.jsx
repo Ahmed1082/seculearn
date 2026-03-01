@@ -2,11 +2,11 @@ import { Outlet } from "react-router-dom";
 import MainHeader from "../components/MainHeader";
 import Footer from "../components/Footer";
 
-const InstructorLayout = () => (
+const LecturerLayout = () => (
   <>
-    <MainHeader role="instructor" />
+    <MainHeader role="lecturer" />
     <Outlet />
     <Footer />
   </>
 );
-export default InstructorLayout;
+export default LecturerLayout;

@@ -10,7 +10,7 @@ import {
   FiTrendingUp,
   FiUsers,
 } from "react-icons/fi";
-import "../../styles/InstructorOverview.css";
+import "../../styles/Overview.css";
 
 const statCards = [
   { label: "TOTAL COURSES", value: "3", icon: <FiBookOpen />, tone: "courses" },
@@ -114,7 +114,7 @@ const OverviewDashboard = ({ coursesPath, userFallbackName }) => {
   }, [userFallbackName]);
 
   return (
-    <div className="instructor-overview-page">
+    <div className="lecturer-overview-page">
       <section className="overview-hero">
         <div>
           <p className="overview-welcome">Welcome back,</p>

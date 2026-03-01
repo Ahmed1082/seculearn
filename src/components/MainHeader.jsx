@@ -23,13 +23,13 @@ const MainHeader = ({ role }) => {
       } catch (error) {
         console.error("Error parsing user data:", error);
         // Fallback to role if name unavailable
-        const fallbackName = role === "student" ? "Student" : role === "ta" ? "TA" : "Instructor";
+        const fallbackName = role === "student" ? "Student" : role === "ta" ? "TA" : "Lecturer";
         setUserName(fallbackName);
         setUserInitial(fallbackName.charAt(0));
       }
     } else {
       // Fallback to role if no user data
-      const fallbackName = role === "student" ? "Student" : role === "ta" ? "TA" : "Instructor";
+      const fallbackName = role === "student" ? "Student" : role === "ta" ? "TA" : "Lecturer";
       setUserName(fallbackName);
       setUserInitial(fallbackName.charAt(0));
     }
@@ -48,11 +48,11 @@ const MainHeader = ({ role }) => {
         {/* Navbar */}
         <nav className="header-nav">
 
-          {role === "instructor" && (
+          {role === "lecturer" && (
             <>
-              <Link to="/instructor">Overview</Link>
-              <Link to="/instructor/courses">Courses</Link>
-              <Link to="/instructor/members">Members</Link>
+              <Link to="/lecturer">Overview</Link>
+              <Link to="/lecturer/courses">Courses</Link>
+              <Link to="/lecturer/members">Members</Link>
             </>
           )}
 

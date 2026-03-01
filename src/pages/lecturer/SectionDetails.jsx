@@ -1,7 +1,7 @@
 import SharedMembers from "../shared/SectionDetails";
 
 const SectionDetails = () => {
-  return <SharedMembers role="instructor" />;
+  return <SharedMembers role="lecturer" />;
 };
 
 export default SectionDetails;
