@@ -162,6 +162,7 @@
   color: #e6faff;
   font-family: "Segoe UI", sans-serif;
   outline: none;
+  box-sizing: border-box;
 }
 
 .uploaded-file {
@@ -191,7 +192,6 @@
   color: black;
 }
 
-
 .comment-input::placeholder {
   color: #8dfbff;
   opacity: 0.8;
@@ -203,14 +203,114 @@
   flex-direction: column;
   gap: 8px;
 }
+
+/* ===== COMMENT ITEM WITH 3-DOT MENU ===== */
 .comment-item {
   background: rgba(0, 234, 255, 0.08);
   padding: 8px 12px;
   border-radius: 12px;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #c8faff;
 }
 
-/* ===== GLOBAL FIX (Important) ===== */
+.comment-text {
+  flex: 1;
+  word-break: break-word;
+}
+
+/* ===== 3-DOT BUTTON ===== */
+.comment-menu-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.three-dot-btn {
+  background: transparent;
+  border: none;
+  color: #00eaff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.three-dot-btn:hover {
+  background: rgba(0, 234, 255, 0.15);
+}
+
+/* ===== DROPDOWN MENU ===== */
+.comment-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #0d1f2d;
+  border: 1.5px solid #00eaff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 234, 255, 0.25);
+  z-index: 100;
+  min-width: 130px;
+  overflow: hidden;
+}
+
+.comment-dropdown button {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: #c8faff;
+  padding: 9px 16px;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.comment-dropdown button:hover {
+  background: rgba(0, 234, 255, 0.12);
+  color: #00eaff;
+}
+
+.comment-dropdown .delete-option:hover {
+  background: rgba(255, 80, 80, 0.15);
+  color: #ff6b6b;
+}
+
+/* ===== INLINE EDIT ROW ===== */
+.comment-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comment-edit-row .edit-inline {
+  margin-top: 0;
+  flex: 1;
+}
+
+.save-edit-btn {
+  background: linear-gradient(90deg, #007cf0, #00dfd8);
+  border: none;
+  color: white;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.2s;
+}
+
+.save-edit-btn:hover {
+  transform: scale(1.05);
+}
+
+/* ===== GLOBAL FIX ===== */
 body {
   margin: 0;
 }
