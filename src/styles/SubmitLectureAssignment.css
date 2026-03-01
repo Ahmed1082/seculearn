@@ -1,1 +1,216 @@
-.submitlectureassignments { padding: 40px; }
+/* ===== PAGE WRAPPER ===== */
+.lectureassignments {
+  background: #000;
+  min-height: calc(100vh - 130px);
+  color: #e6faff;
+  font-family: "Segoe UI", sans-serif;
+
+  padding: 40px clamp(25px, 5vw, 80px);
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== CENTERED CONTAINER ===== */
+.assignment-container {
+  width: 100%;
+  max-width: 1400px;   /* Prevents content from stretching too wide */
+  margin: 0 auto;     /* Centers content */
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== TITLE ===== */
+.course-title {
+  color: #00eaff;
+  font-size: 26px;
+  margin-bottom: 20px;
+}
+
+/* ===== PATH ===== */
+.assignment-path {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.assignment-path button {
+  background: transparent;
+  border: 1.5px solid #00eaff;
+  color: #00eaff;
+  padding: 6px 18px;
+  border-radius: 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.assignment-path span {
+  color: #00eaff;
+}
+
+/* ===== GRID ===== */
+.assignment-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 40px;
+  align-items: stretch;
+}
+
+/* ===== CARD ===== */
+.assignment-card {
+  border: 2px solid #00eaff;
+  border-radius: 22px;
+  padding: 25px;
+  background: #050505;
+  box-shadow: 0 0 20px rgba(0, 234, 255, 0.25);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.assignment-card.large {
+  height: 100%;
+}
+
+/* ===== CARD HEADER ===== */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.assignment-card h2 {
+  color: #00eaff;
+  font-size: 18px;
+}
+
+.due-date,
+.status {
+  color: #8dfbff;
+  font-size: 13px;
+}
+
+.assignment-card p {
+  margin: 5px 0;
+  font-size: 13px;
+  color: #c8faff;
+}
+
+.divider {
+  height: 1px;
+  background: #00eaff;
+  margin: 15px 0;
+  opacity: 0.6;
+}
+
+.file-link {
+  color: #00eaff;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.file-link:hover {
+  text-decoration: underline;
+}
+
+/* ===== RIGHT COLUMN ===== */
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+/* ===== BUTTONS ===== */
+.primary-btn {
+  background: linear-gradient(90deg, #007cf0, #00dfd8);
+  border: none;
+  height: 42px;
+  border-radius: 30px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: 0.3s;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.primary-btn.full {
+  width: 100%;
+}
+
+.primary-btn:hover {
+  transform: scale(1.03);
+}
+
+/* ===== INPUT ===== */
+.comment-input {
+  width: 100%;
+  height: 42px;
+  border-radius: 25px;
+  border: 1.5px solid #00eaff;
+  background: transparent;
+  padding: 0 20px;
+  margin-top: 15px;
+  font-size: 13px;
+  color: #e6faff;
+  font-family: "Segoe UI", sans-serif;
+  outline: none;
+}
+
+.uploaded-file {
+  margin-top: 10px;
+  background: rgba(0, 234, 255, 0.08);
+  padding: 8px 12px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+
+.remove-btn {
+  background: transparent;
+  border: 1px solid #00eaff;
+  color: #00eaff;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.remove-btn:hover {
+  background: #00eaff;
+  color: black;
+}
+
+
+.comment-input::placeholder {
+  color: #8dfbff;
+  opacity: 0.8;
+}
+
+.comments-list {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.comment-item {
+  background: rgba(0, 234, 255, 0.08);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+/* ===== GLOBAL FIX (Important) ===== */
+body {
+  margin: 0;
+}
