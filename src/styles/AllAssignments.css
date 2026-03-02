@@ -264,13 +264,17 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease;
+  cursor: pointer;
+  transition: border-color 0.25s ease, background 0.25s ease, transform 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
 .all-assignments-item:hover {
   transform: translateX(4px);
   border-color: var(--aa-border-strong);
   background: var(--aa-surface-hover);
+  box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.16),
+    0 12px 26px rgba(0, 0, 0, 0.55);
 }
 
 .all-assignments-item-icon {

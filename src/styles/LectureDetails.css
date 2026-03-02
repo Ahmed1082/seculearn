@@ -172,6 +172,18 @@
   background: var(--surface-soft);
   border-radius: 7px;
   padding: 12px;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+/* Hover state for clickable assignment cards (student view) */
+.lecture-details-card:hover {
+  border-color: var(--border);
+  background: var(--surface-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(84, 244, 252, 0.18),
+    0 10px 22px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
 }
 
 .lecture-details-card-head {

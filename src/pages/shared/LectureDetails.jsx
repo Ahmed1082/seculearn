@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -1170,12 +1170,8 @@ const LectureDetails = ({ role = "lecturer" }) => {
                   className="lecture-details-card"
                   onClick={() => {
                     if (role !== "student") return;
-
-                    if (isSectionView) {
-                      navigate(`/student/section/${assignment.id}`);
-                    } else {
-                      navigate(`/student/lecture/${assignment.id}`);
-                    }
+                    const targetId = assignment.apiId ?? assignment.id;
+                    navigate(`/student/section/${targetId}`);
                   }}
                 >
                   {(() => {
