@@ -7,10 +7,30 @@ import { useEffect } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 
+const getDisplayName = () => {
+  try {
+    const stored = localStorage.getItem("user");
+    const role = localStorage.getItem("role") || "student";
+    const fallback = role === "ta" ? "TA" : role === "lecturer" ? "Lecturer" : "Student";
+    if (!stored) return fallback;
+    const user = JSON.parse(stored);
+    return (
+      user.name ||
+      user.full_name ||
+      user.username ||
+      (user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : null) ||
+      user.first_name ||
+      fallback
+    );
+  } catch {
+    return "Student";
+  }
+};
+
 const SubmitSectionAssignment = () => {
   const fileInputRef = useRef(null);
 
-  const studentName = "Student X";
+  const displayName = getDisplayName();
 
   const [privateComment, setPrivateComment] = useState("");
   const [privateComments, setPrivateComments] = useState([]);
@@ -110,7 +130,7 @@ const SubmitSectionAssignment = () => {
     if (classComment.trim() === "") return;
 
     const newComment = {
-      name: studentName,
+      name: displayName,
       text: classComment,
     };
 

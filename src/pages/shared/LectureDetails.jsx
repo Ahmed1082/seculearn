@@ -241,10 +241,17 @@ const LectureDetails = ({ role = "lecturer" }) => {
   const canManageLecture = role === "lecturer" || role === "ta";
   const isTA = role === "ta";
 
-  const [lectureData, setLectureData] = useState({
-    ...lectureSeed,
-    id: lectureId || lectureSeed.id,
-    title: lectureTitleFromState || lectureSeed.title,
+  const [lectureData, setLectureData] = useState(() => {
+    const sectionView = !!location.state?.sectionId;
+    const base = {
+      ...lectureSeed,
+      id: lectureId || lectureSeed.id,
+      title: lectureTitleFromState || lectureSeed.title,
+    };
+    if (role === "student" && sectionView) {
+      return { ...base, assignments: [] };
+    }
+    return base;
   });
   const [openSections, setOpenSections] = useState({
     lecture: true,
@@ -299,12 +306,14 @@ const LectureDetails = ({ role = "lecturer" }) => {
     () => resolveStudentIdForMockData(getCurrentStudentId()),
     []
   );
-  const unitLabel = isTA ? "Section" : "Lecture";
+  const isStudentSectionView = role === "student" && isSectionView;
+  const unitLabel = isTA || isStudentSectionView ? "Section" : "Lecture";
   const unitLabelLower = unitLabel.toLowerCase();
   const resolvedTitle = activeSectionTitle || lectureData.title;
-  const pageTitle = isTA
-    ? resolvedTitle.replace(/^lecture\b/i, "Section")
-    : lectureData.title;
+  const pageTitle =
+    isTA || isStudentSectionView
+      ? resolvedTitle.replace(/^lecture\b/i, "Section")
+      : lectureData.title;
   const contentBlockTitle = `${unitLabel} Content`;
   const uploadButtonLabel = `Upload ${unitLabel} File`;
   const lectureContentHintText = canManageLecture
@@ -347,7 +356,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
   );
 
   useEffect(() => {
-    if (!isTA) return;
+    if (!isSectionView && !isTA) return;
 
     const stateSectionId = location.state?.sectionId || location.state?.id;
     const stateSectionTitle =
@@ -356,15 +365,19 @@ const LectureDetails = ({ role = "lecturer" }) => {
     if (stateSectionId !== undefined && stateSectionId !== null) {
       const normalizedSectionId = String(stateSectionId);
       setActiveSectionId(normalizedSectionId);
-      localStorage.setItem("ta_active_section_id", normalizedSectionId);
+      if (isTA) {
+        localStorage.setItem("ta_active_section_id", normalizedSectionId);
+      }
     }
 
     if (stateSectionTitle) {
       const normalizedSectionTitle = String(stateSectionTitle);
       setActiveSectionTitle(normalizedSectionTitle);
-      localStorage.setItem("ta_active_section_title", normalizedSectionTitle);
+      if (isTA) {
+        localStorage.setItem("ta_active_section_title", normalizedSectionTitle);
+      }
     }
-  }, [isTA, location.state]);
+  }, [isTA, isSectionView, location.state]);
 
   useEffect(() => {
     try {
@@ -476,7 +489,10 @@ const LectureDetails = ({ role = "lecturer" }) => {
     return {
       id: `section-assignment-${assignment.id}`,
       apiId: assignment.id,
-      title: assignment.title || "Untitled Assignment",
+      title:
+        attachmentName !== "assignment.pdf"
+          ? attachmentName
+          : assignment.title || "Untitled Assignment",
       description: assignment.description || "",
       dueDate: toDateTimeInputValue(assignment.due_date),
       maxScore: Number(assignment.points) || 100,
@@ -495,13 +511,15 @@ const LectureDetails = ({ role = "lecturer" }) => {
   }, []);
 
   const fetchSectionAssignments = useCallback(async () => {
-    if (!isTA) return;
-
-    if (!activeSectionId) {
-      setSectionAssignmentsError(
-        "Select a section first from course details to manage assignments."
-      );
-      setLectureData((prev) => ({ ...prev, assignments: [] }));
+    const canFetch =
+      (isTA || (role === "student" && isSectionView)) && activeSectionId;
+    if (!canFetch) {
+      if (isTA && !activeSectionId) {
+        setSectionAssignmentsError(
+          "Select a section first from course details to manage assignments."
+        );
+        setLectureData((prev) => ({ ...prev, assignments: [] }));
+      }
       return;
     }
 
@@ -532,12 +550,11 @@ const LectureDetails = ({ role = "lecturer" }) => {
     } finally {
       setIsFetchingSectionAssignments(false);
     }
-  }, [activeSectionId, isTA, mapSectionAssignmentToCard, token]);
+  }, [activeSectionId, isTA, isSectionView, role, mapSectionAssignmentToCard, token]);
 
   useEffect(() => {
-    if (!isTA) return;
     fetchSectionAssignments();
-  }, [fetchSectionAssignments, isTA]);
+  }, [fetchSectionAssignments]);
 
   const getPersonalStatus = (item) => {
     if (item.doneStudentIds?.includes(currentStudentId)) return "done";
