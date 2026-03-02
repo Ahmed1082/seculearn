@@ -21,8 +21,8 @@ const AddItemModal = ({
     } else {
       setTitle(
         isLecture
-          ? `Lec ${nextNumber}`
-          : `Sec ${nextNumber}`
+          ? `Lecture ${nextNumber}: `
+          : `Section ${nextNumber}: `
       );
     }
   }, [editingItem, nextNumber, isLecture]);

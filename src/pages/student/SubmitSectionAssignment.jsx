@@ -3,6 +3,9 @@ import { FaPlus, FaEllipsisV } from "react-icons/fa";
 import { useRef, useState } from "react";
 import { FaRegCommentDots } from "react-icons/fa";
 import { FaEdit, FaTrash } from "react-icons/fa";
+import { useEffect } from "react";
+import { useParams } from "react-router-dom";
+import axios from "axios";
 
 const SubmitSectionAssignment = () => {
   const fileInputRef = useRef(null);
@@ -28,6 +31,12 @@ const SubmitSectionAssignment = () => {
   const [editingClassIndex, setEditingClassIndex] = useState(null);
   const [editedClassText, setEditedClassText] = useState("");
  
+
+  const { assignmentId } = useParams();
+  const token = localStorage.getItem("token");
+
+  const [assignment, setAssignment] = useState(null);
+
   /* ===== FILE UPLOAD ===== */
   const handleAddWork = () => {
     fileInputRef.current.click();
@@ -138,6 +147,33 @@ const SubmitSectionAssignment = () => {
     setEditingClassIndex(null);
   };
 
+  useEffect(() => {
+    const fetchAssignments = async () => {
+      try {
+        const res = await axios.get(
+          `/api/get-section-assignments/${assignmentId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (res.data.data.length > 0) {
+          setAssignment(res.data.data[0]);
+        }
+
+      } catch (error) {
+        console.error("Error fetching assignments:", error);
+      }
+    };
+
+    if (assignmentId && token) {
+      fetchAssignments();
+    }
+
+  }, [assignmentId, token]);
+
   return (
     <div className="sectionassignments">
       <div className="assignment-container">
@@ -160,17 +196,24 @@ const SubmitSectionAssignment = () => {
           <div className="assignment-card large">
 
             <div className="card-header">
-              <h2>Assignment_1</h2>
-              <span className="due-date">Due 20 Feb</span>
+              <h2>{assignment?.title}</h2>
+              <span className="due-date">
+                Due {assignment?.due_date?.split(" ")[0]}
+              </span>
             </div>
 
-            <p>Assigned: 100 points</p>
+            <p>Assigned: {assignment?.points} points</p>
             <p>Assignment last updated: 19 Feb</p>
 
             <div className="divider" />
 
-            <a href="#" className="file-link">
-              Assignment_1.pdf
+            <a
+              href={`https://cary-nontumorous-unimpedingly.ngrok-free.dev/storage/${assignment?.file_path}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="file-link"
+            >
+              {assignment?.file_path?.split("/").pop()}
             </a>
 
             <p>Please submit work as pdf</p>
@@ -264,7 +307,7 @@ const SubmitSectionAssignment = () => {
               </>
             )}
           </div>
-
+          
           {/* RIGHT SIDE */}
           <div className="right-column">
 

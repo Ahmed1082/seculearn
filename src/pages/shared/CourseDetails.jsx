@@ -10,8 +10,10 @@ const CourseDetails = ({ role }) => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  const isLecturer = role === "lecturer";
-  const isTA = role === "ta";
+  const permissions = {
+    canManageLectures: role === "lecturer",
+    canManageSections: role === "ta",
+  };
 
   const [course, setCourse] = useState(null);
   const [lectures, setLectures] = useState([]);
@@ -23,7 +25,7 @@ const CourseDetails = ({ role }) => {
   const [confirmData, setConfirmData] = useState(null);
 
   const [serverError, setServerError] = useState("");
-
+  
   /* ================= GET COURSE DATA ================= */
   useEffect(() => {
     const fetchCourses = async () => {
@@ -77,7 +79,7 @@ const CourseDetails = ({ role }) => {
       let res;
 
       // ===== LECTURE (Lecturer only) =====
-      if (modalType === "lecture" && isLecturer) {
+      if (modalType === "lecture" && permissions.canManageLectures) {
         if (editingItem) {
           res = await axios.post(
             `/api/edit-lecture/${editingItem.id}`,
@@ -105,7 +107,7 @@ const CourseDetails = ({ role }) => {
       }
 
       // ===== SECTION (TA only) =====
-      if (modalType === "section" && isTA) {
+      if (modalType === "section" && permissions.canManageSections) {
         if (editingItem) {
           res = await axios.post(
             `/api/edit-section/${editingItem.id}`,
@@ -149,7 +151,7 @@ const CourseDetails = ({ role }) => {
 
     try {
       // Lecture delete (Lecturer only)
-      if (confirmData.type === "lecture" && isLecturer) {
+      if (confirmData.type === "lecture" && permissions.canManageLectures) {
         await axios.delete(
           `/api/delete-lecture/${confirmData.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -161,7 +163,7 @@ const CourseDetails = ({ role }) => {
       }
 
       // Section delete (TA only)
-      if (confirmData.type === "section" && isTA) {
+      if (confirmData.type === "section" && permissions.canManageSections) {
         await axios.delete(
           `/api/delete-section/${confirmData.id}`,
           { headers: { Authorization: `Bearer ${token}` } }
@@ -178,13 +180,25 @@ const CourseDetails = ({ role }) => {
     }
   };
 
+  const getShortCircleTitle = (title = "") => {
+    const match = title.match(/lec(ture)?\s*\d+/i);
+    if (!match) return title;
+    return match[0].replace(/lecture/i, "Lec");
+  };
+
+  const getShortSectionTitle = (title = "") => {
+    const match = title.match(/sec(tion)?\s*\d+/i);
+    if (!match) return title;
+    return match[0].replace(/section/i, "Sec");
+  };
+
   return (
     <div className="course-details">
 
       <div className="course-header">
         <h1>{course?.title || "Course"}</h1>
 
-        {isLecturer && (
+        {permissions.canManageLectures && (
           <button
             className="add-btn"
             onClick={() => {
@@ -199,7 +213,7 @@ const CourseDetails = ({ role }) => {
           </button>
         )}
 
-        {isTA && (
+        {permissions.canManageSections && (
           <button
             className="add-btn"
             onClick={() => {
@@ -226,10 +240,19 @@ const CourseDetails = ({ role }) => {
             <div
               className="circle-card"
               key={lecture.id}
-              onClick={() => navigate(`/${role}/lectureDetails`)}
+              onClick={() =>
+                navigate(`/${role}/lectureDetails`, {
+                  state: {
+                    lectureId: lecture.id,
+                    lectureTitle: lecture.title,
+                    courseId: courseId,
+                  },
+                })
+              }
+              style={{ cursor: "pointer" }}
             >
 
-              {isLecturer && (
+              {permissions.canManageLectures && (
                 <div className="circle-actions">
                   <button
                     className="icon-btn"
@@ -260,7 +283,7 @@ const CourseDetails = ({ role }) => {
                 </div>
               )}
 
-              <span>{lecture.title}</span>
+              <span>{getShortCircleTitle(lecture.title)}</span>
             </div>
           ))}
         </div>
@@ -278,7 +301,7 @@ const CourseDetails = ({ role }) => {
               className="circle-card"
               key={section.id}
               onClick={() => {
-                if (isTA) {
+                if (permissions.canManageSections) {
                   localStorage.setItem("ta_active_section_id", String(section.id));
                   localStorage.setItem("ta_active_section_title", section.title || "");
                   navigate(`/${role}/lectureDetails`, {
@@ -291,11 +314,17 @@ const CourseDetails = ({ role }) => {
                   return;
                 }
 
-                navigate(`/${role}/sectionDetails`);
+                navigate(`/${role}/lectureDetails`, {
+                  state: {
+                    sectionId: section.id,
+                    sectionTitle: section.title,
+                    courseId,
+                  },
+                });
               }}
             >
 
-              {isTA && (
+              {permissions.canManageSections && (
                 <div className="circle-actions">
                   <button
                     className="icon-btn"
@@ -326,7 +355,7 @@ const CourseDetails = ({ role }) => {
                 </div>
               )}
 
-              <span>{section.title}</span>
+              <span>{getShortSectionTitle(section.title)}</span>
             </div>
           ))}
         </div>
@@ -366,8 +395,8 @@ const CourseDetails = ({ role }) => {
 
       {/* ================= MODAL ================= */}
       {showModal &&
-        ((modalType === "lecture" && isLecturer) ||
-          (modalType === "section" && isTA)) && (
+        ((modalType === "lecture" && permissions.canManageLectures) ||
+          (modalType === "section" && permissions.canManageSections)) && (
           <AddItemModal
             type={modalType}
             editingItem={editingItem}

@@ -229,6 +229,9 @@ const AccordionSection = ({
 const LectureDetails = ({ role = "lecturer" }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const isSectionView = !!location.state?.sectionId;
+  const lectureId = location.state?.lectureId;
+  const lectureTitleFromState = location.state?.lectureTitle;
   const lectureFileInputRef = useRef(null);
   const assignmentDialogFileInputRef = useRef(null);
   const assignmentDueDateInputRef = useRef(null);
@@ -238,7 +241,11 @@ const LectureDetails = ({ role = "lecturer" }) => {
   const canManageLecture = role === "lecturer" || role === "ta";
   const isTA = role === "ta";
 
-  const [lectureData, setLectureData] = useState(lectureSeed);
+  const [lectureData, setLectureData] = useState({
+    ...lectureSeed,
+    id: lectureId || lectureSeed.id,
+    title: lectureTitleFromState || lectureSeed.title,
+  });
   const [openSections, setOpenSections] = useState({
     lecture: true,
     assignments: true,
@@ -1158,7 +1165,19 @@ const LectureDetails = ({ role = "lecturer" }) => {
                   <p className="lecture-content-hint">No assignments yet.</p>
                 )}
               {lectureData.assignments.map((assignment) => (
-                <article key={assignment.id} className="lecture-details-card">
+                <article
+                  key={assignment.id}
+                  className="lecture-details-card"
+                  onClick={() => {
+                    if (role !== "student") return;
+
+                    if (isSectionView) {
+                      navigate(`/student/section/${assignment.id}`);
+                    } else {
+                      navigate(`/student/lecture/${assignment.id}`);
+                    }
+                  }}
+                >
                   {(() => {
                     const personalStatus = getPersonalStatus(assignment);
                     const personalStatusLabel =
@@ -1798,8 +1817,3 @@ const LectureDetails = ({ role = "lecturer" }) => {
 };
 
 export default LectureDetails;
-
-
-
-
-

@@ -75,10 +75,10 @@ const Router = () => (
       {/* 🔥 Dynamic Course ID */}
       <Route path="/student/courses/:courseId" element={<StudentCourseDetails />} />
       <Route path="/student/lectureDetails" element={<StudentLectureDetails />} />
-      <Route path="/student/lecture/submitAssignment" element={<StudentSubmitLectureAssignment />} />
+      <Route path="/student/lecture/:assignmentId" element={<StudentSubmitLectureAssignment />} />
       <Route path="/student/lecture/submitQuizzes" element={<StudentSubmitLectureQuizzes />} />
       <Route path="/student/sectionDetails" element={<StudentSectionDetails />} />
-      <Route path="/student/section/submitAssignment" element={<StudentSubmitSectionAssignment />} />
+      <Route path="/student/section/:assignmentId" element={<StudentSubmitSectionAssignment />} />
       <Route path="/student/section/submitQuizzes" element={<StudentSubmitSectionQuizzes />} />
       <Route path="/student/allAssignments" element={<StudentAllAssignments />} />
       <Route path="/student/allQuizzes" element={<StudentAllQuizzes />} />
