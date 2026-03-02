@@ -13,7 +13,7 @@ const Login = () => {
   const rawStateRole = location.state?.role;
   const ROLE_MAP = {
     Student: { slug: "student", code: 1 },
-    "Lecturer": { slug: "instructor", code: 2 },
+    "Lecturer": { slug: "lecturer", code: 2 },
     "Teaching Assistant": { slug: "ta", code: 3 },
   };
 
@@ -92,10 +92,10 @@ const Login = () => {
         const NORMALIZE = {
           student: "student",
           learner: "student",
-          instructor: "instructor",
-          lecturer: "instructor",
-          "lecturer (instructor)": "instructor",
-          lectuer: "instructor",
+          instructor: "lecturer",
+          lecturer: "lecturer",
+          "lecturer (instructor)": "lecturer",
+          lectuer: "lecturer",
           ta: "ta",
           "teaching assistant": "ta",
           "teaching_assistant": "ta",
@@ -145,7 +145,8 @@ const Login = () => {
 
       // Redirect to each role's home page (overview for instructor/TA)
       const ROLE_HOME = {
-        instructor: "/instructor",
+        lecturer: "/lecturer",
+        instructor: "/lecturer",
         ta: "/ta",
         student: "/student/courses",
       };

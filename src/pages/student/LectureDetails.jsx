@@ -1,7 +1,7 @@
-import SharedMembers from "../shared/LectureDetails";
+import SharedLectureDetails from "../shared/LectureDetails";
 
 const LectureDetails = () => {
-  return <SharedMembers role="student" />;
+  return <SharedLectureDetails role="student" />;
 };
 
 export default LectureDetails;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { FaTrash, FaEdit } from "react-icons/fa";
 import "../../styles/CourseDetails.css";
 import AddItemModal from "../../components/AddItemModal";
@@ -7,11 +7,11 @@ import axios from "axios";
 
 const CourseDetails = ({ role }) => {
   const { courseId } = useParams();
+  const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
   const isLecturer = role === "lecturer";
   const isTA = role === "ta";
-  const isStudent = role === "student";
 
   const [course, setCourse] = useState(null);
   const [lectures, setLectures] = useState([]);
@@ -223,13 +223,18 @@ const CourseDetails = ({ role }) => {
 
         <div className="circle-grid">
           {lectures.map((lecture) => (
-            <div className="circle-card" key={lecture.id}>
+            <div
+              className="circle-card"
+              key={lecture.id}
+              onClick={() => navigate(`/${role}/lectureDetails`)}
+            >
 
               {isLecturer && (
                 <div className="circle-actions">
                   <button
                     className="icon-btn"
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setServerError("");
                       setModalType("lecture");
                       setEditingItem(lecture);
@@ -241,13 +246,14 @@ const CourseDetails = ({ role }) => {
 
                   <button
                     className="icon-btn delete"
-                    onClick={() =>
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setConfirmData({
                         id: lecture.id,
                         title: lecture.title,
                         type: "lecture",
                       })
-                    }
+                    }}
                   >
                     <FaTrash />
                   </button>
@@ -268,13 +274,33 @@ const CourseDetails = ({ role }) => {
 
         <div className="circle-grid">
           {sections.map((section) => (
-            <div className="circle-card" key={section.id}>
+            <div
+              className="circle-card"
+              key={section.id}
+              onClick={() => {
+                if (isTA) {
+                  localStorage.setItem("ta_active_section_id", String(section.id));
+                  localStorage.setItem("ta_active_section_title", section.title || "");
+                  navigate(`/${role}/lectureDetails`, {
+                    state: {
+                      sectionId: section.id,
+                      sectionTitle: section.title,
+                      courseId,
+                    },
+                  });
+                  return;
+                }
+
+                navigate(`/${role}/sectionDetails`);
+              }}
+            >
 
               {isTA && (
                 <div className="circle-actions">
                   <button
                     className="icon-btn"
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setServerError("");
                       setModalType("section");
                       setEditingItem(section);
@@ -286,13 +312,14 @@ const CourseDetails = ({ role }) => {
 
                   <button
                     className="icon-btn delete"
-                    onClick={() =>
+                    onClick={(event) => {
+                      event.stopPropagation();
                       setConfirmData({
                         id: section.id,
                         title: section.title,
                         type: "section",
                       })
-                    }
+                    }}
                   >
                     <FaTrash />
                   </button>
