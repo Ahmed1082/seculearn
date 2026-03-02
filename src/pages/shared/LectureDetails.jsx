@@ -1186,9 +1186,11 @@ const LectureDetails = ({ role = "lecturer" }) => {
                   key={assignment.id}
                   className="lecture-details-card"
                   onClick={() => {
-                    if (role !== "student") return;
                     const targetId = assignment.apiId ?? assignment.id;
-                    navigate(`/student/section/${targetId}`);
+                    if (role === "student" || isTA) {
+                      const base = isSectionView ? "section" : "lecture";
+                      navigate(`/student/${base}/${targetId}`);
+                    }
                   }}
                 >
                   {(() => {
@@ -1210,18 +1212,31 @@ const LectureDetails = ({ role = "lecturer" }) => {
                           onChange={(event) => setEditedTitle(event.target.value)}
                         />
                         <div className="lecture-details-inline-actions">
-                          <button type="button" onClick={saveEdit}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              saveEdit();
+                            }}
+                          >
                             Save
                           </button>
-                          <button type="button" onClick={cancelEdit}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelEdit();
+                            }}
+                          >
                             Cancel
                           </button>
                           <button
                             type="button"
                             className="delete"
-                            onClick={() =>
-                              deleteItem("assignment", assignment.id)
-                            }
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteItem("assignment", assignment.id);
+                            }}
                           >
                             Delete
                           </button>

@@ -41,19 +41,34 @@ const SubmitSectionAssignment = () => {
 
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submissionId, setSubmissionId] = useState(null);
+  const [submitError, setSubmitError] = useState("");
+  const [commentError, setCommentError] = useState("");
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
 
   const [activeMenu, setActiveMenu] = useState(null);
 
-  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingId, setEditingId] = useState(null);
   const [editedText, setEditedText] = useState("");
 
   const [activeClassMenu, setActiveClassMenu] = useState(null);
-  const [editingClassIndex, setEditingClassIndex] = useState(null);
+  const [editingClassId, setEditingClassId] = useState(null);
   const [editedClassText, setEditedClassText] = useState("");
  
 
   const { assignmentId } = useParams();
   const token = localStorage.getItem("token");
+
+  const currentUserId = (() => {
+    try {
+      const stored = localStorage.getItem("user");
+      if (!stored) return null;
+      const u = JSON.parse(stored);
+      return u?.id ?? null;
+    } catch {
+      return null;
+    }
+  })();
 
   const [assignment, setAssignment] = useState(null);
 
@@ -76,95 +91,214 @@ const SubmitSectionAssignment = () => {
     setSelectedFiles(updated);
   };
 
-  const handleSubmit = () => {
-    if (selectedFiles.length === 0) return;
+  const handleSubmit = async () => {
+    setSubmitError("");
+    if (!token) return setSubmitError("Not authenticated.");
+    if (selectedFiles.length === 0) return setSubmitError("No file selected.");
 
-    console.log("Submitting:", selectedFiles);
-    setIsSubmitted(true);
+    const file = selectedFiles[0];
+    const maxBytes = 10 * 1024 * 1024; // 10MB
+    if (!file.name.toLowerCase().endsWith(".pdf") && file.type !== "application/pdf") {
+      return setSubmitError("Only PDF files are allowed.");
+    }
+    if (file.size > maxBytes) {
+      return setSubmitError("File exceeds 10MB size limit.");
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("assignment_id", String(assignmentId));
+      formData.append("submission_file", file);
+
+      const res = await axios.post(
+        "/api/submit-section-work",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "ngrok-skip-browser-warning": "true",
+          },
+        }
+      );
+
+      const data = res?.data?.data || null;
+      if (data && data.id) {
+        setSubmissionId(data.id);
+      }
+      setSelectedFiles([]);
+      setIsSubmitted(true);
+    } catch (error) {
+      setSubmitError(error?.response?.data?.message || "Failed to submit work.");
+      console.error("Submit error:", error);
+    }
   };
 
-  const handleUnsubmit = () => {
-    setIsSubmitted(false);
+  const handleUnsubmit = async () => {
+    if (!submissionId) return;
+    try {
+      await axios.delete(`/api/unsubmit-section-work/${submissionId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+      setIsSubmitted(false);
+      setSubmissionId(null);
+      setSelectedFiles([]);
+    } catch (error) {
+      console.error("Unsubmit error:", error);
+    }
   };
 
   /* ===== PRIVATE COMMENT ===== */
-  const handlePrivatePost = () => {
-    if (privateComment.trim() === "") return;
-    setPrivateComments([...privateComments, privateComment]);
-    setPrivateComment("");
+  const handlePrivatePost = async () => {
+    setCommentError("");
+    if (privateComment.trim() === "") return setCommentError("Message is required.");
+
+    try {
+      const formData = new FormData();
+      formData.append("assignment_id", String(assignmentId));
+      formData.append("message", privateComment.trim());
+      formData.append("is_private", String(1));
+
+      await axios.post("/api/add-section-assignment-comment", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+
+      setPrivateComment("");
+      await fetchComments();
+    } catch (error) {
+      setCommentError(error?.response?.data?.message || "Failed to post comment.");
+      console.error("Private comment error:", error);
+    }
   };
 
-  const toggleMenu = (index) => {
-    setActiveMenu(activeMenu === index ? null : index);
+  const toggleMenu = (id) => {
+    setActiveMenu(prev =>
+      String(prev) === String(id) ? null : id
+    );
   };
 
-  const handleDelete = (index) => {
-    const updated = privateComments.filter((_, i) => i !== index);
-    setPrivateComments(updated);
-    setActiveMenu(null);
+  const handleDelete = async (id) => {
+    const target = privateComments.find((c) => String(c.id) === String(id));
+    if (!target || !target.id) return;
+    try {
+      await axios.delete(`/api/delete-section-assignment-comment/${target.id}`, {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+      setActiveMenu(null);
+      await fetchComments();
+    } catch (error) {
+      console.error("Delete private comment error:", error);
+    }
   };
 
   // 🔥 تعديل داخلي بدل prompt
-  const handleEdit = (index) => {
-    setEditingIndex(index);
-    setEditedText(privateComments[index]);
+  const handleEdit = (id) => {
+    const target = privateComments.find((c) => String(c.id) === String(id));
+    setEditingId(id);
+    setEditedText(target?.message || "");
     setActiveMenu(null);
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (editedText.trim() === "") return;
+    const target = privateComments.find((c) => String(c.id) === String(editingId));
+    if (!target || !target.id) return;
 
-    const updated = [...privateComments];
-    updated[editingIndex] = editedText;
+    try {
+      const formData = new FormData();
+      formData.append("message", editedText.trim());
 
-    setPrivateComments(updated);
-    setEditingIndex(null);
+      await axios.post(`/api/update-section-assignment-comment/${target.id}`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+
+      setEditingId(null);
+      await fetchComments();
+    } catch (error) {
+      console.error("Update private comment error:", error);
+    }
   };
 
   const handleCancelEdit = () => {
-    setEditingIndex(null);
+    setEditingId(null);
   };
 
   /* ===== CLASS COMMENT ===== */
-  const handleClassPost = () => {
-    if (classComment.trim() === "") return;
+  const handleClassPost = async () => {
+    setCommentError("");
+    if (classComment.trim() === "") return setCommentError("Message is required.");
 
-    const newComment = {
-      name: displayName,
-      text: classComment,
-    };
+    try {
+      const formData = new FormData();
+      formData.append("assignment_id", String(assignmentId));
+      formData.append("message", classComment.trim());
+      formData.append("is_private", String(0));
 
-    setClassComments([...classComments, newComment]);
-    setClassComment("");
+      await axios.post("/api/add-section-assignment-comment", formData, {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+
+      setClassComment("");
+      await fetchComments();
+    } catch (error) {
+      setCommentError(error?.response?.data?.message || "Failed to post comment.");
+      console.error("Class comment error:", error);
+    }
   };
-  const toggleClassMenu = (index) => {
-    setActiveClassMenu(activeClassMenu === index ? null : index);
+  const toggleClassMenu = (id) => {
+    setActiveClassMenu(prev =>
+      String(prev) === String(id) ? null : id
+    );
   };
 
-  const handleDeleteClass = (index) => {
-    const updated = classComments.filter((_, i) => i !== index);
-    setClassComments(updated);
+  const handleDeleteClass = async (id) => {
+    const target = classComments.find((c) => String(c.id) === String(id));
+    if (!target || !target.id) return;
+    try {
+      await axios.delete(`/api/delete-section-assignment-comment/${target.id}`, {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+      setActiveClassMenu(null);
+      await fetchComments();
+    } catch (error) {
+      console.error("Delete class comment error:", error);
+    }
+  };
+
+  const handleEditClass = (id) => {
+    const target = classComments.find((c) => String(c.id) === String(id));
+    setEditingClassId(id);
+    setEditedClassText(target?.message || "");
     setActiveClassMenu(null);
   };
 
-  const handleEditClass = (index) => {
-    setEditingClassIndex(index);
-    setEditedClassText(classComments[index].text);
-    setActiveClassMenu(null);
-  };
-
-  const handleSaveClassEdit = () => {
+  const handleSaveClassEdit = async () => {
     if (editedClassText.trim() === "") return;
+    const target = classComments.find((c) => String(c.id) === String(editingClassId));
+    if (!target || !target.id) return;
 
-    const updated = [...classComments];
-    updated[editingClassIndex].text = editedClassText;
+    try {
+      const formData = new FormData();
+      formData.append("message", editedClassText.trim());
 
-    setClassComments(updated);
-    setEditingClassIndex(null);
+      await axios.post(`/api/update-section-assignment-comment/${target.id}`, formData, {
+        headers: { Authorization: `Bearer ${token}`, "ngrok-skip-browser-warning": "true" },
+      });
+
+      setEditingClassId(null);
+      await fetchComments();
+    } catch (error) {
+      console.error("Update class comment error:", error);
+    }
   };
 
   const handleCancelClassEdit = () => {
-    setEditingClassIndex(null);
+    setEditingClassId(null);
   };
 
   useEffect(() => {
@@ -192,6 +326,37 @@ const SubmitSectionAssignment = () => {
       fetchAssignments();
     }
 
+  }, [assignmentId, token]);
+
+  async function fetchComments() {
+    if (!assignmentId || !token) return;
+    setIsLoadingComments(true);
+    try {
+      const [classRes, privateRes] = await Promise.all([
+        axios.get(`/api/get-class-section-comments/${assignmentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`/api/get-private-section-comments/${assignmentId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      const classData = Array.isArray(classRes?.data?.data) ? classRes.data.data : [];
+      const privateData = Array.isArray(privateRes?.data?.data) ? privateRes.data.data : [];
+
+      setClassComments(classData);
+      setPrivateComments(privateData);
+    } catch (error) {
+      console.error("Error fetching comments:", error);
+    } finally {
+      setIsLoadingComments(false);
+    }
+  };
+
+  useEffect(() => {
+    if (assignmentId && token) {
+      fetchComments();
+    }
   }, [assignmentId, token]);
 
   return (
@@ -267,12 +432,17 @@ const SubmitSectionAssignment = () => {
                 >
                   Post
                 </button>
+                {commentError && (
+                  <p className="form-error" style={{ color: "#e17055", marginTop: 8 }}>
+                    {commentError}
+                  </p>
+                )}
 
                 <div className="comments-list">
                   {classComments.map((comment, index) => (
-                    <div key={index} className="comment-item">
+                    <div key={comment?.id || index} className="comment-item">
 
-                      {editingClassIndex === index ? (
+                      {editingClassId === comment?.id ? (
                         <div className="edit-area">
                           <input
                             type="text"
@@ -292,29 +462,31 @@ const SubmitSectionAssignment = () => {
                       ) : (
                         <>
                           <div className="comment-content">
-                            <strong>{comment.name}</strong>
-                            <span className="comment-text">{comment.text}</span>
+                            <strong>{comment?.user?.name || comment?.user?.username || 'User'}</strong>
+                            <span className="comment-text">{comment?.message}</span>
                           </div>
 
                           <div className="comment-menu">
                             <button
                               className="menu-btn"
-                              onClick={() => toggleClassMenu(index)}
+                              onClick={() => toggleClassMenu(comment?.id)}
                             >
                               <FaEllipsisV />
                             </button>
 
-                            {activeClassMenu === index && (
+                            {String(activeClassMenu) === String(comment?.id) && (
                               <div className="menu-dropdown">
-                                <button onClick={() => handleEditClass(index)}>
-                                  <FaEdit className="dropdown-icon" />
-                                  Edit
-                                </button>
+                                  <>
+                                    <button onClick={() => handleEditClass(comment?.id)}>
+                                      <FaEdit className="dropdown-icon" />
+                                      Edit
+                                    </button>
 
-                                <button onClick={() => handleDeleteClass(index)}>
-                                  <FaTrash className="dropdown-icon" />
-                                  Delete
-                                </button>
+                                    <button onClick={() => handleDeleteClass(comment?.id)}>
+                                      <FaTrash className="dropdown-icon" />
+                                      Delete
+                                    </button>
+                                  </>
                               </div>
                             )}
                           </div>
@@ -343,7 +515,7 @@ const SubmitSectionAssignment = () => {
               <input
                 type="file"
                 multiple
-                accept=".pdf,image/*,video/*"
+                          accept=".pdf"
                 ref={fileInputRef}
                 style={{ display: "none" }}
                 onChange={handleFileChange}
@@ -386,6 +558,11 @@ const SubmitSectionAssignment = () => {
                   >
                     Submit
                   </button>
+                  {submitError && (
+                    <p className="form-error" style={{ color: "#e17055", marginTop: 8 }}>
+                      {submitError}
+                    </p>
+                  )}
                 </>
               ) : (
                 <button
@@ -409,6 +586,12 @@ const SubmitSectionAssignment = () => {
                 className="comment-input"
               />
 
+              {commentError && (
+                <p className="form-error" style={{ color: "#e17055", marginTop: 8 }}>
+                  {commentError}
+                </p>
+              )}
+
               <button
                 className="primary-btn full"
                 onClick={handlePrivatePost}
@@ -418,9 +601,9 @@ const SubmitSectionAssignment = () => {
 
               <div className="comments-list">
                 {privateComments.map((comment, index) => (
-                  <div key={index} className="comment-item">
+                  <div key={comment?.id || index} className="comment-item">
 
-                    {editingIndex === index ? (
+                    {editingId === comment?.id ? (
                       <div className="edit-area">
                         <input
                           type="text"
@@ -439,27 +622,32 @@ const SubmitSectionAssignment = () => {
                       </div>
                     ) : (
                       <>
-                        <span>{comment}</span>
+                        <div className="comment-content">
+                          <strong>{comment?.user?.name || 'Student'}</strong>
+                          <span className="comment-text">{comment?.message}</span>
+                        </div>
 
                         <div className="comment-menu">
                           <button
                             className="menu-btn"
-                            onClick={() => toggleMenu(index)}
+                            onClick={() => toggleMenu(comment?.id)}
                           >
                             <FaEllipsisV />
                           </button>
 
-                          {activeMenu === index && (
+                          {String(activeMenu) === String(comment?.id) && (
                             <div className="menu-dropdown">
-                              <button onClick={() => handleEdit(index)}>
-                                <FaEdit className="dropdown-icon" />
-                                Edit
-                              </button>
-
-                              <button onClick={() => handleDelete(index)}>
-                                <FaTrash className="dropdown-icon" />
-                                Delete
-                              </button>
+                                <>
+                                  <button onClick={() => handleEdit(comment?.id)}>
+                                    <FaEdit className="dropdown-icon" />
+                                    Edit
+                                  </button>                              
+                                  <button onClick={() => handleDelete(comment?.id)}>
+                                    <FaTrash className="dropdown-icon" />
+                                    Delete
+                                  </button>
+                                </>
+                              
                             </div>
                           )}
                         </div>
