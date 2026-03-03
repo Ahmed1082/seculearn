@@ -3,11 +3,20 @@ import { useState, useEffect } from "react";
 import "../styles/MainHeader.css";
 import logo from "../images/logo.png";
 import secuText from "../images/SecuLearn.png";
-
+import { useNavigate } from "react-router-dom";
+// import { FaSignOutAlt } from "react-icons/fa";
+import { FiLogOut } from "react-icons/fi";
 const MainHeader = ({ role }) => {
   const [userName, setUserName] = useState("");
   const [userInitial, setUserInitial] = useState("");
+  const navigate = useNavigate();
+  const handleLogout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  localStorage.removeItem("role");
 
+  navigate("/"); // دي صفحة الـ Welcome
+};
   useEffect(() => {
     // Fetch user data from localStorage
     const storedUser = localStorage.getItem("user");
@@ -79,6 +88,10 @@ const MainHeader = ({ role }) => {
         <div className="profile">
           <span className="user-name">{userName}</span>
           <div className="avatar">{userInitial}</div>
+
+          <button className="logout-btn" onClick={handleLogout}>
+            <FiLogOut />
+          </button>
         </div>
 
       </div>

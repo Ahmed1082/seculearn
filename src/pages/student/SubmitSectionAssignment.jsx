@@ -476,17 +476,17 @@ const SubmitSectionAssignment = () => {
 
                             {String(activeClassMenu) === String(comment?.id) && (
                               <div className="menu-dropdown">
-                                  <>
-                                    <button onClick={() => handleEditClass(comment?.id)}>
-                                      <FaEdit className="dropdown-icon" />
-                                      Edit
-                                    </button>
+                                <>
+                                  <button onClick={() => handleEditClass(comment?.id)}>
+                                    <FaEdit className="dropdown-icon" />
+                                    Edit
+                                  </button>
 
-                                    <button onClick={() => handleDeleteClass(comment?.id)}>
-                                      <FaTrash className="dropdown-icon" />
-                                      Delete
-                                    </button>
-                                  </>
+                                  <button onClick={() => handleDeleteClass(comment?.id)}>
+                                    <FaTrash className="dropdown-icon" />
+                                    Delete
+                                  </button>
+                                </>
                               </div>
                             )}
                           </div>
