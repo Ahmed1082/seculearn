@@ -1186,11 +1186,10 @@ const LectureDetails = ({ role = "lecturer" }) => {
                   key={assignment.id}
                   className="lecture-details-card"
                   onClick={() => {
+                    if (role !== "student") return;
                     const targetId = assignment.apiId ?? assignment.id;
-                    if (role === "student" || isTA) {
-                      const base = isSectionView ? "section" : "lecture";
-                      navigate(`/student/${base}/${targetId}`);
-                    }
+                    const base = isSectionView ? "section" : "lecture";
+                    navigate(`/student/${base}/${targetId}`);
                   }}
                 >
                   {(() => {
