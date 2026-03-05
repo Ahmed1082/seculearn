@@ -944,7 +944,10 @@ const LectureDetails = ({ role = "lecturer" }) => {
         closeAssignmentDialog();
       } catch (error) {
         setSectionAssignmentsError(
-          error?.response?.data?.message || "Failed to create assignment."
+          error?.response?.data?.message ||
+            (isEditMode
+              ? "Failed to update assignment."
+              : "Failed to create assignment.")
         );
       }
       return;
@@ -1030,6 +1033,35 @@ const LectureDetails = ({ role = "lecturer" }) => {
     }));
 
     closeQuizDialog();
+  };
+
+  const deleteAssignmentFromDialog = async () => {
+    if (!isTA) return;
+    if (assignmentDialogMode !== "edit" || !assignmentEditingId) return;
+
+    const assignmentToDelete = lectureData.assignments.find(
+      (assignment) => assignment.id === assignmentEditingId
+    );
+
+    if (!assignmentToDelete?.apiId) {
+      setSectionAssignmentsError("Invalid assignment selected for deletion.");
+      return;
+    }
+
+    try {
+      await axios.delete(
+        `/api/delete-section-assignment/${assignmentToDelete.apiId}`,
+        {
+          headers: buildApiHeaders(token),
+        }
+      );
+      await fetchSectionAssignments();
+      closeAssignmentDialog();
+    } catch (error) {
+      setSectionAssignmentsError(
+        error?.response?.data?.message || "Failed to delete assignment."
+      );
+    }
   };
 
   const onUploadLectureFile = async (event) => {
@@ -1698,6 +1730,15 @@ const LectureDetails = ({ role = "lecturer" }) => {
                 )}
 
                 <div className="lecture-assignment-dialog-actions">
+                  {assignmentDialogMode === "edit" && (
+                    <button
+                      type="button"
+                      className="lecture-assignment-danger-btn"
+                      onClick={deleteAssignmentFromDialog}
+                    >
+                      Delete Assignment
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="lecture-assignment-cancel-btn"
