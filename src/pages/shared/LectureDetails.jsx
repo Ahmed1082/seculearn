@@ -267,6 +267,8 @@ const LectureDetails = ({ role = "lecturer" }) => {
   const [assignmentForm, setAssignmentForm] = useState(
     getDefaultAssignmentForm()
   );
+  const [assignmentDialogMode, setAssignmentDialogMode] = useState("create");
+  const [assignmentEditingId, setAssignmentEditingId] = useState(null);
   const [quizDialogOpen, setQuizDialogOpen] = useState(false);
   const [quizForm, setQuizForm] = useState(getDefaultQuizForm());
   const [quizDialogMode, setQuizDialogMode] = useState("create");
@@ -319,7 +321,14 @@ const LectureDetails = ({ role = "lecturer" }) => {
   const lectureContentHintText = canManageLecture
     ? `Upload ${unitLabelLower} material files (PDF, slides, docs) for students.`
     : `${unitLabel} materials uploaded by your instructor appear below.`;
-  const assignmentDialogDescription = `Create an assignment for this ${unitLabelLower}'s students.`;
+  const assignmentDialogDescription =
+    assignmentDialogMode === "edit"
+      ? `Update this ${unitLabelLower} assignment details.`
+      : `Create an assignment for this ${unitLabelLower}'s students.`;
+  const assignmentDialogTitle =
+    assignmentDialogMode === "edit" ? "Edit Assignment" : "New Assignment";
+  const assignmentDialogSubmitLabel =
+    assignmentDialogMode === "edit" ? "Save Changes" : "Create Assignment";
   const quizCreateDescription = `Configure and launch a quiz for this ${unitLabelLower}.`;
   const quizEditDescription = `Update quiz settings for this ${unitLabelLower}.`;
 
@@ -339,6 +348,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
 
   const revokeEntryUrl = (entry) => {
     if (!entry?.url) return;
+    if (!objectUrlsRef.current.has(entry.url)) return;
     URL.revokeObjectURL(entry.url);
     objectUrlsRef.current.delete(entry.url);
   };
@@ -489,10 +499,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
     return {
       id: `section-assignment-${assignment.id}`,
       apiId: assignment.id,
-      title:
-        attachmentName !== "assignment.pdf"
-          ? attachmentName
-          : assignment.title || "Untitled Assignment",
+      title: assignment.title || attachmentName || "Untitled Assignment",
       description: assignment.description || "",
       dueDate: toDateTimeInputValue(assignment.due_date),
       maxScore: Number(assignment.points) || 100,
@@ -571,6 +578,10 @@ const LectureDetails = ({ role = "lecturer" }) => {
 
   const openEdit = (type, item) => {
     if (!canManageLecture) return;
+    if (isTA && type === "assignment") {
+      openAssignmentEditDialog(item);
+      return;
+    }
     setEditingType(type);
     setEditingId(item.id);
     setEditedTitle(item.title);
@@ -732,7 +743,34 @@ const LectureDetails = ({ role = "lecturer" }) => {
   const openAssignmentDialog = () => {
     if (!canManageLecture) return;
     setSectionAssignmentsError("");
+    setAssignmentDialogMode("create");
+    setAssignmentEditingId(null);
     setAssignmentForm(getDefaultAssignmentForm());
+    setAssignmentDialogOpen(true);
+  };
+
+  const openAssignmentEditDialog = (assignment) => {
+    if (!isTA || !assignment) return;
+    setSectionAssignmentsError("");
+    setAssignmentDialogMode("edit");
+    setAssignmentEditingId(assignment.id);
+    setAssignmentForm({
+      title: assignment.title || "",
+      description: assignment.description || "",
+      dueDate: assignment.dueDate || "",
+      maxScore: Number(assignment.maxScore) || 100,
+      files: Array.isArray(assignment.attachments)
+        ? assignment.attachments.map((attachment) =>
+            typeof attachment === "string"
+              ? { name: attachment, url: "" }
+              : {
+                  name: attachment.name || "attachment.pdf",
+                  url: attachment.url || "",
+                  path: attachment.path || "",
+                }
+          )
+        : [],
+    });
     setAssignmentDialogOpen(true);
   };
 
@@ -742,6 +780,8 @@ const LectureDetails = ({ role = "lecturer" }) => {
     }
 
     setAssignmentDialogOpen(false);
+    setAssignmentDialogMode("create");
+    setAssignmentEditingId(null);
     setAssignmentForm(getDefaultAssignmentForm());
   };
 
@@ -846,13 +886,16 @@ const LectureDetails = ({ role = "lecturer" }) => {
 
       const selectedFileEntry = assignmentForm.files[0];
       const selectedFile = selectedFileEntry?.file;
+      const isEditMode = assignmentDialogMode === "edit";
 
-      if (!(selectedFile instanceof File)) {
+      if (!isEditMode && !(selectedFile instanceof File)) {
         setSectionAssignmentsError("Please upload a PDF file for the assignment.");
         return;
       }
 
+      const hasNewFile = selectedFile instanceof File;
       const isPdf =
+        !hasNewFile ||
         selectedFile.type === "application/pdf" ||
         selectedFile.name.toLowerCase().endsWith(".pdf");
 
@@ -864,17 +907,38 @@ const LectureDetails = ({ role = "lecturer" }) => {
       try {
         const formData = new FormData();
         formData.append("title", trimmed);
-        formData.append("section_id", String(activeSectionId));
         formData.append("description", assignmentForm.description.trim());
         formData.append("points", String(Number(assignmentForm.maxScore) || 100));
-        if (assignmentForm.dueDate) {
-          formData.append("due_date", toApiDateTime(assignmentForm.dueDate));
+        formData.append(
+          "due_date",
+          assignmentForm.dueDate ? toApiDateTime(assignmentForm.dueDate) : ""
+        );
+        if (hasNewFile) {
+          formData.append("assignment_file", selectedFile);
         }
-        formData.append("assignment_file", selectedFile);
 
-        await axios.post("/api/create-section-assignment", formData, {
-          headers: buildApiHeaders(token),
-        });
+        if (isEditMode) {
+          const assignmentToUpdate = lectureData.assignments.find(
+            (assignment) => assignment.id === assignmentEditingId
+          );
+          if (!assignmentToUpdate?.apiId) {
+            setSectionAssignmentsError("Invalid assignment selected for editing.");
+            return;
+          }
+
+          await axios.post(
+            `/api/update-section-assignment/${assignmentToUpdate.apiId}`,
+            formData,
+            {
+              headers: buildApiHeaders(token),
+            }
+          );
+        } else {
+          formData.append("section_id", String(activeSectionId));
+          await axios.post("/api/create-section-assignment", formData, {
+            headers: buildApiHeaders(token),
+          });
+        }
 
         await fetchSectionAssignments();
         closeAssignmentDialog();
@@ -1469,7 +1533,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
               className="lecture-assignment-dialog"
               role="dialog"
               aria-modal="true"
-              aria-label="Create assignment"
+              aria-label={assignmentDialogTitle}
             >
               <div className="lecture-assignment-dialog-header">
                 <div className="lecture-assignment-dialog-heading">
@@ -1477,7 +1541,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
                     <FiFileText />
                   </span>
                   <div>
-                    <h2>New Assignment</h2>
+                    <h2>{assignmentDialogTitle}</h2>
                     <p>{assignmentDialogDescription}</p>
                   </div>
                 </div>
@@ -1646,7 +1710,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
                     className="lecture-assignment-submit-btn"
                     disabled={!isAssignmentFormValid}
                   >
-                    Create Assignment
+                    {assignmentDialogSubmitLabel}
                   </button>
                 </div>
               </form>
