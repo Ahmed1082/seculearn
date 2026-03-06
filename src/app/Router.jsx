@@ -12,25 +12,22 @@ import Login from "../pages/public/Login";
 import LecturerOverview from "../pages/lecturer/Overview";
 import LecturerCourses from "../pages/lecturer/Courses";
 import LecturerCourseDetails from "../pages/lecturer/CourseDetails";
-import LecturerLectureDetails from "../pages/lecturer/LectureDetails";
-import LecturerSectionDetails from "../pages/lecturer/SectionDetails";
+import LecturerContentDetails from "../pages/lecturer/ContentDetails";
 import LecturerMembers from "../pages/lecturer/Members";
 
 /* ================= TA ================= */
 import TAOverview from "../pages/ta/Overview";
 import TACourses from "../pages/ta/Courses";
 import TACourseDetails from "../pages/ta/CourseDetails";
-import TALectureDetails from "../pages/ta/LectureDetails";
-import TASectionDetails from "../pages/ta/SectionDetails";
+import TAContentDetails from "../pages/ta/ContentDetails";
 import TAMembers from "../pages/ta/Members";
 
 /* ================= Student ================= */
 import StudentCourses from "../pages/student/Courses";
 import StudentCourseDetails from "../pages/student/CourseDetails";
-import StudentLectureDetails from "../pages/student/LectureDetails";
+import StudentContentDetails from "../pages/student/ContentDetails";
 import StudentSubmitLectureAssignment from "../pages/student/SubmitLectureAssignment";
 import StudentSubmitLectureQuizzes from "../pages/student/SubmitLectureQuizzes";
-import StudentSectionDetails from "../pages/student/SectionDetails";
 import StudentSubmitSectionAssignment from "../pages/student/SubmitSectionAssignment";
 import StudentSubmitSectionQuizzes from "../pages/student/SubmitSectionQuizzes";
 import StudentAllAssignments from "../pages/student/AllAssignments";
@@ -50,10 +47,9 @@ const Router = () => (
     <Route element={<LecturerLayout />}>
       <Route path="/lecturer" element={<LecturerOverview />} />
       <Route path="/lecturer/courses" element={<LecturerCourses />} />
-      {/* 🔥 Dynamic Course ID */}
+      {/* Dynamic Course ID */}
       <Route path="/lecturer/courses/:courseId" element={<LecturerCourseDetails />} />
-      <Route path="/lecturer/lectureDetails" element={<LecturerLectureDetails />} />
-      <Route path="/lecturer/sectionDetails" element={<LecturerSectionDetails />} />
+      <Route path="/lecturer/contentDetails" element={<LecturerContentDetails />} />
       <Route path="/lecturer/members" element={<LecturerMembers />} />
     </Route>
 
@@ -61,10 +57,9 @@ const Router = () => (
     <Route element={<TALayout />}>
       <Route path="/ta" element={<TAOverview />} />
       <Route path="/ta/courses" element={<TACourses />} />
-      {/* 🔥 Dynamic Course ID */}
+      {/* Dynamic Course ID */}
       <Route path="/ta/courses/:courseId" element={<TACourseDetails />} />
-      <Route path="/ta/lectureDetails" element={<TALectureDetails />} />
-      <Route path="/ta/sectionDetails" element={<TASectionDetails />} />
+      <Route path="/ta/contentDetails" element={<TAContentDetails />} />
       <Route path="/ta/members" element={<TAMembers />} />
     </Route>
 
@@ -72,12 +67,11 @@ const Router = () => (
     <Route element={<StudentLayout />}>
       <Route path="/student" element={<StudentCourses />} />
       <Route path="/student/courses" element={<StudentCourses />} />
-      {/* 🔥 Dynamic Course ID */}
+      {/* Dynamic Course ID */}
       <Route path="/student/courses/:courseId" element={<StudentCourseDetails />} />
-      <Route path="/student/lectureDetails" element={<StudentLectureDetails />} />
+      <Route path="/student/contentDetails" element={<StudentContentDetails />} />
       <Route path="/student/lecture/:assignmentId" element={<StudentSubmitLectureAssignment />} />
       <Route path="/student/lecture/submitQuizzes" element={<StudentSubmitLectureQuizzes />} />
-      <Route path="/student/sectionDetails" element={<StudentSectionDetails />} />
       <Route path="/student/section/:assignmentId" element={<StudentSubmitSectionAssignment />} />
       <Route path="/student/section/submitQuizzes" element={<StudentSubmitSectionQuizzes />} />
       <Route path="/student/allAssignments" element={<StudentAllAssignments />} />

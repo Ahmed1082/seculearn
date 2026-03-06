@@ -241,7 +241,7 @@ const CourseDetails = ({ role }) => {
               className="circle-card"
               key={lecture.id}
               onClick={() =>
-                navigate(`/${role}/lectureDetails`, {
+                navigate(`/${role}/contentDetails`, {
                   state: {
                     lectureId: lecture.id,
                     lectureTitle: lecture.title,
@@ -304,7 +304,7 @@ const CourseDetails = ({ role }) => {
                 if (permissions.canManageSections) {
                   localStorage.setItem("ta_active_section_id", String(section.id));
                   localStorage.setItem("ta_active_section_title", section.title || "");
-                  navigate(`/${role}/lectureDetails`, {
+                  navigate(`/${role}/contentDetails`, {
                     state: {
                       sectionId: section.id,
                       sectionTitle: section.title,
@@ -314,7 +314,7 @@ const CourseDetails = ({ role }) => {
                   return;
                 }
 
-                navigate(`/${role}/lectureDetails`, {
+                navigate(`/${role}/contentDetails`, {
                   state: {
                     sectionId: section.id,
                     sectionTitle: section.title,

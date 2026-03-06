@@ -177,6 +177,17 @@ const toAbsoluteApiUrl = (path = "") => {
   return `${API_BASE_URL}/${String(path).replace(/^\/+/, "")}`;
 };
 
+const resolveFileHref = (fileLike = {}) => {
+  const dataUrl = fileLike?.dataUrl || "";
+  if (dataUrl) return dataUrl;
+
+  const raw = String(fileLike?.url || fileLike?.path || "").trim();
+  if (!raw) return "";
+  if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
+
+  return toAbsoluteApiUrl(raw);
+};
+
 const toApiDateTime = (dateTimeLocalValue) => {
   if (!dateTimeLocalValue) return "";
   const normalized = dateTimeLocalValue.replace("T", " ").trim();
@@ -226,7 +237,7 @@ const AccordionSection = ({
   </section>
 );
 
-const LectureDetails = ({ role = "lecturer" }) => {
+const ContentDetails = ({ role = "lecturer" }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isSectionView = !!location.state?.sectionId;
@@ -487,14 +498,23 @@ const LectureDetails = ({ role = "lecturer" }) => {
         lastModified: entry.lastModified || Date.now(),
         mimeType: entry.mimeType || "",
         dataUrl: entry.dataUrl || "",
-        url: entry.url || "",
+        url: resolveFileHref({ url: entry.url }),
       }));
   };
 
   const mapSectionAssignmentToCard = useCallback((assignment) => {
     const attachmentPath = assignment?.file_path || "";
-    const attachmentName =
+    const attachmentNameFromPath =
       attachmentPath.split("/").filter(Boolean).pop() || "assignment.pdf";
+    const attachmentNameFromApi =
+      assignment?.original_file_name ||
+      assignment?.file_name ||
+      assignment?.filename ||
+      assignment?.file_original_name ||
+      assignment?.assignment_file_name ||
+      assignment?.file_display_name ||
+      "";
+    const attachmentName = attachmentNameFromApi || attachmentNameFromPath;
 
     return {
       id: `section-assignment-${assignment.id}`,
@@ -507,7 +527,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
         ? [
             {
               name: attachmentName,
-              url: toAbsoluteApiUrl(attachmentPath),
+              url: resolveFileHref({ path: attachmentPath }),
               path: attachmentPath,
             },
           ]
@@ -915,6 +935,8 @@ const LectureDetails = ({ role = "lecturer" }) => {
         );
         if (hasNewFile) {
           formData.append("assignment_file", selectedFile);
+          formData.append("file_name", selectedFile.name);
+          formData.append("original_file_name", selectedFile.name);
         }
 
         if (isEditMode) {
@@ -1184,7 +1206,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
 
                       <div className="lecture-file-meta">
                         {(() => {
-                          const fileHref = file.dataUrl || file.url;
+                          const fileHref = resolveFileHref(file);
                           if (!fileHref) {
                             return <span>{file.name}</span>;
                           }
@@ -1213,7 +1235,7 @@ const LectureDetails = ({ role = "lecturer" }) => {
 
                     <div className="lecture-file-actions">
                       {(() => {
-                        const fileHref = file.dataUrl || file.url;
+                        const fileHref = resolveFileHref(file);
                         if (!fileHref) return null;
 
                         return (
@@ -1395,13 +1417,15 @@ const LectureDetails = ({ role = "lecturer" }) => {
                               typeof attachment === "string"
                                 ? { name: attachment, url: "" }
                                 : attachment;
+                            const attachmentHref =
+                              resolveFileHref(normalizedAttachment);
 
                             return (
                               <span key={`${normalizedAttachment.name}-${index}`}>
-                                {normalizedAttachment.url ? (
+                                {attachmentHref ? (
                                   <a
                                     className="lecture-details-file-link"
-                                    href={normalizedAttachment.url}
+                                    href={attachmentHref}
                                     download={normalizedAttachment.name}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -1948,4 +1972,4 @@ const LectureDetails = ({ role = "lecturer" }) => {
   );
 };
 
-export default LectureDetails;
+export default ContentDetails;
