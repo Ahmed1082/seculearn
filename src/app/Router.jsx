@@ -5,6 +5,8 @@ import LecturerLayout from "../layouts/lecturerLayout";
 import TALayout from "../layouts/TALayout";
 import StudentLayout from "../layouts/StudentLayout";
 
+import AssignmentReview from "../pages/shared/AssignmentReview";
+
 import Welcome from "../pages/public/Welcome";
 import Login from "../pages/public/Login";
 
@@ -14,6 +16,7 @@ import LecturerCourses from "../pages/lecturer/Courses";
 import LecturerCourseDetails from "../pages/lecturer/CourseDetails";
 import LecturerContentDetails from "../pages/lecturer/ContentDetails";
 import LecturerMembers from "../pages/lecturer/Members";
+
 
 /* ================= TA ================= */
 import TAOverview from "../pages/ta/Overview";
@@ -51,6 +54,8 @@ const Router = () => (
       <Route path="/lecturer/courses/:courseId" element={<LecturerCourseDetails />} />
       <Route path="/lecturer/contentDetails" element={<LecturerContentDetails />} />
       <Route path="/lecturer/members" element={<LecturerMembers />} />
+    
+      <Route path="/lecturer/assignmentreview/:assignmentId" element={<AssignmentReview />} />
     </Route>
 
     {/* ================= TA ================= */}
@@ -61,6 +66,8 @@ const Router = () => (
       <Route path="/ta/courses/:courseId" element={<TACourseDetails />} />
       <Route path="/ta/contentDetails" element={<TAContentDetails />} />
       <Route path="/ta/members" element={<TAMembers />} />
+
+      <Route path="/ta/assignmentreview/:assignmentId" element={<AssignmentReview />} />
     </Route>
 
     {/* ================= Student ================= */}
