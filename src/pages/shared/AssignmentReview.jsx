@@ -2,6 +2,7 @@
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
+  ChevronDown,
   Users,
   Search,
   Clock3,
@@ -244,6 +245,11 @@ const AssignmentReview = () => {
   const [filterType, setFilterType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [acceptingSubmissions, setAcceptingSubmissions] = useState(true);
+  const [statusOverrides, setStatusOverrides] = useState({});
+  const [excusedByStudent, setExcusedByStudent] = useState({});
+  const [returnedByStudent, setReturnedByStudent] = useState({});
+  const [isReturnMenuOpen, setIsReturnMenuOpen] = useState(false);
+  const [returnActionFeedback, setReturnActionFeedback] = useState("");
   const [draftGrades, setDraftGrades] = useState({});
   const [publicMessages, setPublicMessages] = useState([]);
   const [publicDraft, setPublicDraft] = useState("");
@@ -262,6 +268,11 @@ const AssignmentReview = () => {
     setSelectedStudentId(null);
     setFilterType("all");
     setSearchQuery("");
+    setStatusOverrides({});
+    setExcusedByStudent({});
+    setReturnedByStudent({});
+    setIsReturnMenuOpen(false);
+    setReturnActionFeedback("");
     setDraftGrades({});
     setPublicMessages([...(publicCommentsSeed[assignment.id] || [])]);
     setPublicDraft("");
@@ -287,6 +298,7 @@ const AssignmentReview = () => {
     submissions.find((sub) => sub.studentId === studentId) || null;
 
   const getComputedStatus = (studentId) => {
+    if (statusOverrides[studentId]) return statusOverrides[studentId];
     if (assignment.doneStudentIds.includes(studentId)) return "turned_in";
     if (assignment.missedStudentIds.includes(studentId)) return "missed";
     return "assigned";
@@ -298,9 +310,9 @@ const AssignmentReview = () => {
     submission: getSubmissionForStudent(student.id),
   }));
 
-  const turnedInCount = assignment.doneStudentIds.length;
-  const missedCount = assignment.missedStudentIds.length;
-  const assignedCount = students.length - turnedInCount - missedCount;
+  const turnedInCount = studentList.filter((student) => student.status === "turned_in").length;
+  const missedCount = studentList.filter((student) => student.status === "missed").length;
+  const assignedCount = studentList.filter((student) => student.status === "assigned").length;
 
   const filteredStudents = studentList.filter((student) => {
     const statusMatches = filterType === "all" || student.status === filterType;
@@ -316,6 +328,8 @@ const AssignmentReview = () => {
     setActivePrivateMenuId(null);
     setEditingPrivateCommentId(null);
     setPrivateEditDraft("");
+    setIsReturnMenuOpen(false);
+    setReturnActionFeedback("");
   }, [selectedStudentId]);
 
   const getPrivateMessages = (studentId) => privateMessagesByStudent[studentId] || [];
@@ -482,6 +496,84 @@ const AssignmentReview = () => {
     }
   };
 
+  const applyStatusToStudents = (studentIds, status) => {
+    if (!studentIds.length) return;
+    setStatusOverrides((prev) => ({
+      ...prev,
+      ...studentIds.reduce((acc, id) => ({ ...acc, [id]: status }), {}),
+    }));
+  };
+
+  const handleReturnAssignments = (student) => {
+    if (!student || student.status !== "turned_in" || !student.submission) {
+      setReturnActionFeedback("This student has no turned-in submission to return.");
+      setIsReturnMenuOpen(false);
+      return;
+    }
+
+    setReturnedByStudent((prev) => ({ ...prev, [student.id]: true }));
+    setReturnActionFeedback(`Returned submission for ${student.name}.`);
+    setIsReturnMenuOpen(false);
+  };
+
+  const handleBulkGrade = (student) => {
+    if (!student || student.status !== "turned_in" || !student.submission) {
+      setReturnActionFeedback("This student cannot be graded before submission.");
+      setIsReturnMenuOpen(false);
+      return;
+    }
+
+    setSubmissions((prev) =>
+      prev.map((sub) =>
+        sub.studentId === student.id
+          ? { ...sub, grade: 100 }
+          : sub
+      )
+    );
+    setDraftGrades((prev) => ({ ...prev, [student.id]: "100" }));
+    setReturnActionFeedback(`Set grade to 100 for ${student.name}.`);
+    setIsReturnMenuOpen(false);
+  };
+
+  const handleMarkComplete = (student) => {
+    if (!student) return;
+    applyStatusToStudents([student.id], "turned_in");
+    setExcusedByStudent((prev) => ({ ...prev, [student.id]: false }));
+    setReturnActionFeedback(`Marked ${student.name} as complete.`);
+    setIsReturnMenuOpen(false);
+  };
+
+  const handleMarkMissing = (student) => {
+    if (!student) return;
+    applyStatusToStudents([student.id], "missed");
+    setReturnActionFeedback(`Marked ${student.name} as missing.`);
+    setIsReturnMenuOpen(false);
+  };
+
+  const handleExcuse = (student) => {
+    if (!student || student.status !== "missed") {
+      setReturnActionFeedback("Only missed students can be excused.");
+      setIsReturnMenuOpen(false);
+      return;
+    }
+
+    setExcusedByStudent((prev) => ({ ...prev, [student.id]: true }));
+    setReturnActionFeedback(`Excused ${student.name}.`);
+    setIsReturnMenuOpen(false);
+  };
+
+  const handleRemoveExcuse = (student) => {
+    if (!student || !excusedByStudent[student.id]) {
+      setReturnActionFeedback("This student is not marked as excused.");
+      setIsReturnMenuOpen(false);
+      return;
+    }
+
+    setExcusedByStudent((prev) => ({ ...prev, [student.id]: false }));
+    setReturnActionFeedback(`Removed excuse from ${student.name}.`);
+    setIsReturnMenuOpen(false);
+  };
+
   return (
     <section className="assignment-review-page">
       <div className="assignment-review-inner">
@@ -558,11 +650,20 @@ const AssignmentReview = () => {
 
                     <span className="assignment-review-student-state">
                       {student.status === "turned_in" ? (
-                        <span className="assignment-review-grade">
-                          {gradeValue !== "" ? `${gradeValue}/100` : "___/100"}
+                        <span className="assignment-review-grade-wrap">
+                          <span className="assignment-review-grade">
+                            {gradeValue !== "" ? `${gradeValue}/100` : "___/100"}
+                          </span>
+                          {returnedByStudent[student.id] && (
+                            <small className="assignment-review-returned-tag">Returned</small>
+                          )}
                         </span>
                       ) : student.status === "missed" ? (
-                        <XCircle size={16} className="assignment-review-status-missed" />
+                        excusedByStudent[student.id] ? (
+                          <span className="assignment-review-excused-pill">Excused</span>
+                        ) : (
+                          <XCircle size={16} className="assignment-review-status-missed" />
+                        )
                       ) : (
                         <Clock3 size={16} className="assignment-review-status-pending" />
                       )}
@@ -631,7 +732,9 @@ const AssignmentReview = () => {
                             <span>{submission.fileName}</span>
                           </div>
 
-                          <span className="assignment-review-turned-pill">Turned in</span>
+                          <span className={`assignment-review-turned-pill ${returnedByStudent[submission.studentId] ? "returned" : ""}`}>
+                            {returnedByStudent[submission.studentId] ? "Returned" : "Turned in"}
+                          </span>
                         </button>
                       );
                     })}
@@ -770,6 +873,61 @@ const AssignmentReview = () => {
                     <p>{selectedStudent.studentId}</p>
                   </div>
                 </header>
+
+                <section className="assignment-review-return-row">
+                  <div className="assignment-review-return-control">
+                    <button
+                      type="button"
+                      className="assignment-review-return-main-btn"
+                      onClick={() => handleReturnAssignments(selectedStudent)}
+                      disabled={selectedStudent.status !== "turned_in" || !selectedStudent.submission}
+                    >
+                      Return
+                    </button>
+                    
+                    {isReturnMenuOpen && (
+                      <div className="assignment-review-return-menu">
+                        <button
+                          type="button"
+                          onClick={() => handleBulkGrade(selectedStudent)}
+                          disabled={selectedStudent.status !== "turned_in" || !selectedStudent.submission}
+                        >
+                          Bulk grade
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkComplete(selectedStudent)}
+                        >
+                          Mark as complete
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMarkMissing(selectedStudent)}
+                          disabled={selectedStudent.status === "turned_in"}
+                        >
+                          Mark as missing
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleExcuse(selectedStudent)}
+                          disabled={selectedStudent.status !== "missed"}
+                        >
+                          Excuse
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExcuse(selectedStudent)}
+                          disabled={!excusedByStudent[selectedStudent.id]}
+                        >
+                          Do not excuse
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                    {returnActionFeedback && (
+                    <p className="assignment-review-return-feedback">{returnActionFeedback}</p>
+                  )}
+                </section>
 
                 {selectedStudent.status === "turned_in" && selectedStudent.submission ? (
                   <>
