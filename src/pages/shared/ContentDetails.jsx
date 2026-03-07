@@ -171,6 +171,15 @@ const buildApiHeaders = (token) => ({
   "ngrok-skip-browser-warning": "true",
 });
 
+const LECTURE_ASSIGNMENT_FILE_ACCEPT =
+  ".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar";
+const SECTION_ASSIGNMENT_FILE_ACCEPT = ".pdf,application/pdf";
+const ALLOWED_ASSIGNMENT_FILE_EXTENSIONS = new Set(
+  LECTURE_ASSIGNMENT_FILE_ACCEPT.split(",").map((entry) =>
+    entry.replace(".", "").toLowerCase()
+  )
+);
+
 const toAbsoluteApiUrl = (path = "") => {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
@@ -199,6 +208,45 @@ const toDateTimeInputValue = (apiDateTime) => {
   if (!apiDateTime) return "";
   const normalized = String(apiDateTime).trim().replace(" ", "T");
   return normalized.slice(0, 16);
+};
+
+const getApiFileDisplayName = (fileLike = {}, fallbackPath = "") => {
+  const apiName =
+    fileLike?.original_name ||
+    fileLike?.original_file_name ||
+    fileLike?.file_name ||
+    fileLike?.filename ||
+    fileLike?.file_original_name ||
+    fileLike?.assignment_file_name ||
+    fileLike?.submission_file_name ||
+    fileLike?.file_display_name ||
+    "";
+
+  if (apiName) return apiName;
+
+  return String(fallbackPath || "")
+    .split("?")[0]
+    .split("/")
+    .filter(Boolean)
+    .pop() || "";
+};
+
+const isPdfFile = (file) => {
+  if (!(file instanceof File)) return false;
+  return (
+    file.type === "application/pdf" ||
+    String(file.name || "").toLowerCase().endsWith(".pdf")
+  );
+};
+
+const isSupportedLectureAssignmentFile = (file) => {
+  if (!(file instanceof File)) return false;
+  const extension = String(file.name || "")
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+
+  return !!extension && ALLOWED_ASSIGNMENT_FILE_EXTENSIONS.has(extension);
 };
 
 const AccordionSection = ({
@@ -241,6 +289,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isSectionView = !!location.state?.sectionId;
+  const stateCourseId = location.state?.courseId;
+  const stateSectionId = location.state?.sectionId || location.state?.id;
+  const stateSectionTitle =
+    location.state?.sectionTitle || location.state?.title;
   const lectureId = location.state?.lectureId;
   const lectureTitleFromState = location.state?.lectureTitle;
   const lectureFileInputRef = useRef(null);
@@ -251,13 +303,16 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
   const canManageLecture = role === "lecturer" || role === "ta";
   const isTA = role === "ta";
+  const isLecturer = role === "lecturer";
 
   const [lectureData, setLectureData] = useState(() => {
     const sectionView = !!location.state?.sectionId;
     const base = {
       ...lectureSeed,
       id: lectureId || lectureSeed.id,
-      title: lectureTitleFromState || lectureSeed.title,
+      title: sectionView
+        ? stateSectionTitle || lectureTitleFromState || lectureSeed.title
+        : lectureTitleFromState || lectureSeed.title,
     };
     if (role === "student" && sectionView) {
       return { ...base, assignments: [] };
@@ -273,6 +328,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const [uploadedLectureFiles, setUploadedLectureFiles] = useState([]);
   const [hasLoadedLectureFiles, setHasLoadedLectureFiles] = useState(false);
   const [isUploadingLectureFiles, setIsUploadingLectureFiles] = useState(false);
+  const [isFetchingSectionUploads, setIsFetchingSectionUploads] =
+    useState(false);
   const [lectureUploadError, setLectureUploadError] = useState("");
   const [assignmentDialogOpen, setAssignmentDialogOpen] = useState(false);
   const [assignmentForm, setAssignmentForm] = useState(
@@ -319,14 +376,47 @@ const ContentDetails = ({ role = "lecturer" }) => {
     () => resolveStudentIdForMockData(getCurrentStudentId()),
     []
   );
-  const isStudentSectionView = role === "student" && isSectionView;
-  const unitLabel = isTA || isStudentSectionView ? "Section" : "Lecture";
+  const canManageAssignmentsViaApi = isSectionView ? isTA : isLecturer;
+  const canManageUploadsViaApi = isSectionView ? isTA : isLecturer;
+  const shouldFetchAssignmentsFromApi = true;
+  const shouldUseUploadsApi = true;
+  const contentApiId = useMemo(() => {
+    if (isSectionView) {
+      const sectionTargetId = activeSectionId || stateSectionId;
+      return sectionTargetId ? String(sectionTargetId) : "";
+    }
+
+    const lectureTargetId = lectureId || lectureData.id;
+    return lectureTargetId ? String(lectureTargetId) : "";
+  }, [activeSectionId, isSectionView, stateSectionId, lectureId, lectureData.id]);
+  const assignmentApiScope = isSectionView ? "section" : "lecture";
+  const assignmentOwnerField =
+    assignmentApiScope === "section" ? "section_id" : "lecture_id";
+  const assignmentCollectionEndpoint = contentApiId
+    ? `/api/get-${assignmentApiScope}-assignments/${contentApiId}`
+    : "";
+  const createAssignmentEndpoint = `/api/create-${assignmentApiScope}-assignment`;
+  const getAssignmentUpdateEndpoint = (assignmentId) =>
+    `/api/update-${assignmentApiScope}-assignment/${assignmentId}`;
+  const getAssignmentDeleteEndpoint = (assignmentId) =>
+    `/api/delete-${assignmentApiScope}-assignment/${assignmentId}`;
+  const uploadApiScope = isSectionView ? "section" : "lecture";
+  const uploadOwnerField = uploadApiScope === "section" ? "section_id" : "lecture_id";
+  const uploadCollectionEndpoint = contentApiId
+    ? `/api/get-${uploadApiScope}-uploads/${contentApiId}`
+    : "";
+  const createUploadEndpoint = `/api/upload-${uploadApiScope}`;
+  const getUploadDeleteEndpoint = (uploadId) =>
+    `/api/delete-${uploadApiScope}-upload/${uploadId}`;
+  const assignmentFileAccept = isSectionView
+    ? SECTION_ASSIGNMENT_FILE_ACCEPT
+    : LECTURE_ASSIGNMENT_FILE_ACCEPT;
+  const unitLabel = isSectionView ? "Section" : "Lecture";
   const unitLabelLower = unitLabel.toLowerCase();
-  const resolvedTitle = activeSectionTitle || lectureData.title;
-  const pageTitle =
-    isTA || isStudentSectionView
-      ? resolvedTitle.replace(/^lecture\b/i, "Section")
-      : lectureData.title;
+  const resolvedTitle = isSectionView
+    ? activeSectionTitle || stateSectionTitle || lectureData.title
+    : lectureTitleFromState || lectureData.title;
+  const pageTitle = resolvedTitle;
   const contentBlockTitle = `${unitLabel} Content`;
   const uploadButtonLabel = `Upload ${unitLabel} File`;
   const lectureContentHintText = canManageLecture
@@ -379,10 +469,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
   useEffect(() => {
     if (!isSectionView && !isTA) return;
 
-    const stateSectionId = location.state?.sectionId || location.state?.id;
-    const stateSectionTitle =
-      location.state?.sectionTitle || location.state?.title;
-
     if (stateSectionId !== undefined && stateSectionId !== null) {
       const normalizedSectionId = String(stateSectionId);
       setActiveSectionId(normalizedSectionId);
@@ -398,9 +484,24 @@ const ContentDetails = ({ role = "lecturer" }) => {
         localStorage.setItem("ta_active_section_title", normalizedSectionTitle);
       }
     }
-  }, [isTA, isSectionView, location.state]);
+  }, [isTA, isSectionView, stateSectionId, stateSectionTitle]);
 
   useEffect(() => {
+    setLectureData((prev) => ({
+      ...prev,
+      id: lectureId || prev.id || lectureSeed.id,
+      title: isSectionView
+        ? stateSectionTitle || prev.title || lectureSeed.title
+        : lectureTitleFromState || prev.title || lectureSeed.title,
+    }));
+  }, [isSectionView, lectureId, lectureTitleFromState, stateSectionTitle]);
+
+  useEffect(() => {
+    if (shouldUseUploadsApi) {
+      setHasLoadedLectureFiles(false);
+      return;
+    }
+
     try {
       const rawStoredFiles = localStorage.getItem(lectureFilesStorageKey);
       if (!rawStoredFiles) {
@@ -416,9 +517,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
     } finally {
       setHasLoadedLectureFiles(true);
     }
-  }, [lectureFilesStorageKey]);
+  }, [lectureFilesStorageKey, shouldUseUploadsApi]);
 
   useEffect(() => {
+    if (shouldUseUploadsApi) return;
     if (!hasLoadedLectureFiles) return;
 
     const serializableFiles = uploadedLectureFiles.map((file) => ({
@@ -435,9 +537,16 @@ const ContentDetails = ({ role = "lecturer" }) => {
       lectureFilesStorageKey,
       JSON.stringify(serializableFiles)
     );
-  }, [hasLoadedLectureFiles, lectureFilesStorageKey, uploadedLectureFiles]);
+  }, [
+    hasLoadedLectureFiles,
+    lectureFilesStorageKey,
+    shouldUseUploadsApi,
+    uploadedLectureFiles,
+  ]);
 
   useEffect(() => {
+    if (shouldUseUploadsApi) return;
+
     const handleStorageSync = (event) => {
       if (event.key !== lectureFilesStorageKey) return;
       if (!event.newValue) {
@@ -455,7 +564,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
     window.addEventListener("storage", handleStorageSync);
     return () => window.removeEventListener("storage", handleStorageSync);
-  }, [lectureFilesStorageKey]);
+  }, [lectureFilesStorageKey, shouldUseUploadsApi]);
 
   const formatDueDate = (dateValue) => {
     if (!dateValue) return "";
@@ -502,22 +611,83 @@ const ContentDetails = ({ role = "lecturer" }) => {
       }));
   };
 
-  const mapSectionAssignmentToCard = useCallback((assignment) => {
-    const attachmentPath = assignment?.file_path || "";
-    const attachmentNameFromPath =
-      attachmentPath.split("/").filter(Boolean).pop() || "assignment.pdf";
-    const attachmentNameFromApi =
-      assignment?.original_file_name ||
-      assignment?.file_name ||
-      assignment?.filename ||
-      assignment?.file_original_name ||
-      assignment?.assignment_file_name ||
-      assignment?.file_display_name ||
-      "";
-    const attachmentName = attachmentNameFromApi || attachmentNameFromPath;
+  const mapSectionUploadToLectureFile = useCallback((upload) => {
+    const name =
+      getApiFileDisplayName(upload, upload?.file_path || upload?.path || upload?.url) ||
+      upload?.name ||
+      "Uploaded file";
+    const sizeKb = Number(upload?.size_kb);
+    const sizeBytes =
+      Number(upload?.size_bytes) ||
+      Number(upload?.size) ||
+      (Number.isFinite(sizeKb) ? Math.round(sizeKb * 1024) : 0);
 
     return {
-      id: `section-assignment-${assignment.id}`,
+      id: `section-upload-${upload?.id ?? createClientId("section-upload")}`,
+      apiId: upload?.id ?? null,
+      name,
+      size: Number.isFinite(sizeBytes) ? sizeBytes : 0,
+      lastModified: upload?.updated_at || upload?.created_at || Date.now(),
+      mimeType: upload?.mime_type || "",
+      dataUrl: "",
+      url: resolveFileHref({
+        path: upload?.file_path || upload?.path || upload?.url || "",
+      }),
+    };
+  }, []);
+
+  const fetchSectionUploads = useCallback(async () => {
+    if (!shouldUseUploadsApi) return;
+
+    if (!contentApiId) {
+      setUploadedLectureFiles([]);
+      if (canManageLecture) {
+        setLectureUploadError(
+          "Select a lecture or section first from course details to manage uploads."
+        );
+      }
+      return;
+    }
+
+    setIsFetchingSectionUploads(true);
+    setLectureUploadError("");
+
+    try {
+      const response = await axios.get(uploadCollectionEndpoint, {
+        headers: buildApiHeaders(token),
+      });
+      const payload = Array.isArray(response?.data?.data)
+        ? response.data.data
+        : [];
+      setUploadedLectureFiles(payload.map(mapSectionUploadToLectureFile));
+    } catch (error) {
+      setLectureUploadError(
+        error?.response?.data?.message || "Failed to load uploads."
+      );
+      setUploadedLectureFiles([]);
+    } finally {
+      setIsFetchingSectionUploads(false);
+    }
+  }, [
+    canManageLecture,
+    contentApiId,
+    mapSectionUploadToLectureFile,
+    shouldUseUploadsApi,
+    token,
+    uploadCollectionEndpoint,
+  ]);
+
+  useEffect(() => {
+    fetchSectionUploads();
+  }, [fetchSectionUploads]);
+
+  const mapSectionAssignmentToCard = useCallback((assignment) => {
+    const attachmentPath = assignment?.file_path || "";
+    const attachmentName =
+      getApiFileDisplayName(assignment, attachmentPath) || "assignment.pdf";
+
+    return {
+      id: `assignment-${assignment.id}`,
       apiId: assignment.id,
       title: assignment.title || attachmentName || "Untitled Assignment",
       description: assignment.description || "",
@@ -538,12 +708,11 @@ const ContentDetails = ({ role = "lecturer" }) => {
   }, []);
 
   const fetchSectionAssignments = useCallback(async () => {
-    const canFetch =
-      (isTA || (role === "student" && isSectionView)) && activeSectionId;
+    const canFetch = shouldFetchAssignmentsFromApi && contentApiId;
     if (!canFetch) {
-      if (isTA && !activeSectionId) {
+      if (canManageAssignmentsViaApi && !contentApiId) {
         setSectionAssignmentsError(
-          "Select a section first from course details to manage assignments."
+          "Select a lecture or section first from course details to manage assignments."
         );
         setLectureData((prev) => ({ ...prev, assignments: [] }));
       }
@@ -554,12 +723,9 @@ const ContentDetails = ({ role = "lecturer" }) => {
     setSectionAssignmentsError("");
 
     try {
-      const response = await axios.get(
-        `/api/get-section-assignments/${activeSectionId}`,
-        {
-          headers: buildApiHeaders(token),
-        }
-      );
+      const response = await axios.get(assignmentCollectionEndpoint, {
+        headers: buildApiHeaders(token),
+      });
 
       const payload = Array.isArray(response?.data?.data)
         ? response.data.data
@@ -571,13 +737,20 @@ const ContentDetails = ({ role = "lecturer" }) => {
       }));
     } catch (error) {
       setSectionAssignmentsError(
-        error?.response?.data?.message || "Failed to load section assignments."
+        error?.response?.data?.message || "Failed to load assignments."
       );
       setLectureData((prev) => ({ ...prev, assignments: [] }));
     } finally {
       setIsFetchingSectionAssignments(false);
     }
-  }, [activeSectionId, isTA, isSectionView, role, mapSectionAssignmentToCard, token]);
+  }, [
+    assignmentCollectionEndpoint,
+    canManageAssignmentsViaApi,
+    contentApiId,
+    mapSectionAssignmentToCard,
+    shouldFetchAssignmentsFromApi,
+    token,
+  ]);
 
   useEffect(() => {
     fetchSectionAssignments();
@@ -598,7 +771,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
   const openEdit = (type, item) => {
     if (!canManageLecture) return;
-    if (isTA && type === "assignment") {
+    if (canManageAssignmentsViaApi && type === "assignment") {
       openAssignmentEditDialog(item);
       return;
     }
@@ -618,7 +791,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
     const trimmedTitle = editedTitle.trim();
     if (!trimmedTitle || !editingId || !editingType) return;
 
-    if (isTA && editingType === "assignment") {
+    if (canManageAssignmentsViaApi && editingType === "assignment") {
       const assignmentToUpdate = lectureData.assignments.find(
         (assignment) => assignment.id === editingId
       );
@@ -636,7 +809,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
         }
 
         await axios.post(
-          `/api/update-section-assignment/${assignmentToUpdate.apiId}`,
+          getAssignmentUpdateEndpoint(assignmentToUpdate.apiId),
           formData,
           {
             headers: buildApiHeaders(token),
@@ -695,7 +868,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
     if (!canManageLecture) return;
     if (!type || !id) return;
 
-    if (isTA && type === "assignment") {
+    if (canManageAssignmentsViaApi && type === "assignment") {
       const assignmentToDelete = lectureData.assignments.find(
         (assignment) => assignment.id === id
       );
@@ -704,7 +877,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
       try {
         await axios.delete(
-          `/api/delete-section-assignment/${assignmentToDelete.apiId}`,
+          getAssignmentDeleteEndpoint(assignmentToDelete.apiId),
           {
             headers: buildApiHeaders(token),
           }
@@ -761,7 +934,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
   };
 
   const openAssignmentDialog = () => {
-    if (!canManageLecture) return;
+    if (!canManageAssignmentsViaApi) return;
     setSectionAssignmentsError("");
     setAssignmentDialogMode("create");
     setAssignmentEditingId(null);
@@ -770,7 +943,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
   };
 
   const openAssignmentEditDialog = (assignment) => {
-    if (!isTA || !assignment) return;
+    if (!canManageAssignmentsViaApi || !assignment) return;
     setSectionAssignmentsError("");
     setAssignmentDialogMode("edit");
     setAssignmentEditingId(assignment.id);
@@ -865,13 +1038,15 @@ const ContentDetails = ({ role = "lecturer" }) => {
     if (!files.length) return;
     const fileEntries = files.map((file) => createDownloadEntry(file));
 
-    if (isTA) {
+    if (canManageAssignmentsViaApi) {
       setSectionAssignmentsError("");
     }
 
     setAssignmentForm((prev) => ({
       ...prev,
-      files: isTA ? [fileEntries[0]] : [...prev.files, ...fileEntries],
+      files: canManageAssignmentsViaApi
+        ? [fileEntries[0]]
+        : [...prev.files, ...fileEntries],
     }));
 
     event.target.value = "";
@@ -896,10 +1071,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
     const trimmed = assignmentForm.title.trim();
     if (!trimmed) return;
 
-    if (isTA) {
-      if (!activeSectionId) {
+    if (canManageAssignmentsViaApi) {
+      if (!contentApiId) {
         setSectionAssignmentsError(
-          "No active section selected. Open section details from the course page."
+          "No active lecture or section selected. Open content details from the course page."
         );
         return;
       }
@@ -909,18 +1084,25 @@ const ContentDetails = ({ role = "lecturer" }) => {
       const isEditMode = assignmentDialogMode === "edit";
 
       if (!isEditMode && !(selectedFile instanceof File)) {
-        setSectionAssignmentsError("Please upload a PDF file for the assignment.");
+        setSectionAssignmentsError(
+          "Please upload an assignment file before saving."
+        );
         return;
       }
 
       const hasNewFile = selectedFile instanceof File;
-      const isPdf =
-        !hasNewFile ||
-        selectedFile.type === "application/pdf" ||
-        selectedFile.name.toLowerCase().endsWith(".pdf");
+      const isSupportedFile = !hasNewFile
+        ? true
+        : isSectionView
+          ? isPdfFile(selectedFile)
+          : isSupportedLectureAssignmentFile(selectedFile);
 
-      if (!isPdf) {
-        setSectionAssignmentsError("Only PDF files are allowed.");
+      if (!isSupportedFile) {
+        setSectionAssignmentsError(
+          isSectionView
+            ? "Section assignments must be uploaded as PDF files."
+            : "Supported files: PDF, DOC, DOCX, PPT, PPTX, XLS, XLSX, TXT, ZIP, RAR."
+        );
         return;
       }
 
@@ -949,15 +1131,15 @@ const ContentDetails = ({ role = "lecturer" }) => {
           }
 
           await axios.post(
-            `/api/update-section-assignment/${assignmentToUpdate.apiId}`,
+            getAssignmentUpdateEndpoint(assignmentToUpdate.apiId),
             formData,
             {
               headers: buildApiHeaders(token),
             }
           );
         } else {
-          formData.append("section_id", String(activeSectionId));
-          await axios.post("/api/create-section-assignment", formData, {
+          formData.append(assignmentOwnerField, String(contentApiId));
+          await axios.post(createAssignmentEndpoint, formData, {
             headers: buildApiHeaders(token),
           });
         }
@@ -1058,7 +1240,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
   };
 
   const deleteAssignmentFromDialog = async () => {
-    if (!isTA) return;
+    if (!canManageAssignmentsViaApi) return;
     if (assignmentDialogMode !== "edit" || !assignmentEditingId) return;
 
     const assignmentToDelete = lectureData.assignments.find(
@@ -1072,7 +1254,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
     try {
       await axios.delete(
-        `/api/delete-section-assignment/${assignmentToDelete.apiId}`,
+        getAssignmentDeleteEndpoint(assignmentToDelete.apiId),
         {
           headers: buildApiHeaders(token),
         }
@@ -1087,13 +1269,34 @@ const ContentDetails = ({ role = "lecturer" }) => {
   };
 
   const onUploadLectureFile = async (event) => {
-    if (!canManageLecture) return;
+    if (!canManageUploadsViaApi) return;
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     setIsUploadingLectureFiles(true);
     setLectureUploadError("");
 
     try {
+      if (shouldUseUploadsApi) {
+        if (!contentApiId) {
+          setLectureUploadError(
+            "No active lecture or section selected. Open content details from the course page."
+          );
+          return;
+        }
+
+        const selectedFile = files[0];
+        const formData = new FormData();
+        formData.append(uploadOwnerField, String(contentApiId));
+        formData.append("upload_file", selectedFile);
+
+        await axios.post(createUploadEndpoint, formData, {
+          headers: buildApiHeaders(token),
+        });
+
+        await fetchSectionUploads();
+        return;
+      }
+
       const fileEntries = await Promise.all(
         files.map(async (file) => ({
           id: createClientId("lecture-file"),
@@ -1116,15 +1319,37 @@ const ContentDetails = ({ role = "lecturer" }) => {
         );
         return [...prev, ...uniqueEntries];
       });
-    } catch {
-      setLectureUploadError("Upload failed. Please try again.");
+    } catch (error) {
+      setLectureUploadError(
+        error?.response?.data?.message || "Upload failed. Please try again."
+      );
     } finally {
       setIsUploadingLectureFiles(false);
       event.target.value = "";
     }
   };
 
-  const removeLectureFile = (fileId) => {
+  const removeLectureFile = async (fileId) => {
+    if (shouldUseUploadsApi && canManageUploadsViaApi) {
+      const target = uploadedLectureFiles.find((file) => file.id === fileId);
+      if (!target?.apiId) return;
+
+      try {
+        setLectureUploadError("");
+        await axios.delete(getUploadDeleteEndpoint(target.apiId), {
+          headers: buildApiHeaders(token),
+        });
+        setUploadedLectureFiles((prev) =>
+          prev.filter((file) => file.id !== fileId)
+        );
+      } catch (error) {
+        setLectureUploadError(
+          error?.response?.data?.message || "Failed to delete file."
+        );
+      }
+      return;
+    }
+
     setUploadedLectureFiles((prev) => {
       const target = prev.find((file) => file.id === fileId);
 
@@ -1141,6 +1366,14 @@ const ContentDetails = ({ role = "lecturer" }) => {
     quizForm.title.trim().length > 0 &&
     sanitizeQuizNumber(quizForm.timeLimit, 1, 180, 0) > 0 &&
     sanitizeQuizNumber(quizForm.questionCount, 1, 200, 0) > 0;
+  const handleBackNavigation = () => {
+    if (stateCourseId) {
+      navigate(`/${role}/courses/${stateCourseId}`);
+      return;
+    }
+
+    navigate(`/${role}/courses`);
+  };
 
   return (
     <section className="lecture-details-page">
@@ -1148,7 +1381,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
         <button
           type="button"
           className="lecture-details-back-btn"
-          onClick={() => navigate(`/${role}/courses`)}
+          onClick={handleBackNavigation}
         >
           <FiArrowLeft />
           Back to {lectureData.course}
@@ -1168,12 +1401,19 @@ const ContentDetails = ({ role = "lecturer" }) => {
               {lectureContentHintText}
             </p>
 
-            {canManageLecture && (
+            {canManageUploadsViaApi && (
               <div className="lecture-details-upload-wrap">
                 <input
                   type="file"
                   ref={lectureFileInputRef}
                   className="lecture-details-hidden-file"
+                  accept={
+                    shouldUseUploadsApi
+                      ? isSectionView
+                        ? ".pdf,.ppt,.pptx,.doc,.docx"
+                        : ".pdf,.ppt,.pptx"
+                      : undefined
+                  }
                   onChange={onUploadLectureFile}
                 />
                 <button
@@ -1189,6 +1429,9 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
             {isUploadingLectureFiles && (
               <p className="lecture-content-hint">Uploading file(s)...</p>
+            )}
+            {shouldUseUploadsApi && isFetchingSectionUploads && (
+              <p className="lecture-content-hint">Loading uploaded files...</p>
             )}
 
             {lectureUploadError && (
@@ -1262,7 +1505,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           </>
                         );
                       })()}
-                      {canManageLecture && (
+                      {canManageUploadsViaApi && (
                         <button
                           type="button"
                           className="lecture-file-action-btn danger"
@@ -1289,10 +1532,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
             onToggle={toggleSection}
           >
             <div className="lecture-details-card-list">
-              {isTA && isFetchingSectionAssignments && (
-                <p className="lecture-content-hint">Loading section assignments...</p>
+              {isFetchingSectionAssignments && (
+                <p className="lecture-content-hint">Loading assignments...</p>
               )}
-              {isTA && sectionAssignmentsError && (
+              {sectionAssignmentsError && (
                 <p className="lecture-content-hint">{sectionAssignmentsError}</p>
               )}
               {!isFetchingSectionAssignments &&
@@ -1307,7 +1550,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     if (role !== "student") return;
                     const targetId = assignment.apiId ?? assignment.id;
                     const base = isSectionView ? "section" : "lecture";
-                    navigate(`/student/${base}/${targetId}`);
+                    navigate(`/student/${base}/${contentApiId}/${targetId}`);
                   }}
                 >
                   {(() => {
@@ -1363,7 +1606,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                       <h3>{assignment.title}</h3>
                     )}
 
-                    {canManageLecture &&
+                    {canManageAssignmentsViaApi &&
                       editingId !== assignment.id &&
                       editingType !== "assignment" && (
                         <button
@@ -1377,7 +1620,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                       )}
                   </div>
 
-                  {canManageLecture ? (
+                  {canManageAssignmentsViaApi ? (
                     <div className="lecture-details-status-row">
                       <p className="status done">
                         <FiCheckCircle />
@@ -1453,7 +1696,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
               ))}
             </div>
 
-            {canManageLecture && (
+            {canManageAssignmentsViaApi && (
               <div className="lecture-details-actions-row">
                 <div className="lecture-details-inline-add">
                   <button
@@ -1702,8 +1945,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     ref={assignmentDialogFileInputRef}
                     className="lecture-details-hidden-file"
                     onChange={onUploadAssignmentFileInDialog}
-                    accept={isTA ? ".pdf,application/pdf" : ".pdf,.doc,.docx,.txt,.zip,.rar"}
-                    multiple={!isTA}
+                    accept={assignmentFileAccept}
+                    multiple={!canManageAssignmentsViaApi}
                   />
                   <button
                     type="button"
@@ -1740,7 +1983,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     </ul>
                   )}
 
-                  {isTA && sectionAssignmentsError && (
+                  {canManageAssignmentsViaApi && sectionAssignmentsError && (
                     <p className="lecture-content-hint">{sectionAssignmentsError}</p>
                   )}
                 </div>

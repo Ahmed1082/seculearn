@@ -29,9 +29,8 @@ import TAMembers from "../pages/ta/Members";
 import StudentCourses from "../pages/student/Courses";
 import StudentCourseDetails from "../pages/student/CourseDetails";
 import StudentContentDetails from "../pages/student/ContentDetails";
-import StudentSubmitLectureAssignment from "../pages/student/SubmitLectureAssignment";
+import StudentSubmitAssignment from "../pages/student/SubmitAssignment";
 import StudentSubmitLectureQuizzes from "../pages/student/SubmitLectureQuizzes";
-import StudentSubmitSectionAssignment from "../pages/student/SubmitSectionAssignment";
 import StudentSubmitSectionQuizzes from "../pages/student/SubmitSectionQuizzes";
 import StudentAllAssignments from "../pages/student/AllAssignments";
 import StudentAllQuizzes from "../pages/student/AllQuizzes";
@@ -77,9 +76,9 @@ const Router = () => (
       {/* Dynamic Course ID */}
       <Route path="/student/courses/:courseId" element={<StudentCourseDetails />} />
       <Route path="/student/contentDetails" element={<StudentContentDetails />} />
-      <Route path="/student/lecture/:assignmentId" element={<StudentSubmitLectureAssignment />} />
+      <Route path="/student/lecture/:lectureId/:assignmentId" element={<StudentSubmitAssignment unitType="lecture" />} />
       <Route path="/student/lecture/submitQuizzes" element={<StudentSubmitLectureQuizzes />} />
-      <Route path="/student/section/:assignmentId" element={<StudentSubmitSectionAssignment />} />
+      <Route path="/student/section/:sectionId/:assignmentId" element={<StudentSubmitAssignment unitType="section" />} />
       <Route path="/student/section/submitQuizzes" element={<StudentSubmitSectionQuizzes />} />
       <Route path="/student/allAssignments" element={<StudentAllAssignments />} />
       <Route path="/student/allQuizzes" element={<StudentAllQuizzes />} />
