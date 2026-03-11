@@ -1,50 +1,21 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import {
+  FiAlertCircle,
   FiBookOpen,
   FiCheckCircle,
   FiClock,
   FiFileText,
   FiFilter,
+  FiRefreshCw,
   FiXCircle,
 } from "react-icons/fi";
 import "../../styles/AllAssignments.css";
 
-const courses = [
-  { id: "c1", name: "Introduction to Cybersecurity" },
-  { id: "c2", name: "Introduction to Cryptography" },
-  { id: "c3", name: "Ethical Hacking" },
-];
-
-const lectures = [
-  { id: "l1", courseId: "c1", title: "Lecture 1: Cyber Fundamentals" },
-  { id: "l2", courseId: "c1", title: "Lecture 2: Firewall Rules" },
-  { id: "l3", courseId: "c2", title: "Lecture 1: Classical Ciphers" },
-  { id: "l4", courseId: "c2", title: "Lecture 2: AES and Modes" },
-  { id: "l5", courseId: "c3", title: "Lecture 1: Vulnerability Scanning" },
-  { id: "l6", courseId: "c3", title: "Lecture 2: Post Exploitation" },
-];
-
-const assignments = [
-  { id: "a1", title: "Assignment 1: Threat Report", lectureId: "l1", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a2", title: "Assignment 2: Vulnerability Scan", lectureId: "l1", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a3", title: "Assignment 3: Risk Assessment", lectureId: "l1", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a4", title: "Assignment 1: Firewall Config", lectureId: "l2", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a5", title: "Assignment 2: Network Segmentation", lectureId: "l2", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a6", title: "Assignment 1: Caesar Attack", lectureId: "l3", doneStudentIds: [], missedStudentIds: [] },
-  { id: "a7", title: "Assignment 2: Vigenere Break", lectureId: "l3", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a8", title: "Assignment 1: AES Lab", lectureId: "l4", doneStudentIds: [], missedStudentIds: [] },
-  { id: "a9", title: "Assignment 2: CBC Analysis", lectureId: "l4", doneStudentIds: [], missedStudentIds: [] },
-  { id: "a10", title: "Assignment 1: Nmap Report", lectureId: "l5", doneStudentIds: ["s1"], missedStudentIds: [] },
-  { id: "a11", title: "Assignment 2: Web Vulnerabilities", lectureId: "l5", doneStudentIds: [], missedStudentIds: ["s1"] },
-  { id: "a12", title: "Assignment 1: Incident Timeline", lectureId: "l6", doneStudentIds: ["s1"], missedStudentIds: [] },
-];
-
-const mockStudentIds = new Set(
-  assignments.flatMap((assignment) => [
-    ...assignment.doneStudentIds.map((id) => String(id)),
-    ...assignment.missedStudentIds.map((id) => String(id)),
-  ])
-);
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
 
 const statusConfig = {
   done: {
@@ -61,71 +32,265 @@ const statusConfig = {
   },
 };
 
-const getStatus = (assignment, currentStudentId) => {
-  if (assignment.doneStudentIds.includes(currentStudentId)) return "done";
-  if (assignment.missedStudentIds.includes(currentStudentId)) return "missed";
+const toAbsoluteApiUrl = (path = "") => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE_URL}/${String(path).replace(/^\/+/, "")}`;
+};
+
+const buildApiHeaders = (token) => ({
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  "ngrok-skip-browser-warning": "true",
+});
+
+const normalizeStatus = (value, dueDate) => {
+  const status = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (status === "submitted" || status === "done") return "done";
+  if (status === "missed") return "missed";
+  if (!dueDate) return "pending";
   return "pending";
 };
 
-const getCurrentStudentId = () => {
-  const fallbackId = "s1";
-  const stored = localStorage.getItem("user");
+const normalizeSource = (value) => {
+  const source = String(value || "")
+    .trim()
+    .toLowerCase();
 
-  if (!stored) return fallbackId;
-
-  try {
-    const user = JSON.parse(stored);
-    const id = user.id || user.student_id || user.user_id || fallbackId;
-    return String(id);
-  } catch {
-    return fallbackId;
-  }
+  if (source === "section") return "section";
+  return "lecture";
 };
 
-const resolveStudentIdForMockData = (studentId) => {
-  if (mockStudentIds.has(studentId)) return studentId;
-  if (mockStudentIds.has("s1")) return "s1";
-  return studentId;
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const formatDueDate = (value) => {
+  if (!value) return "No due date";
+
+  const normalized = String(value).replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+};
+
+const getAssignmentId = (assignment) =>
+  String(assignment?.id ?? assignment?.assignment_id ?? "");
+
+const getContentId = (assignment, source) => {
+  const sourceKey = source === "section" ? "section" : "lecture";
+
+  return (
+    assignment?.[`${sourceKey}_id`] ??
+    assignment?.[`${sourceKey}Id`] ??
+    assignment?.content_id ??
+    assignment?.contentId ??
+    assignment?.unit_id ??
+    assignment?.unitId ??
+    null
+  );
+};
+
+const getTrackerEndpoint = (courseId) =>
+  toAbsoluteApiUrl(
+    courseId
+      ? `/api/student/assignments-tracker/${courseId}`
+      : "/api/student/assignments-tracker"
+  );
+
+const extractAssignments = (payload) => {
+  if (Array.isArray(payload?.assignments)) return payload.assignments;
+  if (Array.isArray(payload?.data?.assignments)) return payload.data.assignments;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const extractStats = (payload, assignments) => {
+  const stats = payload?.stats || payload?.data?.stats || {};
+  const normalizedAssignments = Array.isArray(assignments) ? assignments : [];
+
+  const submitted =
+    toNumber(stats.submitted, -1) >= 0
+      ? toNumber(stats.submitted)
+      : normalizedAssignments.filter((item) => item.status === "done").length;
+  const pending =
+    toNumber(stats.pending, -1) >= 0
+      ? toNumber(stats.pending)
+      : normalizedAssignments.filter((item) => item.status === "pending").length;
+  const missed =
+    toNumber(stats.missed, -1) >= 0
+      ? toNumber(stats.missed)
+      : normalizedAssignments.filter((item) => item.status === "missed").length;
+  const total =
+    toNumber(stats.total, -1) >= 0
+      ? toNumber(stats.total)
+      : normalizedAssignments.length;
+  const progress =
+    toNumber(stats.progress_percentage, -1) >= 0
+      ? Math.max(0, Math.min(100, toNumber(stats.progress_percentage)))
+      : total
+        ? Math.round((submitted / total) * 100)
+        : 0;
+
+  return {
+    total,
+    done: submitted,
+    pending,
+    missed,
+    progress,
+  };
 };
 
 const StudentAllAssignments = () => {
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeCourse, setActiveCourse] = useState("all");
-  const currentStudentId = useMemo(() => resolveStudentIdForMockData(getCurrentStudentId()), []);
+  const [courses, setCourses] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [stats, setStats] = useState({
+    total: 0,
+    done: 0,
+    pending: 0,
+    missed: 0,
+    progress: 0,
+  });
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const [isLoadingAssignments, setIsLoadingAssignments] = useState(false);
+  const [coursesError, setCoursesError] = useState("");
+  const [assignmentsError, setAssignmentsError] = useState("");
 
-  const enrichedAssignments = useMemo(() => {
-    return assignments
-      .map((assignment) => {
-        const lecture = lectures.find((item) => item.id === assignment.lectureId);
-        const course = courses.find((item) => item.id === lecture?.courseId);
+  useEffect(() => {
+    if (!token) return;
 
-        return {
-          ...assignment,
-          lecture,
-          course,
-          status: getStatus(assignment, currentStudentId),
-        };
-      })
-      .sort((a, b) => a.title.localeCompare(b.title));
-  }, [currentStudentId]);
+    let isMounted = true;
 
-  const stats = useMemo(() => {
-    const total = enrichedAssignments.length;
-    const done = enrichedAssignments.filter((item) => item.status === "done").length;
-    const pending = enrichedAssignments.filter((item) => item.status === "pending").length;
-    const missed = enrichedAssignments.filter((item) => item.status === "missed").length;
-    const progress = total ? Math.round((done / total) * 100) : 0;
+    const fetchCourses = async () => {
+      setIsLoadingCourses(true);
+      setCoursesError("");
 
-    return { total, done, pending, missed, progress };
-  }, [enrichedAssignments]);
+      try {
+        const response = await axios.get("/api/get-courses", {
+          headers: buildApiHeaders(token),
+        });
+
+        if (!isMounted) return;
+        setCourses(Array.isArray(response?.data?.courses) ? response.data.courses : []);
+      } catch (error) {
+        if (!isMounted) return;
+        setCoursesError(
+          error?.response?.data?.message || "Failed to load courses."
+        );
+      } finally {
+        if (isMounted) {
+          setIsLoadingCourses(false);
+        }
+      }
+    };
+
+    fetchCourses();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let isMounted = true;
+
+    const fetchAssignments = async () => {
+      setIsLoadingAssignments(true);
+      setAssignmentsError("");
+
+      try {
+        const response = await axios.get(
+          activeCourse === "all" ? getTrackerEndpoint() : getTrackerEndpoint(activeCourse),
+          {
+          headers: buildApiHeaders(token),
+          }
+        );
+
+        if (!isMounted) return;
+
+        const normalizedAssignments = extractAssignments(response?.data).map((assignment) => {
+          const courseName =
+            assignment?.course_name ||
+            assignment?.course?.title ||
+            assignment?.course?.name ||
+            "Course";
+          const source = normalizeSource(assignment?.source);
+          const dueDate = assignment?.due_date || assignment?.dueDate || null;
+
+          return {
+            ...assignment,
+            id: getAssignmentId(assignment),
+            courseId:
+              assignment?.course_id ??
+              assignment?.courseId ??
+              assignment?.course?.id ??
+              null,
+            courseName,
+            status: normalizeStatus(assignment?.status, dueDate),
+            source,
+            sourceLabel: source === "section" ? "Section" : "Lecture",
+            dueDate,
+            points: toNumber(assignment?.points, 100),
+            originalName:
+              assignment?.original_name ||
+              assignment?.original_file_name ||
+              assignment?.file_name ||
+              "",
+            contentId: getContentId(assignment, source),
+          };
+        });
+
+        setAssignments(normalizedAssignments);
+        setStats(extractStats(response?.data, normalizedAssignments));
+      } catch (error) {
+        if (!isMounted) return;
+
+        setAssignments([]);
+        setStats({
+          total: 0,
+          done: 0,
+          pending: 0,
+          missed: 0,
+          progress: 0,
+        });
+        setAssignmentsError(
+          error?.response?.data?.message || "Failed to load assignments."
+        );
+      } finally {
+        if (isMounted) {
+          setIsLoadingAssignments(false);
+        }
+      }
+    };
+
+    fetchAssignments();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeCourse, token]);
 
   const filteredAssignments = useMemo(() => {
-    return enrichedAssignments.filter((item) => {
-      const statusMatch = activeFilter === "all" || item.status === activeFilter;
-      const courseMatch = activeCourse === "all" || item.course?.id === activeCourse;
-      return statusMatch && courseMatch;
-    });
-  }, [activeCourse, activeFilter, enrichedAssignments]);
+    if (activeFilter === "all") return assignments;
+    return assignments.filter((item) => item.status === activeFilter);
+  }, [activeFilter, assignments]);
 
   const filterItems = [
     { key: "all", label: "All", count: stats.total },
@@ -140,6 +305,14 @@ const StudentAllAssignments = () => {
     { label: "Pending", value: stats.pending, className: "all-assignments-stat-pending" },
     { label: "Missed", value: stats.missed, className: "all-assignments-stat-missed" },
   ];
+
+  const handleOpenAssignment = (assignment) => {
+    if (!assignment?.contentId || !assignment?.id) return;
+    navigate(`/student/${assignment.source}/${assignment.contentId}/${assignment.id}`);
+  };
+
+  const getPendingActionLabel = (assignment) =>
+    assignment?.contentId ? "Submit Now" : "Pending";
 
   return (
     <section className="all-assignments-page">
@@ -203,30 +376,52 @@ const StudentAllAssignments = () => {
               value={activeCourse}
               onChange={(event) => setActiveCourse(event.target.value)}
               aria-label="Filter assignments by course"
+              disabled={isLoadingCourses || isLoadingAssignments}
             >
               <option value="all">All Courses</option>
               {courses.map((course) => (
                 <option key={course.id} value={course.id}>
-                  {course.name}
+                  {course.title || course.name}
                 </option>
               ))}
             </select>
           </div>
         </section>
 
-        <section className="all-assignments-list">
-          {filteredAssignments.length === 0 ? (
-            <article className="all-assignments-empty-state">
-              <FiFileText size={24} />
-              <p>No assignments match the selected filter.</p>
-            </article>
-          ) : (
-            filteredAssignments.map((assignment) => {
-              const status = statusConfig[assignment.status];
+        {(coursesError || assignmentsError) && (
+          <section className="all-assignments-feedback error" aria-live="polite">
+            <FiAlertCircle size={16} />
+            <p>{assignmentsError || coursesError}</p>
+          </section>
+        )}
+
+        {isLoadingAssignments ? (
+          <section className="all-assignments-empty-state">
+            <FiRefreshCw size={24} className="all-assignments-spin" />
+            <p>Loading assignments...</p>
+          </section>
+        ) : filteredAssignments.length === 0 ? (
+          <section className="all-assignments-empty-state">
+            <FiFileText size={24} />
+            <p>
+              {assignmentsError
+                ? "Assignments could not be loaded."
+                : "No assignments match the selected filter."}
+            </p>
+          </section>
+        ) : (
+          <section className="all-assignments-list">
+            {filteredAssignments.map((assignment) => {
+              const status = statusConfig[assignment.status] || statusConfig.pending;
               const StatusIcon = status.icon;
+              const canOpen = Boolean(assignment.contentId && assignment.id);
 
               return (
-                <article key={assignment.id} className="all-assignments-item">
+                <article
+                  key={assignment.id}
+                  className={`all-assignments-item ${canOpen ? "" : "is-static"}`}
+                  onClick={() => canOpen && handleOpenAssignment(assignment)}
+                >
                   <div className={`all-assignments-item-icon status-${assignment.status}`}>
                     <StatusIcon size={14} />
                   </div>
@@ -234,12 +429,16 @@ const StudentAllAssignments = () => {
                   <div className="all-assignments-item-content">
                     <div className="all-assignments-item-head">
                       <div>
-                        <h3>{assignment.title}</h3>
+                        <h3>{assignment.title || "Untitled assignment"}</h3>
 
                         <div className="all-assignments-item-meta">
-                          <span>{assignment.course?.name}</span>
+                          <span>{assignment.courseName}</span>
                           <span className="all-assignments-dot">&middot;</span>
-                          <span>{assignment.lecture?.title?.split(":")[0]}</span>
+                          <span>{assignment.sourceLabel}</span>
+                          <span className="all-assignments-dot">&middot;</span>
+                          <span>{assignment.points} pts</span>
+                          <span className="all-assignments-dot">&middot;</span>
+                          <span>{formatDueDate(assignment.dueDate)}</span>
                         </div>
                       </div>
 
@@ -250,13 +449,27 @@ const StudentAllAssignments = () => {
                     </div>
 
                     <div className="all-assignments-item-foot">
+                      {assignment.originalName && (
+                        <p className="all-assignments-file-name">{assignment.originalName}</p>
+                      )}
+
                       {assignment.status === "done" && (
                         <p className="all-assignments-note done">Submitted successfully</p>
                       )}
 
                       {assignment.status === "pending" && (
-                        <button type="button" className="all-assignments-submit-btn">
-                          Submit Now
+                        <button
+                          type="button"
+                          className="all-assignments-submit-btn"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (canOpen) {
+                              handleOpenAssignment(assignment);
+                            }
+                          }}
+                          disabled={!canOpen}
+                        >
+                          {getPendingActionLabel(assignment)}
                         </button>
                       )}
 
@@ -267,9 +480,9 @@ const StudentAllAssignments = () => {
                   </div>
                 </article>
               );
-            })
-          )}
-        </section>
+            })}
+          </section>
+        )}
       </div>
     </section>
   );

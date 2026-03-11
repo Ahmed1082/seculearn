@@ -1,7 +1,7 @@
 import "../../styles/SubmitAssignment.css";
 import { FaEdit, FaEllipsisV, FaPlus, FaRegCommentDots, FaTrash } from "react-icons/fa";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
 const API_BASE_URL =
@@ -54,6 +54,23 @@ const getDisplayName = () => {
     );
   } catch {
     return "Student";
+  }
+};
+
+const getCurrentUserId = () => {
+  try {
+    const stored = localStorage.getItem("user");
+    if (!stored) return "student";
+    const user = JSON.parse(stored);
+    return String(
+      user.id ||
+        user.student_id ||
+        user.user_id ||
+        user.username ||
+        "student"
+    );
+  } catch {
+    return "student";
   }
 };
 
@@ -115,6 +132,99 @@ const extractSubmissionMeta = (payload) => {
   return null;
 };
 
+const extractExistingSubmissionMeta = (assignment) => {
+  if (!assignment) return null;
+
+  const candidates = [
+    assignment?.submission,
+    assignment?.student_submission,
+    assignment?.my_submission,
+    assignment?.data?.submission,
+    assignment?.data?.student_submission,
+    assignment?.data?.my_submission,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const meta = extractSubmissionMeta(candidate);
+    if (meta?.url || meta?.id || meta?.name) {
+      return meta;
+    }
+  }
+
+  return null;
+};
+
+const hasSubmissionBinding = (assignment) =>
+  !!assignment &&
+  (Object.prototype.hasOwnProperty.call(assignment, "submission") ||
+    Object.prototype.hasOwnProperty.call(assignment, "student_submission") ||
+    Object.prototype.hasOwnProperty.call(assignment, "my_submission"));
+
+const toNumberOrNull = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const formatGradeDate = (value) => {
+  if (!value) return "";
+
+  const normalized = String(value).replace(" ", "T");
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+};
+
+const extractGradeMeta = (assignment) => {
+  if (!assignment) {
+    return {
+      value: null,
+      gradedAt: "",
+    };
+  }
+
+  const candidates = [
+    assignment?.my_submission,
+    assignment?.student_submission,
+    assignment?.submission,
+    assignment?.data?.my_submission,
+    assignment?.data?.student_submission,
+    assignment?.data?.submission,
+    assignment,
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const value =
+      toNumberOrNull(candidate?.grade) ??
+      toNumberOrNull(candidate?.score) ??
+      toNumberOrNull(candidate?.points_awarded) ??
+      toNumberOrNull(candidate?.awarded_points) ??
+      toNumberOrNull(candidate?.mark);
+
+    const gradedAt =
+      candidate?.graded_at ||
+      candidate?.returned_at ||
+      candidate?.updated_at ||
+      "";
+
+    if (value !== null || gradedAt) {
+      return {
+        value,
+        gradedAt,
+      };
+    }
+  }
+
+  return {
+    value: null,
+    gradedAt: "",
+  };
+};
+
 const normalizeComment = (comment, fallbackName = "User") => ({
   id: comment?.id ?? createClientId("comment"),
   message: comment?.message || comment?.text || "",
@@ -146,16 +256,29 @@ const findAssignmentById = (payload, assignmentId) => {
 };
 
 const SubmitAssignment = ({ unitType = "lecture" }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef(null);
   const objectUrlsRef = useRef(new Set());
   const { assignmentId, lectureId, sectionId } = useParams();
   const token = localStorage.getItem("token");
   const displayName = useMemo(() => getDisplayName(), []);
+  const currentUserId = useMemo(() => getCurrentUserId(), []);
 
   const isSection = unitType === "section";
   const scope = isSection ? "section" : "lecture";
   const unitLabel = isSection ? "Section" : "Lecture";
   const contentId = isSection ? sectionId : lectureId;
+  const stateLectureTitle = location.state?.lectureTitle || location.state?.title || "";
+  const stateSectionTitle = location.state?.sectionTitle || location.state?.title || "";
+  const stateCourseId = location.state?.courseId || "";
+  const submissionCacheKey = useMemo(
+    () =>
+      `student-submission:${scope}:${String(contentId || "unknown")}:${String(
+        assignmentId || "unknown"
+      )}:${currentUserId}`,
+    [assignmentId, contentId, currentUserId, scope]
+  );
 
   const [privateComment, setPrivateComment] = useState("");
   const [privateComments, setPrivateComments] = useState([]);
@@ -230,6 +353,52 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     }
   }, [assignmentId, displayName, token]);
 
+  const readCachedSubmission = useCallback(() => {
+    if (!submissionCacheKey) return null;
+
+    try {
+      const raw = localStorage.getItem(submissionCacheKey);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+
+      if (!parsed.url && !parsed.name && !parsed.id) {
+        localStorage.removeItem(submissionCacheKey);
+        return null;
+      }
+
+      return {
+        id: parsed.id || null,
+        name: parsed.name || "Submitted file",
+        url: parsed.url || "",
+      };
+    } catch {
+      localStorage.removeItem(submissionCacheKey);
+      return null;
+    }
+  }, [submissionCacheKey]);
+
+  const cacheSubmittedFile = useCallback(
+    (entry, id = null) => {
+      if (!submissionCacheKey || !entry) return;
+
+      const payload = {
+        id: id || null,
+        name: entry.name || "Submitted file",
+        url: entry.url || "",
+      };
+
+      if (!payload.id && !payload.name && !payload.url) return;
+      localStorage.setItem(submissionCacheKey, JSON.stringify(payload));
+    },
+    [submissionCacheKey]
+  );
+
+  const clearCachedSubmission = useCallback(() => {
+    if (!submissionCacheKey) return;
+    localStorage.removeItem(submissionCacheKey);
+  }, [submissionCacheKey]);
+
   useEffect(() => {
     const fetchAssignment = async () => {
       if (!assignmentId) return;
@@ -267,15 +436,37 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
         const loadedAssignment = findAssignmentById(res?.data, assignmentId);
         setAssignment(loadedAssignment);
 
-        const existingSubmission = extractSubmissionMeta(loadedAssignment);
+        const existingSubmission = extractExistingSubmissionMeta(loadedAssignment);
         if (existingSubmission?.url || existingSubmission?.id) {
           if (existingSubmission?.id) setSubmissionId(existingSubmission.id);
-          setSubmittedFile({
+          const nextSubmittedFile = {
             name: existingSubmission.name || "Submitted file",
             url: existingSubmission.url || "",
             isLocal: false,
-          });
+          };
+          setSubmittedFile(nextSubmittedFile);
           setIsSubmitted(true);
+          cacheSubmittedFile(nextSubmittedFile, existingSubmission.id);
+        } else if (!hasSubmissionBinding(loadedAssignment)) {
+          const cachedSubmission = readCachedSubmission();
+          if (cachedSubmission?.url || cachedSubmission?.name || cachedSubmission?.id) {
+            if (cachedSubmission?.id) setSubmissionId(cachedSubmission.id);
+            setSubmittedFile({
+              name: cachedSubmission.name || "Submitted file",
+              url: cachedSubmission.url || "",
+              isLocal: false,
+            });
+            setIsSubmitted(true);
+          } else {
+            setSubmittedFile(null);
+            setSubmissionId(null);
+            setIsSubmitted(false);
+          }
+        } else {
+          clearCachedSubmission();
+          setSubmittedFile(null);
+          setSubmissionId(null);
+          setIsSubmitted(false);
         }
 
         await fetchAssignmentComments();
@@ -285,10 +476,52 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     };
 
     fetchAssignment();
-  }, [assignmentId, contentId, fetchAssignmentComments, scope, token, unitLabel]);
+  }, [
+    assignmentId,
+    cacheSubmittedFile,
+    clearCachedSubmission,
+    contentId,
+    fetchAssignmentComments,
+    readCachedSubmission,
+    scope,
+    token,
+    unitLabel,
+  ]);
 
   const handleAddWork = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleNavigateToAssignments = () => {
+    navigate("/student/allAssignments");
+  };
+
+  const handleNavigateToUnit = () => {
+    if (!contentId) {
+      handleNavigateToAssignments();
+      return;
+    }
+
+    if (isSection) {
+      navigate("/student/contentDetails", {
+        state: {
+          sectionId: contentId,
+          id: contentId,
+          sectionTitle: stateSectionTitle || `${unitLabel} ${contentId}`,
+          ...(stateCourseId ? { courseId: stateCourseId } : {}),
+        },
+      });
+      return;
+    }
+
+    navigate("/student/contentDetails", {
+      state: {
+        lectureId: contentId,
+        id: contentId,
+        lectureTitle: stateLectureTitle || `${unitLabel} ${contentId}`,
+        ...(stateCourseId ? { courseId: stateCourseId } : {}),
+      },
+    });
   };
 
   const handleFileChange = (event) => {
@@ -358,11 +591,12 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     }
 
     if (!token) {
-      setSubmittedFile({
+      const nextSubmittedFile = {
         name: selectedEntry.name,
         url: selectedEntry.url,
         isLocal: true,
-      });
+      };
+      setSubmittedFile(nextSubmittedFile);
       clearSelectedFiles(selectedEntry.url);
       setIsSubmitted(true);
       return;
@@ -388,6 +622,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
       setSubmittedFile(submittedEntry);
       clearSelectedFiles(submittedEntry.isLocal ? submittedEntry.url : "");
       setIsSubmitted(true);
+      cacheSubmittedFile(submittedEntry, meta?.id || null);
     } catch (error) {
       setSubmitError(error?.response?.data?.message || "Failed to submit work.");
       console.error("Submit error:", error);
@@ -408,6 +643,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
       await axios.delete(`/api/unsubmit-work/${submissionId}`, {
         headers: buildApiHeaders(token),
       });
+      clearCachedSubmission();
       setIsSubmitted(false);
       setSubmissionId(null);
       setSubmittedFile(null);
@@ -652,6 +888,15 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     : "";
   const assignmentTitle = assignment?.title || `${unitLabel} Assignment`;
   const assignmentPoints = Number(assignment?.points) || 100;
+  const gradeMeta = useMemo(() => extractGradeMeta(assignment), [assignment]);
+  const hasGrade = gradeMeta.value !== null;
+  const gradePercent = assignmentPoints
+    ? Math.max(0, Math.min(100, Math.round((Math.max(0, gradeMeta.value || 0) / assignmentPoints) * 100)))
+    : 0;
+  const gradeDisplay = hasGrade
+    ? `${Math.round((gradeMeta.value || 0) * 10) / 10}/${assignmentPoints}`
+    : `--/${assignmentPoints}`;
+  const gradeDateLabel = formatGradeDate(gradeMeta.gradedAt);
   const assignmentFilePath = assignment?.file_path || "";
   const assignmentFileName = getApiFileDisplayName(assignment, assignmentFilePath);
   const assignmentFileUrl = toAssignmentFileUrl(assignmentFilePath);
@@ -662,11 +907,17 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
         <h1 className="course-title">Introduction to Cybersecurity</h1>
 
         <div className="assignment-path">
-          <button>{unitLabel} 1</button>
+          <button type="button" onClick={handleNavigateToUnit}>
+            {unitLabel} {contentId || 1}
+          </button>
           <span>&gt;</span>
-          <button>Assignments</button>
+          <button type="button" onClick={handleNavigateToAssignments}>
+            Assignments
+          </button>
           <span>&gt;</span>
-          <button>{assignmentTitle}</button>
+          <button type="button" aria-current="page">
+            {assignmentTitle}
+          </button>
         </div>
 
         <div className="assignment-grid">
@@ -864,6 +1115,32 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
               )}
             </div>
 
+            <div className={`assignment-card assignment-grade-card ${hasGrade ? "is-graded" : "is-pending"}`}>
+              <div className="assignment-grade-header">
+                <div>
+                  <p className="assignment-grade-eyebrow">Evaluation</p>
+                  <h2>Grade</h2>
+                </div>
+                <span className={`assignment-grade-pill ${hasGrade ? "is-graded" : "is-pending"}`}>
+                  {hasGrade ? "Returned" : "Not Graded Yet"}
+                </span>
+              </div>
+
+              <div className="assignment-grade-body">
+                <div
+                  className={`assignment-grade-ring ${hasGrade ? "is-graded" : "is-pending"}`}
+                  style={{ "--grade-progress": `${gradePercent}%` }}
+                >
+                  <strong>{gradeDisplay}</strong>
+                  <span>{hasGrade ? "Score" : "Pending"}</span>
+                </div>
+              </div>
+              <p className="assignment-grade-meta">
+                Max score: {assignmentPoints} points
+                {gradeDateLabel ? ` - Updated ${gradeDateLabel}` : ""}
+              </p>
+            </div>
+
             <div className="assignment-card">
               <h2>Private Comments</h2>
 
@@ -944,3 +1221,4 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 };
 
 export default SubmitAssignment;
+
