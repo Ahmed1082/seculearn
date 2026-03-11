@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
   FiAlignLeft,
@@ -287,32 +287,59 @@ const AccordionSection = ({
 
 const ContentDetails = ({ role = "lecturer" }) => {
   const navigate = useNavigate();
+  const { courseId, lectureId, sectionId } = useParams();
   const location = useLocation();
-  const isSectionView = !!location.state?.sectionId;
-  const stateCourseId = location.state?.courseId;
-  const stateSectionId = location.state?.sectionId || location.state?.id;
+  const isSectionView = !!sectionId;
+  const stateCourseId = courseId;
+  const stateSectionId = sectionId;
   const stateSectionTitle =
     location.state?.sectionTitle || location.state?.title;
-  const lectureId = location.state?.lectureId;
-  const lectureTitleFromState = location.state?.lectureTitle;
+  const lectureTitleFromState =
+    location.state?.lectureTitle || location.state?.title;
   const lectureFileInputRef = useRef(null);
   const assignmentDialogFileInputRef = useRef(null);
   const assignmentDueDateInputRef = useRef(null);
   const objectUrlsRef = useRef(new Set());
   const token = localStorage.getItem("token");
 
+  useEffect(() => {
+    const fetchCourse = async () => {
+      try {
+        const res = await axios.get(`${API_BASE_URL}/api/get-courses`, {
+          headers: buildApiHeaders(token),
+        });
+
+        const selectedCourse = res.data.courses.find(
+          (c) => c.id === Number(stateCourseId)
+        );
+
+        if (selectedCourse) {
+          setCourseTitle(selectedCourse.title);
+        }
+      } catch (err) {
+        console.error("Error fetching course:", err);
+      }
+    };
+
+    if (stateCourseId && token) {
+      fetchCourse();
+    }
+  }, [stateCourseId, token]);
+
   const canManageLecture = role === "lecturer" || role === "ta";
   const isTA = role === "ta";
   const isLecturer = role === "lecturer";
 
+  const [courseTitle, setCourseTitle] = useState("");
+
   const [lectureData, setLectureData] = useState(() => {
-    const sectionView = !!location.state?.sectionId;
+    const sectionView = !!sectionId;
     const base = {
       ...lectureSeed,
       id: lectureId || lectureSeed.id,
       title: sectionView
-        ? stateSectionTitle || lectureTitleFromState || lectureSeed.title
-        : lectureTitleFromState || lectureSeed.title,
+      ? stateSectionTitle || `Section ${sectionId}`
+      : lectureTitleFromState || `Lecture ${lectureId}`,
     };
     if (role === "student" && sectionView) {
       return { ...base, assignments: [] };
@@ -382,7 +409,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const shouldUseUploadsApi = true;
   const contentApiId = useMemo(() => {
     if (isSectionView) {
-      const sectionTargetId = activeSectionId || stateSectionId;
+      const sectionTargetId = stateSectionId || activeSectionId;
       return sectionTargetId ? String(sectionTargetId) : "";
     }
 
@@ -1384,7 +1411,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
           onClick={handleBackNavigation}
         >
           <FiArrowLeft />
-          Back to {lectureData.course}
+          Back to {courseTitle || lectureData.course}
         </button>
 
         <h1 className="lecture-details-title">{pageTitle}</h1>
@@ -1547,10 +1574,38 @@ const ContentDetails = ({ role = "lecturer" }) => {
                   key={assignment.id}
                   className="lecture-details-card"
                   onClick={() => {
-                    if (role !== "student") return;
                     const targetId = assignment.apiId ?? assignment.id;
-                    const base = isSectionView ? "section" : "lecture";
-                    navigate(`/student/${base}/${contentApiId}/${targetId}`);
+                    
+                    if (role === "student") {
+                      const base = isSectionView ? "section" : "lecture";
+                      navigate(
+                      `/student/courses/${courseId}/${base}/${contentApiId}/assignment/${targetId}`
+                    );
+                    } else if (role === "lecturer") {
+                      navigate(`/lecturer/assignmentreview/${targetId}`, {
+                        state: {
+                          courseId,
+                          lectureId,
+                          sectionId,
+                          courseTitle: courseTitle,
+                          lectureTitle: pageTitle,
+                          assignmentTitle: assignment.title,
+                          maxScore: assignment.maxScore
+                        }
+                      });
+                    } else if (role === "ta") {
+                      navigate(`/ta/assignmentreview/${targetId}`, {
+                        state: {
+                          courseId,
+                          lectureId,
+                          sectionId,
+                          courseTitle: courseTitle,
+                          lectureTitle: pageTitle,
+                          assignmentTitle: assignment.title,
+                          maxScore: assignment.maxScore
+                        },
+                      });
+                    }
                   }}
                 >
                   {(() => {
@@ -1612,7 +1667,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
                         <button
                           type="button"
                           className="lecture-details-icon-btn"
-                          onClick={() => openEdit("assignment", assignment)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit("assignment", assignment);
+                          }}
                           aria-label={`Edit ${assignment.title}`}
                         >
                           <FaRegEdit size={12} />

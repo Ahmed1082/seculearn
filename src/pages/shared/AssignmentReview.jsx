@@ -1,8 +1,8 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import axios from "axios";
 import {
   ArrowLeft,
-  ChevronDown,
   Users,
   Search,
   Clock3,
@@ -19,167 +19,23 @@ import {
 } from "lucide-react";
 import "../../styles/AssignmentReview.css";
 
-const courses = [
-  { id: "c1", name: "Introduction to Cybersecurity" },
-];
-
-const lectures = [
-  { id: "l1", courseId: "c1", title: "Lecture 1: Threat Landscape Overview" },
-];
-
-const assignments = [
-  {
-    id: "a1",
-    lectureId: "l1",
-    title: "Assignment 1: Threat Report",
-    doneStudentIds: ["s1", "s2", "s3", "s4", "s5"],
-    missedStudentIds: ["s6", "s7"],
-  },
-];
-
-const students = [
-  { id: "s1", name: "Ahmed Ali", studentId: "STU001" },
-  { id: "s2", name: "Sara Hassan", studentId: "STU002" },
-  { id: "s3", name: "Omar Khalil", studentId: "STU003" },
-  { id: "s4", name: "Fatima Nour", studentId: "STU004" },
-  { id: "s5", name: "Youssef Amin", studentId: "STU005" },
-  { id: "s6", name: "Layla Ibrahim", studentId: "STU006" },
-  { id: "s7", name: "Kareem Fahmy", studentId: "STU007" },
-  { id: "s8", name: "Nadia Sayed", studentId: "STU008" },
-  { id: "s9", name: "Tarek Mostafa", studentId: "STU009" },
-  { id: "s10", name: "Hana Zaki", studentId: "STU010" },
-];
-
-const submissionsByAssignment = {
-  a1: [
-    {
-      id: "sub-1",
-      assignmentId: "a1",
-      studentId: "s1",
-      fileName: "ThreatReport_AhmedAli.pdf",
-      fileType: "application/pdf",
-      fileSize: 384211,
-      submittedAt: "2026-02-25T10:15:00Z",
-      grade: 85,
-    },
-    {
-      id: "sub-2",
-      assignmentId: "a1",
-      studentId: "s2",
-      fileName: "Threat_Analysis_Sara.docx",
-      fileType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      fileSize: 276902,
-      submittedAt: "2026-02-25T12:30:00Z",
-      grade: 92,
-    },
-    {
-      id: "sub-3",
-      assignmentId: "a1",
-      studentId: "s3",
-      fileName: "threat_report_omar.pdf",
-      fileType: "application/pdf",
-      fileSize: 412680,
-      submittedAt: "2026-02-25T15:15:00Z",
-      grade: null,
-    },
-    {
-      id: "sub-4",
-      assignmentId: "a1",
-      studentId: "s4",
-      fileName: "ThreatLandscape_Fatima.pdf",
-      fileType: "application/pdf",
-      fileSize: 532400,
-      submittedAt: "2026-02-26T09:08:00Z",
-      grade: 78,
-    },
-    {
-      id: "sub-5",
-      assignmentId: "a1",
-      studentId: "s5",
-      fileName: "Report_Youssef.zip",
-      fileType: "application/zip",
-      fileSize: 1364800,
-      submittedAt: "2026-02-26T10:30:00Z",
-      grade: null,
-    },
-  ],
+const roleMap = {
+  lecturer: "Lecturer",
+  ta: "TA",
+  student: "Student",
 };
 
-const publicCommentsSeed = {
-  a1: [
-    {
-      id: "pub-1",
-      authorId: "inst-1",
-      authorName: "Dr. Mahmoud",
-      authorRole: "Instructor",
-      text: "Reminder: Focus on at least 3 different threat categories in your report. Quality over quantity.",
-      timestamp: "2026-02-25T11:00:00Z",
-    },
-    {
-      id: "pub-2",
-      authorId: "s2",
-      authorName: "Sara Hassan",
-      authorRole: "Student",
-      text: "Are we allowed to use external references beyond the lecture slides?",
-      timestamp: "2026-02-25T12:30:00Z",
-    },
-    {
-      id: "pub-3",
-      authorId: "inst-1",
-      authorName: "Dr. Mahmoud",
-      authorRole: "Instructor",
-      text: "Yes, external references are encouraged. Just make sure to cite them properly using APA format.",
-      timestamp: "2026-02-25T13:00:00Z",
-    },
-    {
-      id: "pub-4",
-      authorId: "s3",
-      authorName: "Omar Khalil",
-      authorRole: "Student",
-      text: "Thanks for clarifying. Also, is there a minimum page count?",
-      timestamp: "2026-02-25T15:15:00Z",
-    },
-    {
-      id: "pub-5",
-      authorId: "inst-1",
-      authorName: "Dr. Mahmoud",
-      authorRole: "Instructor",
-      text: "No minimum page count. Focus on depth of analysis.",
-      timestamp: "2026-02-25T16:00:00Z",
-    },
-    {
-      id: "pub-6",
-      authorId: "s1",
-      authorName: "Ahmed Ali",
-      authorRole: "Student",
-      text: "Can we include diagrams from threat intelligence reports?",
-      timestamp: "2026-02-26T10:30:00Z",
-    },
-    {
-      id: "pub-7",
-      authorId: "inst-1",
-      authorName: "Dr. Mahmoud",
-      authorRole: "Instructor",
-      text: "Yes, diagrams are welcome as long as the source is cited.",
-      timestamp: "2026-02-26T11:00:00Z",
-    },
-  ],
-};
+const currentUserRole = (localStorage.getItem("role") || "student").toLowerCase();
 
-const privateCommentsSeed = {
-  a1: {
-    s1: [
-      {
-        id: "p1",
-        authorId: "inst-1",
-        authorName: "Dr. Mahmoud",
-        authorRole: "Instructor",
-        text: "Great structure. Add one more real-world attack case.",
-        timestamp: "2026-02-26T11:10:00Z",
-      },
-    ],
-  },
-};
+// API helpers
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
+
+const buildApiHeaders = (token) => ({
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  "ngrok-skip-browser-warning": "true",
+});
 
 const formatFileSize = (bytes) => {
   if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
@@ -219,26 +75,26 @@ const AssignmentReview = () => {
   const { assignmentId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const {
+    courseId,
+    lectureId,
+    sectionId,
+    courseTitle,
+    lectureTitle,
+    assignmentTitle,
+    maxScore = 100
+  } = location.state || {};
   const contentDetailsPath = useMemo(() => {
-    if (location.pathname.startsWith("/ta/")) return "/ta/contentDetails";
-    if (location.pathname.startsWith("/student/")) return "/student/contentDetails";
-    return "/lecturer/contentDetails";
-  }, [location.pathname]);
+    if (location.pathname.startsWith("/ta/")) {
+      return sectionId
+        ? `/ta/courses/${courseId}/section/${sectionId}`
+        : `/ta/courses/${courseId}/lecture/${lectureId}`;
+    }
 
-  const assignment = useMemo(
-    () => assignments.find((item) => item.id === assignmentId) || assignments[0],
-    [assignmentId]
-  );
-
-  const lecture = useMemo(
-    () => lectures.find((item) => item.id === assignment?.lectureId) || null,
-    [assignment]
-  );
-
-  const course = useMemo(
-    () => courses.find((item) => item.id === lecture?.courseId) || null,
-    [lecture]
-  );
+    return sectionId
+      ? `/lecturer/courses/${courseId}/section/${sectionId}`
+      : `/lecturer/courses/${courseId}/lecture/${lectureId}`;
+  }, [location.pathname, courseId, lectureId, sectionId]);
 
   const [submissions, setSubmissions] = useState([]);
   const [selectedStudentId, setSelectedStudentId] = useState(null);
@@ -262,9 +118,212 @@ const AssignmentReview = () => {
   const [editingPrivateCommentId, setEditingPrivateCommentId] = useState(null);
   const [privateEditDraft, setPrivateEditDraft] = useState("");
 
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  // -------- API-driven state --------
+  const [assignmentStats, setAssignmentStats] = useState({
+    turned_in: 0,
+    assigned: 0,
+    missed: 0,
+  });
+  const [studentsList, setStudentsList] = useState([]);
+
+  // -------- API helper functions --------
+  const fetchAssignmentSubmissions = async () => {
+    if (!assignmentId) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        `${API_BASE_URL}/api/dr-ta/assignment/${assignmentId}/get-assignment-submissions`,
+        { headers: buildApiHeaders(token) }
+      );
+      const data = res.data || {};
+      if (data.stats) setAssignmentStats(data.stats);
+      if (typeof data.accepting_submissions === "boolean") {
+        setAcceptingSubmissions(data.accepting_submissions);
+      }
+      if (data.students) {
+        const formattedStudents = data.students.map((s) => ({
+          id: s.student_id,
+          name: s.student_name,
+          studentId: s.custom_id,
+          status: s.status,
+          grade: s.grade,
+          submitted_at: s.submitted_at,
+          submission_id: s.submission_id,
+
+          submission: s.submission_id
+            ? {
+                submission_id: s.submission_id,
+                submittedAt: s.submitted_at,
+                grade: s.grade,
+                fileName: s.file_name || "",
+                file_url: s.file_url || "",
+                fileSize: s.file_size || 0
+              }
+            : null
+        }));
+
+        setStudentsList(formattedStudents);
+      }
+    } catch (err) {
+      console.error("Failed to fetch assignment submissions", err);
+    }
+  };
+
+  const saveGradeApi = async (submissionId, grade) => {
+    if (!submissionId) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${API_BASE_URL}/api/dr-ta/submission/${submissionId}/save-grade`,
+        { grade },
+        { headers: buildApiHeaders(token) }
+      );
+    } catch (err) {
+      console.error("Failed to save grade", err);
+    }
+  };
+
+  const toggleAcceptingApi = async () => {
+    if (!assignmentId) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${API_BASE_URL}/api/dr-ta/assignment/${assignmentId}/toggle-accepting`,
+        {},
+        { headers: buildApiHeaders(token) }
+      );
+    } catch (err) {
+      console.error("Failed to toggle accepting submissions", err);
+    }
+  };
+
+  const getStudentSubmissionDetailsApi = async (studentId) => {
+    if (!assignmentId || !studentId) return null;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        `${API_BASE_URL}/api/dr-ta/assignment/${assignmentId}/student/${studentId}`,
+        { headers: buildApiHeaders(token) }
+      );
+      return res.data || null;
+    } catch (err) {
+      console.error("Failed to fetch student submission details", err);
+      return null;
+    }
+  };
+
+  const returnSubmissionApi = async (submissionId) => {
+    if (!submissionId) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        `${API_BASE_URL}/api/dr-ta/submission/${submissionId}/return`,
+        { headers: buildApiHeaders(token) }
+      );
+    } catch (err) {
+      console.error("Failed to return submission", err);
+    }
+  };
+
+  const addAssignmentCommentApi = async (text, isPrivate = 0, studentId = null) => {
+
+    if (!assignmentId || !text) return null;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        assignment_id: assignmentId,
+        message: text,
+        is_private: isPrivate,
+      };
+
+      if (studentId) {
+        payload.student_id = studentId;
+      }
+
+      const res = await axios.post(
+        `${API_BASE_URL}/api/add-comment`,
+        payload,
+        { headers: buildApiHeaders(token) }
+      );
+
+      return res.data?.data || res.data;
+
+    } catch (err) {
+      console.error("Failed to add assignment comment", err);
+      return null;
+    }
+  };
+
+  const getClassCommentsApi = async () => {
+    if (!assignmentId) return [];
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        `${API_BASE_URL}/api/get-class-comments/${assignmentId}`,
+        { headers: buildApiHeaders(token) }
+      );
+      // Handle both array and object with data property
+      const comments = res.data?.data || res.data || [];
+      return Array.isArray(comments) ? comments : [];
+    } catch (err) {
+      console.error("Failed to fetch class comments", err);
+      return [];
+    }
+  };
+
+  const getPrivateCommentsApi = async () => {
+    if (!assignmentId) return [];
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(
+        `${API_BASE_URL}/api/get-private-comments/${assignmentId}`,
+        { headers: buildApiHeaders(token) }
+      );
+      // Handle both array and object with data property
+      const comments = res.data?.data || res.data || [];
+      return Array.isArray(comments) ? comments : [];
+    } catch (err) {
+      console.error("Failed to fetch private comments", err);
+      return [];
+    }
+  };
+
+  const deleteCommentApi = async (commentId) => {
+    if (!commentId) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.delete(
+        `${API_BASE_URL}/api/delete-comment/${commentId}`,
+        { headers: buildApiHeaders(token) }
+      );
+    } catch (err) {
+      console.error("Failed to delete comment", err);
+    }
+  };
+
+  const updateCommentApi = async (commentId, text) => {
+    if (!commentId || !text) return;
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post(
+        `${API_BASE_URL}/api/update-comment/${commentId}`,
+        { message: text },
+        { headers: buildApiHeaders(token) }
+      );
+    } catch (err) {
+      console.error("Failed to update comment", err);
+    }
+  };
+
   useEffect(() => {
-    if (!assignment) return;
-    setSubmissions([...(submissionsByAssignment[assignment.id] || [])]);
+    if (!assignmentId) return;
+
+    // reset local state
+    setSubmissions([]);
     setSelectedStudentId(null);
     setFilterType("all");
     setSearchQuery("");
@@ -274,49 +333,76 @@ const AssignmentReview = () => {
     setIsReturnMenuOpen(false);
     setReturnActionFeedback("");
     setDraftGrades({});
-    setPublicMessages([...(publicCommentsSeed[assignment.id] || [])]);
+    setPublicMessages([]);
     setPublicDraft("");
     setActivePublicMenuId(null);
     setEditingPublicCommentId(null);
     setPublicEditDraft("");
-    setPrivateMessagesByStudent({ ...(privateCommentsSeed[assignment.id] || {}) });
+    setPrivateMessagesByStudent({});
     setPrivateDraft("");
     setActivePrivateMenuId(null);
     setEditingPrivateCommentId(null);
     setPrivateEditDraft("");
-  }, [assignment]);
 
-  if (!assignment) {
-    return (
-      <section className="assignment-review-page">
-        <div className="assignment-review-not-found">Assignment not found.</div>
-      </section>
-    );
-  }
+    // fetch from API
+    fetchAssignmentSubmissions();
 
-  const getSubmissionForStudent = (studentId) =>
-    submissions.find((sub) => sub.studentId === studentId) || null;
+    getClassCommentsApi().then((comments) => {
+      if (Array.isArray(comments)) setPublicMessages(
+        comments.map((c) => ({
+          id: c.id,
+          authorName: c.user?.name || "User",
+          authorRole: (c.user?.role || "student").toLowerCase(),
+          text: c.message,
+          timestamp: c.created_at,
+        }))
+      );
+    });
+    getPrivateCommentsApi().then((comments) => {
+      const grouped = {};
+
+      comments.forEach((c) => {
+        const studentId = c.student_id;
+
+        if (!grouped[studentId]) {
+          grouped[studentId] = [];
+        }
+
+        grouped[studentId].push({
+          id: c.id,
+          authorName: c.user?.name || "User",
+          authorRole: (c.user?.role || "student").toLowerCase(),
+          text: c.message,
+          timestamp: c.created_at,
+        });
+      });
+
+      setPrivateMessagesByStudent(grouped);
+    });
+  }, [assignmentId]);
 
   const getComputedStatus = (studentId) => {
     if (statusOverrides[studentId]) return statusOverrides[studentId];
-    if (assignment.doneStudentIds.includes(studentId)) return "turned_in";
-    if (assignment.missedStudentIds.includes(studentId)) return "missed";
+
+    const apiStudent = studentsList.find((s) => s.id === studentId);
+    if (apiStudent) return apiStudent.status;
+
     return "assigned";
   };
 
-  const studentList = students.map((student) => ({
+  const studentList = studentsList.map((student) => ({
     ...student,
     status: getComputedStatus(student.id),
-    submission: getSubmissionForStudent(student.id),
   }));
-
-  const turnedInCount = studentList.filter((student) => student.status === "turned_in").length;
-  const missedCount = studentList.filter((student) => student.status === "missed").length;
-  const assignedCount = studentList.filter((student) => student.status === "assigned").length;
+  const turnedInCount = assignmentStats.turned_in || studentList.filter((student) => student.status === "turned_in").length;
+  const missedCount = assignmentStats.missed || studentList.filter((student) => student.status === "missed").length;
+  const assignedCount = assignmentStats.assigned || studentList.filter((student) => student.status === "assigned").length;
 
   const filteredStudents = studentList.filter((student) => {
     const statusMatches = filterType === "all" || student.status === filterType;
-    const searchMatches = student.name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+    const searchMatches = (student.name || "")
+      .toLowerCase()
+      .includes(searchQuery.trim().toLowerCase());
     return statusMatches && searchMatches;
   });
 
@@ -341,37 +427,49 @@ const AssignmentReview = () => {
     return String(student.submission.grade);
   };
 
-  const handleSaveGrade = (studentId) => {
+  const handleSaveGrade = async (studentId) => {
     const value = draftGrades[studentId];
     if (value === undefined || value === "") return;
     const numeric = Number(value);
     if (Number.isNaN(numeric)) return;
-    const clamped = Math.max(0, Math.min(100, Math.round(numeric)));
+    const clamped = Math.max(0, Math.min(maxScore, Math.round(numeric)));
 
-    setSubmissions((prev) =>
-      prev.map((sub) =>
-        sub.studentId === studentId
+    setStudentsList((prev) =>
+      prev.map((s) =>
+        s.id === studentId
           ? {
-              ...sub,
-              grade: clamped,
+              ...s,
+              submission: {
+                ...s.submission,
+                grade: clamped,
+              },
             }
-          : sub
+          : s
       )
     );
     setDraftGrades((prev) => ({ ...prev, [studentId]: String(clamped) }));
+
+    // call backend
+    const student = studentList.find((s) => s.id === studentId);
+    const submissionId =
+      student?.submission?.submission_id || student?.submission?.id;
+    if (submissionId) {
+      await saveGradeApi(submissionId, clamped);
+    }
   };
 
-  const handleSendPublicComment = () => {
+  const handleSendPublicComment = async () => {
     const text = publicDraft.trim();
     if (!text) return;
 
+    const response = await addAssignmentCommentApi(text, 0);
     const nextComment = {
-      id: `pub-${Date.now()}`,
-      authorId: "inst-1",
-      authorName: "Dr. Mahmoud",
-      authorRole: "Instructor",
+      id: response?.id || `pub-${Date.now()}`,
+      authorId: response?.authorId || "inst-1",
+      authorName: response?.authorName || "Dr. Mahmoud",
+      authorRole: response?.authorRole || currentUserRole,
       text,
-      timestamp: new Date().toISOString(),
+      timestamp: response?.timestamp || new Date().toISOString(),
     };
 
     setPublicMessages((prev) => [...prev, nextComment]);
@@ -386,7 +484,8 @@ const AssignmentReview = () => {
   };
 
   const handleEditPublicComment = (comment) => {
-    if (!comment || comment.authorRole !== "Instructor") return;
+    const isInstructor = currentUserRole === "lecturer" || currentUserRole === "ta";
+    if (!comment || !isInstructor) return;
     setEditingPublicCommentId(comment.id);
     setPublicEditDraft(comment.text || "");
     setActivePublicMenuId(null);
@@ -397,25 +496,8 @@ const AssignmentReview = () => {
     setPublicEditDraft("");
   };
 
-  const handleSavePublicEdit = () => {
-    const text = publicEditDraft.trim();
-    if (!text || !editingPublicCommentId) return;
-    setPublicMessages((prev) =>
-      prev.map((comment) =>
-        comment.id === editingPublicCommentId
-          ? {
-              ...comment,
-              text,
-              timestamp: new Date().toISOString(),
-            }
-          : comment
-      )
-    );
-    setEditingPublicCommentId(null);
-    setPublicEditDraft("");
-  };
-
-  const handleDeletePublicComment = (commentId) => {
+  const handleDeletePublicComment = async (commentId) => {
+    await deleteCommentApi(commentId);
     setPublicMessages((prev) => prev.filter((comment) => comment.id !== commentId));
     setActivePublicMenuId(null);
     if (editingPublicCommentId === commentId) {
@@ -424,17 +506,21 @@ const AssignmentReview = () => {
     }
   };
 
-  const handleSendPrivateComment = (studentId) => {
+
+
+  const handleSendPrivateComment = async (studentId) => {
     const text = privateDraft.trim();
-    if (!text) return;
+    if (!text || !studentId) return;
+
+    const response = await addAssignmentCommentApi(text, 1, studentId);
 
     const nextComment = {
-      id: `prv-${Date.now()}`,
-      authorId: "inst-1",
-      authorName: "Dr. Mahmoud",
-      authorRole: "Instructor",
+      id: response?.id || `prv-${Date.now()}`,
+      authorId: response?.authorId || "inst-1",
+      authorName: response?.authorName || user?.name || "User",
+      authorRole: response?.authorRole || currentUserRole,
       text,
-      timestamp: new Date().toISOString(),
+      timestamp: response?.timestamp || response?.created_at || new Date().toISOString(),
     };
 
     setPrivateMessagesByStudent((prev) => ({
@@ -452,7 +538,8 @@ const AssignmentReview = () => {
   };
 
   const handleEditPrivateComment = (comment) => {
-    if (!comment || comment.authorRole !== "Instructor") return;
+    const isInstructor = currentUserRole === "lecturer" || currentUserRole === "ta";
+    if (!comment || !isInstructor) return;
     setEditingPrivateCommentId(comment.id);
     setPrivateEditDraft(comment.text || "");
     setActivePrivateMenuId(null);
@@ -463,28 +550,9 @@ const AssignmentReview = () => {
     setPrivateEditDraft("");
   };
 
-  const handleSavePrivateEdit = (studentId) => {
-    const text = privateEditDraft.trim();
-    if (!text || !editingPrivateCommentId || !studentId) return;
-
-    setPrivateMessagesByStudent((prev) => ({
-      ...prev,
-      [studentId]: (prev[studentId] || []).map((comment) =>
-        comment.id === editingPrivateCommentId
-          ? {
-              ...comment,
-              text,
-              timestamp: new Date().toISOString(),
-            }
-          : comment
-      ),
-    }));
-    setEditingPrivateCommentId(null);
-    setPrivateEditDraft("");
-  };
-
-  const handleDeletePrivateComment = (studentId, commentId) => {
+  const handleDeletePrivateComment = async (studentId, commentId) => {
     if (!studentId || !commentId) return;
+    await deleteCommentApi(commentId);
     setPrivateMessagesByStudent((prev) => ({
       ...prev,
       [studentId]: (prev[studentId] || []).filter((comment) => comment.id !== commentId),
@@ -496,6 +564,8 @@ const AssignmentReview = () => {
     }
   };
 
+
+
   const applyStatusToStudents = (studentIds, status) => {
     if (!studentIds.length) return;
     setStatusOverrides((prev) => ({
@@ -504,11 +574,28 @@ const AssignmentReview = () => {
     }));
   };
 
-  const handleReturnAssignments = (student) => {
+  const handleReturnAssignments = async (student) => {
     if (!student || student.status !== "turned_in" || !student.submission) {
       setReturnActionFeedback("This student has no turned-in submission to return.");
       setIsReturnMenuOpen(false);
       return;
+    }
+
+    const submissionId = student.submission.submission_id;
+    if (submissionId) {
+      await returnSubmissionApi(submissionId);
+      await fetchAssignmentSubmissions();
+      setStudentsList((prev) =>
+        prev.map((s) =>
+          s.id === student.id
+            ? {
+                ...s,
+                status: "assigned",
+                submission: null,
+              }
+            : s
+        )
+      );
     }
 
     setReturnedByStudent((prev) => ({ ...prev, [student.id]: true }));
@@ -516,21 +603,32 @@ const AssignmentReview = () => {
     setIsReturnMenuOpen(false);
   };
 
-  const handleBulkGrade = (student) => {
+  const handleBulkGrade = async (student) => {
     if (!student || student.status !== "turned_in" || !student.submission) {
       setReturnActionFeedback("This student cannot be graded before submission.");
       setIsReturnMenuOpen(false);
       return;
     }
 
-    setSubmissions((prev) =>
-      prev.map((sub) =>
-        sub.studentId === student.id
-          ? { ...sub, grade: 100 }
-          : sub
-      )
-    );
-    setDraftGrades((prev) => ({ ...prev, [student.id]: "100" }));
+    const submissionId = student.submission.submission_id || student.submission.id;
+    if (submissionId) {
+      await saveGradeApi(submissionId, 100);
+      setDraftGrades((prev) => ({ ...prev, [student.id]: "100" }));
+      setStudentsList((prev) =>
+        prev.map((s) =>
+          s.id === student.id
+            ? {
+                ...s,
+                grade: 100,
+                submission: {
+                  ...s.submission,
+                  grade: 100,
+                },
+              }
+            : s
+        )
+      );
+    }
     setReturnActionFeedback(`Set grade to 100 for ${student.name}.`);
     setIsReturnMenuOpen(false);
   };
@@ -574,13 +672,66 @@ const AssignmentReview = () => {
     setIsReturnMenuOpen(false);
   };
 
+  const handleSavePublicEdit = async () => {
+    if (!editingPublicCommentId || !publicEditDraft.trim()) return;
+
+    await updateCommentApi(editingPublicCommentId, publicEditDraft.trim());
+
+    setPublicMessages((prev) =>
+      prev.map((c) =>
+        c.id === editingPublicCommentId 
+          ? { 
+              ...c, 
+              text: publicEditDraft.trim(),
+              timestamp: new Date().toISOString()
+            } 
+          : c
+      )
+    );
+
+    setEditingPublicCommentId(null);
+    setPublicEditDraft("");
+  };
+
+  const handleSavePrivateEdit = async (studentId) => {
+    if (!editingPrivateCommentId || !privateEditDraft.trim() || !studentId) return;
+
+    await updateCommentApi(editingPrivateCommentId, privateEditDraft.trim());
+
+    setPrivateMessagesByStudent((prev) => ({
+      ...prev,
+      [studentId]: (prev[studentId] || []).map((c) =>
+        c.id === editingPrivateCommentId 
+          ? { 
+              ...c, 
+              text: privateEditDraft.trim(),
+              timestamp: new Date().toISOString()
+            } 
+          : c
+      ),
+    }));
+
+    setEditingPrivateCommentId(null);
+    setPrivateEditDraft("");
+  };
+
   return (
     <section className="assignment-review-page">
       <div className="assignment-review-inner">
         <button
           type="button"
           className="assignment-review-back"
-          onClick={() => navigate(contentDetailsPath)}
+          onClick={() =>
+            navigate(contentDetailsPath, {
+              state: {
+                courseTitle,
+                lectureTitle,
+                sectionId,
+                lectureId,
+                courseId
+              }
+            })
+          }
         >
           <ArrowLeft size={14} />
           Back
@@ -609,7 +760,7 @@ const AssignmentReview = () => {
                 {filterTabs.map((tab) => {
                   const count =
                     tab.key === "all"
-                      ? students.length
+                      ? studentList.length
                       : tab.key === "turned_in"
                         ? turnedInCount
                         : tab.key === "assigned"
@@ -639,7 +790,48 @@ const AssignmentReview = () => {
                     type="button"
                     key={student.id}
                     className={`assignment-review-student-item ${selectedStudentId === student.id ? "is-selected" : ""}`}
-                    onClick={() => setSelectedStudentId(student.id)}
+                    onClick={async () => {
+                      if (selectedStudentId === student.id) return;
+
+                      setSelectedStudentId(student.id);
+
+                      const details = await getStudentSubmissionDetailsApi(student.id);
+
+                      if (details?.submission) {
+                        setStudentsList((prev) =>
+                          prev.map((s) =>
+                            s.id === student.id
+                              ? {
+                                  ...s,
+                                  status: "turned_in",
+                                  submission: {
+                                    submission_id: details.submission.id,
+                                    submittedAt: details.submission.submitted_at,
+                                    grade: details.submission.grade,
+                                    fileName: details.submission.file_name,
+                                    file_url: details.submission.file_url,
+                                    fileSize: details.submission.file_size || 0,
+                                  },
+                                }
+                              : s
+                          )
+                        );
+                        setSubmissions((prev) => [
+                          ...prev.filter((s) => s.studentId !== student.id),
+                          {
+                            id: details.submission.id,
+                            submission_id: details.submission.id,
+                            studentId: student.id,
+                            fileName: details.submission.file_name,
+                            fileType: details.submission.file_type || "application/pdf",
+                            fileSize: details.submission.file_size || 0,
+                            submittedAt: details.submission.submitted_at,
+                            grade: details.submission.grade,
+                            file_url: details.submission.file_url,
+                          },
+                        ]);
+                      }
+                    }}
                   >
                     <span className="assignment-review-student-avatar">{getInitials(student.name)}</span>
 
@@ -652,7 +844,7 @@ const AssignmentReview = () => {
                       {student.status === "turned_in" ? (
                         <span className="assignment-review-grade-wrap">
                           <span className="assignment-review-grade">
-                            {gradeValue !== "" ? `${gradeValue}/100` : "___/100"}
+                            {gradeValue !== "" ? `${gradeValue}/${maxScore}` : `___/${maxScore}`}
                           </span>
                           {returnedByStudent[student.id] && (
                             <small className="assignment-review-returned-tag">Returned</small>
@@ -678,9 +870,9 @@ const AssignmentReview = () => {
             {!selectedStudent ? (
               <div className="assignment-review-overview">
                 <header className="assignment-review-title-block">
-                  <h1>{assignment.title}</h1>
+                  <h1>{assignmentTitle}</h1>
                   <p>
-                    {course?.name} · {lecture?.title?.split(":")[0]}
+                    {courseTitle} · {lectureTitle}
                   </p>
                 </header>
 
@@ -701,7 +893,11 @@ const AssignmentReview = () => {
                   <button
                     type="button"
                     className={`assignment-review-switch ${acceptingSubmissions ? "is-on" : ""}`}
-                    onClick={() => setAcceptingSubmissions((prev) => !prev)}
+                    onClick={async () => {
+                      setAcceptingSubmissions((prev) => !prev);
+                      await toggleAcceptingApi();
+                      await fetchAssignmentSubmissions();
+                    }}
                     aria-label="Toggle accepting submissions"
                     aria-pressed={acceptingSubmissions}
                   >
@@ -713,14 +909,12 @@ const AssignmentReview = () => {
                   <h2>Student Submissions</h2>
 
                   <div className="assignment-review-submissions-grid">
-                    {submissions.map((submission) => {
-                      const student = students.find((item) => item.id === submission.studentId);
-                      return (
+                    {studentList.filter(s => s.status === "turned_in" && s.submission).map((student) => (
                         <button
                           type="button"
-                          key={submission.id}
+                          key={student.id}
                           className="assignment-review-submission-card"
-                          onClick={() => setSelectedStudentId(submission.studentId)}
+                          onClick={() => setSelectedStudentId(student.id)}
                         >
                           <div className="assignment-review-submission-head">
                             <span className="assignment-review-student-avatar">{getInitials(student?.name)}</span>
@@ -728,16 +922,15 @@ const AssignmentReview = () => {
                           </div>
 
                           <div className="assignment-review-submission-file">
-                            {getFileIcon(submission.fileType)}
-                            <span>{submission.fileName}</span>
+                            {getFileIcon(student.submission.fileType)}
+                            <span>{student.submission.fileName}</span>
                           </div>
 
-                          <span className={`assignment-review-turned-pill ${returnedByStudent[submission.studentId] ? "returned" : ""}`}>
-                            {returnedByStudent[submission.studentId] ? "Returned" : "Turned in"}
+                          <span className={`assignment-review-turned-pill ${returnedByStudent[student.id] ? "returned" : ""}`}>
+                            {returnedByStudent[student.id] ? "Returned" : "Turned in"}
                           </span>
                         </button>
-                      );
-                    })}
+                      ))}
                   </div>
                 </section>
 
@@ -752,7 +945,7 @@ const AssignmentReview = () => {
 
                   <div className="assignment-review-comments-list">
                     {publicMessages.map((comment) => {
-                      const canManageComment = comment.authorRole === "Instructor";
+                      const canManageComment = ["lecturer", "ta"].includes(currentUserRole);
                       const isEditingComment = editingPublicCommentId === comment.id;
 
                       return (
@@ -765,9 +958,7 @@ const AssignmentReview = () => {
                             <div className="assignment-review-comment-content">
                               <div className="assignment-review-comment-topline">
                                 <strong>{comment.authorName}</strong>
-                                {canManageComment && (
-                                  <em>Instructor</em>
-                                )}
+                                <em>{roleMap[comment.authorRole] || "Student"}</em>
                               </div>
 
                               {isEditingComment ? (
@@ -933,7 +1124,7 @@ const AssignmentReview = () => {
                   <>
                     <article className="assignment-review-file-preview-card">
                       <div className="assignment-review-submission-file-row">
-                        {getFileIcon(selectedStudent.submission.fileType)}
+                        {getFileIcon(selectedStudent.submission.fileType || selectedStudent.submission.fileName)}
                         <div>
                           <strong>{selectedStudent.submission.fileName}</strong>
                           <p>
@@ -944,7 +1135,17 @@ const AssignmentReview = () => {
 
                       <div className="assignment-review-file-preview-placeholder">
                         <FileText size={40} />
-                        <p>File preview</p>
+                        {selectedStudent.submission?.file_url ? (
+                          <a
+                            href={selectedStudent.submission.file_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View File
+                          </a>
+                        ) : (
+                          <span>No file available</span>
+                        )}
                       </div>
                     </article>
 
@@ -965,7 +1166,7 @@ const AssignmentReview = () => {
                           }
                           placeholder="___"
                         />
-                        <span>/ 100</span>
+                        <span>/ {maxScore}</span>
 
                         <button
                           type="button"
@@ -999,7 +1200,9 @@ const AssignmentReview = () => {
 
                   <div className="assignment-review-comments-list">
                     {getPrivateMessages(selectedStudent.id).map((comment) => {
-                      const canManageComment = comment.authorRole === "Instructor";
+                      const canManageComment =
+                        (currentUserRole === "lecturer" || currentUserRole === "ta") &&
+                        (comment.authorRole === "lecturer" || comment.authorRole === "ta");
                       const isEditingComment = editingPrivateCommentId === comment.id;
 
                       return (
@@ -1012,7 +1215,8 @@ const AssignmentReview = () => {
                             <div className="assignment-review-comment-content">
                               <div className="assignment-review-comment-topline">
                                 <strong>{comment.authorName}</strong>
-                                {canManageComment && <em>Instructor</em>}
+                                {comment.authorRole === "lecturer" && <em>Lecturer</em>}
+                                {comment.authorRole === "ta" && <em>TA</em>}
                               </div>
 
                               {isEditingComment ? (

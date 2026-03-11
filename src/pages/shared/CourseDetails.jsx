@@ -35,7 +35,7 @@ const CourseDetails = ({ role }) => {
         });
 
         const selectedCourse = res.data.courses.find(
-          (c) => c.id == courseId
+          (c) => c.id === Number(courseId)
         );
 
         setCourse(selectedCourse);
@@ -241,12 +241,11 @@ const CourseDetails = ({ role }) => {
               className="circle-card"
               key={lecture.id}
               onClick={() =>
-                navigate(`/${role}/contentDetails`, {
+                navigate(`/${role}/courses/${courseId}/lecture/${lecture.id}`, {
                   state: {
-                    lectureId: lecture.id,
                     lectureTitle: lecture.title,
-                    courseId: courseId,
-                  },
+                    courseTitle: course?.title
+                  }
                 })
               }
               style={{ cursor: "pointer" }}
@@ -304,22 +303,13 @@ const CourseDetails = ({ role }) => {
                 if (permissions.canManageSections) {
                   localStorage.setItem("ta_active_section_id", String(section.id));
                   localStorage.setItem("ta_active_section_title", section.title || "");
-                  navigate(`/${role}/contentDetails`, {
-                    state: {
-                      sectionId: section.id,
-                      sectionTitle: section.title,
-                      courseId,
-                    },
-                  });
-                  return;
                 }
 
-                navigate(`/${role}/contentDetails`, {
+                navigate(`/${role}/courses/${courseId}/section/${section.id}`, {
                   state: {
-                    sectionId: section.id,
                     sectionTitle: section.title,
-                    courseId,
-                  },
+                    courseTitle: course?.title
+                  }
                 });
               }}
             >
