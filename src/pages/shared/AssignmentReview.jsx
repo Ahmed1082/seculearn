@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import {
@@ -87,6 +87,21 @@ const normalizeReviewComment = (
     timestamp: rawComment?.created_at || rawComment?.updated_at || new Date().toISOString(),
     ...(isPrivate ? { studentId } : {}),
   };
+};
+
+const getPrivateThreadMapStorageKey = (assignmentId) =>
+  `assignment-review:private-thread-map:${String(assignmentId || "")}`;
+
+const readPrivateThreadMap = (assignmentId) => {
+  if (!assignmentId) return {};
+  try {
+    const raw = localStorage.getItem(getPrivateThreadMapStorageKey(assignmentId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
 };
 
 // API helpers
@@ -180,8 +195,36 @@ const AssignmentReview = () => {
   const [editingPrivateCommentId, setEditingPrivateCommentId] = useState(null);
   const [privateEditDraft, setPrivateEditDraft] = useState("");
   const currentUserId = useMemo(() => getCurrentUserId(), []);
+  const privateThreadMapRef = useRef({});
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
+
+  useEffect(() => {
+    privateThreadMapRef.current = readPrivateThreadMap(assignmentId);
+  }, [assignmentId]);
+
+  const persistPrivateThreadMap = useCallback(() => {
+    if (!assignmentId) return;
+    localStorage.setItem(
+      getPrivateThreadMapStorageKey(assignmentId),
+      JSON.stringify(privateThreadMapRef.current || {})
+    );
+  }, [assignmentId]);
+
+  const bindCommentToStudent = useCallback(
+    (commentId, studentId) => {
+      if (!assignmentId || !commentId || !studentId) return;
+      const key = String(commentId);
+      const value = String(studentId);
+      if (privateThreadMapRef.current[key] === value) return;
+      privateThreadMapRef.current = {
+        ...privateThreadMapRef.current,
+        [key]: value,
+      };
+      persistPrivateThreadMap();
+    },
+    [assignmentId, persistPrivateThreadMap]
+  );
 
   // -------- API-driven state --------
   const [assignmentStats, setAssignmentStats] = useState({
@@ -437,6 +480,8 @@ const AssignmentReview = () => {
       );
 
       const grouped = {};
+      let mapUpdated = false;
+      const threadMapSnapshot = { ...(privateThreadMapRef.current || {}) };
       (privateComments || []).forEach((comment) => {
         const normalized = normalizeReviewComment(comment, {
           isPrivate: true,
@@ -445,10 +490,36 @@ const AssignmentReview = () => {
           studentIds,
         });
 
-        if (!normalized.studentId) return;
-        if (!grouped[normalized.studentId]) grouped[normalized.studentId] = [];
-        grouped[normalized.studentId].push(normalized);
+        const commentKey = String(normalized.id || "");
+        let resolvedStudentId = normalized.studentId || threadMapSnapshot[commentKey] || null;
+        if (
+          !resolvedStudentId &&
+          normalized.authorRole === "student" &&
+          normalized.authorId &&
+          studentIds.has(String(normalized.authorId))
+        ) {
+          resolvedStudentId = String(normalized.authorId);
+        }
+
+        if (!resolvedStudentId) return;
+
+        if (commentKey && threadMapSnapshot[commentKey] !== String(resolvedStudentId)) {
+          threadMapSnapshot[commentKey] = String(resolvedStudentId);
+          mapUpdated = true;
+        }
+
+        const hydratedComment = {
+          ...normalized,
+          studentId: String(resolvedStudentId),
+        };
+        if (!grouped[hydratedComment.studentId]) grouped[hydratedComment.studentId] = [];
+        grouped[hydratedComment.studentId].push(hydratedComment);
       });
+
+      if (mapUpdated) {
+        privateThreadMapRef.current = threadMapSnapshot;
+        persistPrivateThreadMap();
+      }
 
       setPrivateMessagesByStudent(grouped);
     };
@@ -593,6 +664,9 @@ const AssignmentReview = () => {
 
     const response = await addAssignmentCommentApi(text, 1, studentId);
     if (!response) return;
+    if (response?.id) {
+      bindCommentToStudent(response.id, studentId);
+    }
 
     const nextComment = {
       id: response?.id || `prv-${Date.now()}`,
@@ -603,6 +677,7 @@ const AssignmentReview = () => {
         normalizeRole(response?.user?.role || response?.authorRole) || currentUserRole,
       text,
       timestamp: response?.timestamp || response?.created_at || new Date().toISOString(),
+      studentId: String(studentId),
     };
 
     setPrivateMessagesByStudent((prev) => ({
@@ -636,6 +711,12 @@ const AssignmentReview = () => {
     if (!studentId || !commentId) return;
     const deleted = await deleteCommentApi(commentId);
     if (!deleted) return;
+    if (privateThreadMapRef.current[String(commentId)]) {
+      const nextMap = { ...privateThreadMapRef.current };
+      delete nextMap[String(commentId)];
+      privateThreadMapRef.current = nextMap;
+      persistPrivateThreadMap();
+    }
     setPrivateMessagesByStudent((prev) => ({
       ...prev,
       [studentId]: (prev[studentId] || []).filter((comment) => comment.id !== commentId),
@@ -957,7 +1038,7 @@ const AssignmentReview = () => {
                 <header className="assignment-review-title-block">
                   <h1>{assignmentTitle}</h1>
                   <p>
-                    {courseTitle} · {lectureTitle}
+                    {courseTitle} - {lectureTitle}
                   </p>
                 </header>
 
@@ -1215,7 +1296,7 @@ const AssignmentReview = () => {
                         <div>
                           <strong>{selectedStudent.submission.fileName}</strong>
                           <p>
-                            {formatFileSize(selectedStudent.submission.fileSize)} · Submitted {formatCommentTime(selectedStudent.submission.submittedAt)}
+                            {formatFileSize(selectedStudent.submission.fileSize)} - Submitted {formatCommentTime(selectedStudent.submission.submittedAt)}
                           </p>
                         </div>
                       </div>
@@ -1404,3 +1485,4 @@ const AssignmentReview = () => {
 };
 
 export default AssignmentReview;
+
