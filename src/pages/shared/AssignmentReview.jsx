@@ -27,6 +27,68 @@ const roleMap = {
 
 const currentUserRole = (localStorage.getItem("role") || "student").toLowerCase();
 
+const getCurrentUserId = () => {
+  try {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    return String(user.id || user.user_id || user.student_id || user.username || "");
+  } catch {
+    return "";
+  }
+};
+
+const normalizeRole = (value) => {
+  const role = String(value || "").toLowerCase();
+  if (role === "lecturer" || role === "ta" || role === "student") return role;
+  return "";
+};
+
+const normalizeReviewComment = (
+  rawComment,
+  { isPrivate = false, currentUserId = "", fallbackRole = "student", studentIds = new Set() } = {}
+) => {
+  const authorId = rawComment?.user_id ?? rawComment?.user?.id ?? rawComment?.author_id ?? null;
+  const authorRoleFromApi = normalizeRole(rawComment?.user?.role || rawComment?.role);
+
+  const studentIdCandidates = [
+    rawComment?.student_id,
+    rawComment?.studentId,
+    rawComment?.student?.id,
+    rawComment?.student?.student_id,
+    rawComment?.assignment_submission?.student_id,
+    rawComment?.submission?.student_id,
+  ];
+
+  let studentId = null;
+  for (const candidate of studentIdCandidates) {
+    if (candidate !== null && candidate !== undefined && String(candidate) !== "") {
+      studentId = String(candidate);
+      break;
+    }
+  }
+
+  if (isPrivate && !studentId && authorId !== null && authorId !== undefined && String(authorId) !== "") {
+    if (authorRoleFromApi === "student") {
+      studentId = String(authorId);
+    } else if (studentIds.has(String(authorId))) {
+      studentId = String(authorId);
+    }
+  }
+
+  const authorRole =
+    authorRoleFromApi ||
+    (String(authorId || "") === String(currentUserId || "") ? fallbackRole : "student");
+
+  return {
+    id: rawComment?.id ?? `${isPrivate ? "prv" : "pub"}-${Date.now()}`,
+    authorId: authorId !== null && authorId !== undefined ? String(authorId) : null,
+    authorName: rawComment?.user?.name || rawComment?.name || "User",
+    authorRole,
+    text: rawComment?.message || rawComment?.text || "",
+    timestamp: rawComment?.created_at || rawComment?.updated_at || new Date().toISOString(),
+    ...(isPrivate ? { studentId } : {}),
+  };
+};
+
 // API helpers
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -117,6 +179,7 @@ const AssignmentReview = () => {
   const [activePrivateMenuId, setActivePrivateMenuId] = useState(null);
   const [editingPrivateCommentId, setEditingPrivateCommentId] = useState(null);
   const [privateEditDraft, setPrivateEditDraft] = useState("");
+  const currentUserId = useMemo(() => getCurrentUserId(), []);
 
   const user = JSON.parse(localStorage.getItem("user") || "{}");
 
@@ -165,9 +228,12 @@ const AssignmentReview = () => {
         }));
 
         setStudentsList(formattedStudents);
+        return formattedStudents;
       }
+      return [];
     } catch (err) {
       console.error("Failed to fetch assignment submissions", err);
+      return [];
     }
   };
 
@@ -234,19 +300,18 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
 
-      const payload = {
-        assignment_id: assignmentId,
-        message: text,
-        is_private: isPrivate,
-      };
+      const formData = new FormData();
+      formData.append("assignment_id", String(assignmentId));
+      formData.append("message", text);
+      formData.append("is_private", String(isPrivate));
 
       if (studentId) {
-        payload.student_id = studentId;
+        formData.append("student_id", String(studentId));
       }
 
       const res = await axios.post(
         `${API_BASE_URL}/api/add-comment`,
-        payload,
+        formData,
         { headers: buildApiHeaders(token) }
       );
 
@@ -300,22 +365,29 @@ const AssignmentReview = () => {
         `${API_BASE_URL}/api/delete-comment/${commentId}`,
         { headers: buildApiHeaders(token) }
       );
+      return true;
     } catch (err) {
       console.error("Failed to delete comment", err);
+      return false;
     }
   };
 
-  const updateCommentApi = async (commentId, text) => {
+  const updateCommentApi = async (commentId, text, isPrivate) => {
     if (!commentId || !text) return;
     try {
       const token = localStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("message", text);
+      formData.append("is_private", String(isPrivate));
       await axios.post(
         `${API_BASE_URL}/api/update-comment/${commentId}`,
-        { message: text },
+        formData,
         { headers: buildApiHeaders(token) }
       );
+      return true;
     } catch (err) {
       console.error("Failed to update comment", err);
+      return false;
     }
   };
 
@@ -344,42 +416,45 @@ const AssignmentReview = () => {
     setEditingPrivateCommentId(null);
     setPrivateEditDraft("");
 
-    // fetch from API
-    fetchAssignmentSubmissions();
+    const hydrateComments = async () => {
+      const students = await fetchAssignmentSubmissions();
+      const studentIds = new Set((students || []).map((student) => String(student.id)));
 
-    getClassCommentsApi().then((comments) => {
-      if (Array.isArray(comments)) setPublicMessages(
-        comments.map((c) => ({
-          id: c.id,
-          authorName: c.user?.name || "User",
-          authorRole: (c.user?.role || "student").toLowerCase(),
-          text: c.message,
-          timestamp: c.created_at,
-        }))
+      const [classComments, privateComments] = await Promise.all([
+        getClassCommentsApi(),
+        getPrivateCommentsApi(),
+      ]);
+
+      setPublicMessages(
+        (classComments || []).map((comment) =>
+          normalizeReviewComment(comment, {
+            isPrivate: false,
+            currentUserId,
+            fallbackRole: currentUserRole,
+            studentIds,
+          })
+        )
       );
-    });
-    getPrivateCommentsApi().then((comments) => {
+
       const grouped = {};
-
-      comments.forEach((c) => {
-        const studentId = c.student_id;
-
-        if (!grouped[studentId]) {
-          grouped[studentId] = [];
-        }
-
-        grouped[studentId].push({
-          id: c.id,
-          authorName: c.user?.name || "User",
-          authorRole: (c.user?.role || "student").toLowerCase(),
-          text: c.message,
-          timestamp: c.created_at,
+      (privateComments || []).forEach((comment) => {
+        const normalized = normalizeReviewComment(comment, {
+          isPrivate: true,
+          currentUserId,
+          fallbackRole: currentUserRole,
+          studentIds,
         });
+
+        if (!normalized.studentId) return;
+        if (!grouped[normalized.studentId]) grouped[normalized.studentId] = [];
+        grouped[normalized.studentId].push(normalized);
       });
 
       setPrivateMessagesByStudent(grouped);
-    });
-  }, [assignmentId]);
+    };
+
+    hydrateComments();
+  }, [assignmentId, currentUserId]);
 
   const getComputedStatus = (studentId) => {
     if (statusOverrides[studentId]) return statusOverrides[studentId];
@@ -463,13 +538,16 @@ const AssignmentReview = () => {
     if (!text) return;
 
     const response = await addAssignmentCommentApi(text, 0);
+    if (!response) return;
     const nextComment = {
       id: response?.id || `pub-${Date.now()}`,
-      authorId: response?.authorId || "inst-1",
-      authorName: response?.authorName || "Dr. Mahmoud",
-      authorRole: response?.authorRole || currentUserRole,
+      authorId:
+        response?.user_id || response?.user?.id || response?.authorId || currentUserId || "inst-1",
+      authorName: response?.user?.name || response?.authorName || user?.name || "User",
+      authorRole:
+        normalizeRole(response?.user?.role || response?.authorRole) || currentUserRole,
       text,
-      timestamp: response?.timestamp || new Date().toISOString(),
+      timestamp: response?.created_at || response?.timestamp || new Date().toISOString(),
     };
 
     setPublicMessages((prev) => [...prev, nextComment]);
@@ -497,7 +575,8 @@ const AssignmentReview = () => {
   };
 
   const handleDeletePublicComment = async (commentId) => {
-    await deleteCommentApi(commentId);
+    const deleted = await deleteCommentApi(commentId);
+    if (!deleted) return;
     setPublicMessages((prev) => prev.filter((comment) => comment.id !== commentId));
     setActivePublicMenuId(null);
     if (editingPublicCommentId === commentId) {
@@ -513,12 +592,15 @@ const AssignmentReview = () => {
     if (!text || !studentId) return;
 
     const response = await addAssignmentCommentApi(text, 1, studentId);
+    if (!response) return;
 
     const nextComment = {
       id: response?.id || `prv-${Date.now()}`,
-      authorId: response?.authorId || "inst-1",
-      authorName: response?.authorName || user?.name || "User",
-      authorRole: response?.authorRole || currentUserRole,
+      authorId:
+        response?.user_id || response?.user?.id || response?.authorId || currentUserId || "inst-1",
+      authorName: response?.user?.name || response?.authorName || user?.name || "User",
+      authorRole:
+        normalizeRole(response?.user?.role || response?.authorRole) || currentUserRole,
       text,
       timestamp: response?.timestamp || response?.created_at || new Date().toISOString(),
     };
@@ -552,7 +634,8 @@ const AssignmentReview = () => {
 
   const handleDeletePrivateComment = async (studentId, commentId) => {
     if (!studentId || !commentId) return;
-    await deleteCommentApi(commentId);
+    const deleted = await deleteCommentApi(commentId);
+    if (!deleted) return;
     setPrivateMessagesByStudent((prev) => ({
       ...prev,
       [studentId]: (prev[studentId] || []).filter((comment) => comment.id !== commentId),
@@ -675,7 +758,8 @@ const AssignmentReview = () => {
   const handleSavePublicEdit = async () => {
     if (!editingPublicCommentId || !publicEditDraft.trim()) return;
 
-    await updateCommentApi(editingPublicCommentId, publicEditDraft.trim());
+    const updated = await updateCommentApi(editingPublicCommentId, publicEditDraft.trim(), 0);
+    if (!updated) return;
 
     setPublicMessages((prev) =>
       prev.map((c) =>
@@ -696,7 +780,8 @@ const AssignmentReview = () => {
   const handleSavePrivateEdit = async (studentId) => {
     if (!editingPrivateCommentId || !privateEditDraft.trim() || !studentId) return;
 
-    await updateCommentApi(editingPrivateCommentId, privateEditDraft.trim());
+    const updated = await updateCommentApi(editingPrivateCommentId, privateEditDraft.trim(), 1);
+    if (!updated) return;
 
     setPrivateMessagesByStudent((prev) => ({
       ...prev,
@@ -945,7 +1030,9 @@ const AssignmentReview = () => {
 
                   <div className="assignment-review-comments-list">
                     {publicMessages.map((comment) => {
-                      const canManageComment = ["lecturer", "ta"].includes(currentUserRole);
+                      const canManageComment =
+                        ["lecturer", "ta"].includes(currentUserRole) &&
+                        String(comment.authorId || "") === String(currentUserId || "");
                       const isEditingComment = editingPublicCommentId === comment.id;
 
                       return (
@@ -1202,7 +1289,7 @@ const AssignmentReview = () => {
                     {getPrivateMessages(selectedStudent.id).map((comment) => {
                       const canManageComment =
                         (currentUserRole === "lecturer" || currentUserRole === "ta") &&
-                        (comment.authorRole === "lecturer" || comment.authorRole === "ta");
+                        String(comment.authorId || "") === String(currentUserId || "");
                       const isEditingComment = editingPrivateCommentId === comment.id;
 
                       return (

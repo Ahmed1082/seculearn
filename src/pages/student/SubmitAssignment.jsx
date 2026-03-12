@@ -74,6 +74,15 @@ const getCurrentUserId = () => {
   }
 };
 
+const getCurrentUserRole = () => {
+  try {
+    const role = localStorage.getItem("role") || "student";
+    return String(role).toLowerCase();
+  } catch {
+    return "student";
+  }
+};
+
 const createClientId = (prefix) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -225,17 +234,23 @@ const extractGradeMeta = (assignment) => {
   };
 };
 
-const normalizeComment = (comment, fallbackName = "User") => ({
-  id: comment?.id ?? createClientId("comment"),
-  message: comment?.message || comment?.text || "",
-  user: {
-    name:
-      comment?.user?.name ||
-      comment?.user?.username ||
-      comment?.name ||
-      fallbackName,
-  },
-});
+const normalizeComment = (comment, fallbackName = "User", fallbackRole = "student") => {
+  const userId = comment?.user_id ?? comment?.user?.id ?? null;
+  return {
+    id: comment?.id ?? createClientId("comment"),
+    message: comment?.message || comment?.text || "",
+    user_id: userId,
+    user: {
+      id: userId,
+      role: String(comment?.user?.role || comment?.role || fallbackRole || "student").toLowerCase(),
+      name:
+        comment?.user?.name ||
+        comment?.user?.username ||
+        comment?.name ||
+        fallbackName,
+    },
+  };
+};
 
 const findAssignmentById = (payload, assignmentId) => {
   const candidates = Array.isArray(payload?.data)
@@ -264,6 +279,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const token = localStorage.getItem("token");
   const displayName = useMemo(() => getDisplayName(), []);
   const currentUserId = useMemo(() => getCurrentUserId(), []);
+  const currentUserRole = useMemo(() => getCurrentUserRole(), []);
 
   const isSection = unitType === "section";
   const scope = isSection ? "section" : "lecture";
@@ -303,6 +319,15 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const [editedClassText, setEditedClassText] = useState("");
 
   const [assignment, setAssignment] = useState(null);
+
+  const isCommentOwnedByCurrentUser = useCallback(
+    (comment) => {
+      const ownerId = comment?.user_id ?? comment?.user?.id;
+      if (ownerId === null || ownerId === undefined || String(ownerId) === "") return true;
+      return String(ownerId) === String(currentUserId);
+    },
+    [currentUserId]
+  );
 
   const createObjectUrl = useCallback((file) => {
     const url = URL.createObjectURL(file);
@@ -346,12 +371,14 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
       setClassComments(classData.map((comment) => normalizeComment(comment)));
       setPrivateComments(
-        privateData.map((comment) => normalizeComment(comment, displayName))
+        privateData.map((comment) =>
+          normalizeComment(comment, displayName, currentUserRole)
+        )
       );
     } catch (error) {
       console.error("Error fetching comments:", error);
     }
-  }, [assignmentId, displayName, token]);
+  }, [assignmentId, currentUserRole, displayName, token]);
 
   const readCachedSubmission = useCallback(() => {
     if (!submissionCacheKey) return null;
@@ -667,9 +694,11 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
           {
             id: createClientId("private"),
             message,
-            user: { name: displayName },
+            user: { id: currentUserId, role: currentUserRole, name: displayName },
+            user_id: currentUserId,
           },
-          displayName
+          displayName,
+          currentUserRole
         ),
       ]);
       setPrivateComment("");
@@ -705,6 +734,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
     const target = privateComments.find((comment) => String(comment.id) === String(id));
     if (!target?.id) return;
+    if (!isCommentOwnedByCurrentUser(target)) return;
 
     try {
       await axios.delete(`/api/delete-comment/${target.id}`, {
@@ -719,6 +749,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
   const handleEdit = (id) => {
     const target = privateComments.find((comment) => String(comment.id) === String(id));
+    if (!isCommentOwnedByCurrentUser(target)) return;
     setEditingId(id);
     setEditedText(target?.message || "");
     setActiveMenu(null);
@@ -744,10 +775,12 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
       (comment) => String(comment.id) === String(editingId)
     );
     if (!target?.id) return;
+    if (!isCommentOwnedByCurrentUser(target)) return;
 
     try {
       const formData = new FormData();
       formData.append("message", message);
+      formData.append("is_private", String(1));
 
       await axios.post(`/api/update-comment/${target.id}`, formData, {
         headers: buildApiHeaders(token),
@@ -775,9 +808,11 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
           {
             id: createClientId("class"),
             message,
-            user: { name: displayName },
+            user: { id: currentUserId, role: currentUserRole, name: displayName },
+            user_id: currentUserId,
           },
-          displayName
+          displayName,
+          currentUserRole
         ),
       ]);
       setClassComment("");
@@ -813,6 +848,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
     const target = classComments.find((comment) => String(comment.id) === String(id));
     if (!target?.id) return;
+    if (!isCommentOwnedByCurrentUser(target)) return;
 
     try {
       await axios.delete(`/api/delete-comment/${target.id}`, {
@@ -827,6 +863,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
   const handleEditClass = (id) => {
     const target = classComments.find((comment) => String(comment.id) === String(id));
+    if (!isCommentOwnedByCurrentUser(target)) return;
     setEditingClassId(id);
     setEditedClassText(target?.message || "");
     setActiveClassMenu(null);
@@ -852,10 +889,12 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
       (comment) => String(comment.id) === String(editingClassId)
     );
     if (!target?.id) return;
+    if (!isCommentOwnedByCurrentUser(target)) return;
 
     try {
       const formData = new FormData();
       formData.append("message", message);
+      formData.append("is_private", String(0));
 
       await axios.post(`/api/update-comment/${target.id}`, formData, {
         headers: buildApiHeaders(token),
@@ -985,10 +1024,12 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
                 )}
 
                 <div className="comments-list">
-                  {classComments.map((comment) => (
+                  {classComments.map((comment) => {
+                    const canManageComment = isCommentOwnedByCurrentUser(comment);
+                    return (
                     <div key={comment.id} className="comment-item">
-                      {String(editingClassId) === String(comment.id) ? (
-                        <div className="edit-area">
+                    {String(editingClassId) === String(comment.id) ? (
+                      <div className="edit-area">
                           <input
                             type="text"
                             value={editedClassText}
@@ -1014,32 +1055,35 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
                             <span className="comment-text">{comment?.message}</span>
                           </div>
 
-                          <div className="comment-menu">
-                            <button
-                              className="menu-btn"
-                              onClick={() => toggleClassMenu(comment.id)}
-                            >
-                              <FaEllipsisV />
-                            </button>
+                          {canManageComment && (
+                            <div className="comment-menu">
+                              <button
+                                className="menu-btn"
+                                onClick={() => toggleClassMenu(comment.id)}
+                              >
+                                <FaEllipsisV />
+                              </button>
 
-                            {String(activeClassMenu) === String(comment.id) && (
-                              <div className="menu-dropdown">
-                                <button onClick={() => handleEditClass(comment.id)}>
-                                  <FaEdit className="dropdown-icon" />
-                                  Edit
-                                </button>
+                              {String(activeClassMenu) === String(comment.id) && (
+                                <div className="menu-dropdown">
+                                  <button onClick={() => handleEditClass(comment.id)}>
+                                    <FaEdit className="dropdown-icon" />
+                                    Edit
+                                  </button>
 
-                                <button onClick={() => handleDeleteClass(comment.id)}>
-                                  <FaTrash className="dropdown-icon" />
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </div>
+                                  <button onClick={() => handleDeleteClass(comment.id)}>
+                                    <FaTrash className="dropdown-icon" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </>
             )}
@@ -1163,7 +1207,9 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
               </button>
 
               <div className="comments-list">
-                {privateComments.map((comment) => (
+                {privateComments.map((comment) => {
+                  const canManageComment = isCommentOwnedByCurrentUser(comment);
+                  return (
                   <div key={comment.id} className="comment-item">
                     {String(editingId) === String(comment.id) ? (
                       <div className="edit-area">
@@ -1189,28 +1235,31 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
                           <span className="comment-text">{comment?.message}</span>
                         </div>
 
-                        <div className="comment-menu">
-                          <button className="menu-btn" onClick={() => toggleMenu(comment.id)}>
-                            <FaEllipsisV />
-                          </button>
+                        {canManageComment && (
+                          <div className="comment-menu">
+                            <button className="menu-btn" onClick={() => toggleMenu(comment.id)}>
+                              <FaEllipsisV />
+                            </button>
 
-                          {String(activeMenu) === String(comment.id) && (
-                            <div className="menu-dropdown">
-                              <button onClick={() => handleEdit(comment.id)}>
-                                <FaEdit className="dropdown-icon" />
-                                Edit
-                              </button>
-                              <button onClick={() => handleDelete(comment.id)}>
-                                <FaTrash className="dropdown-icon" />
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                            {String(activeMenu) === String(comment.id) && (
+                              <div className="menu-dropdown">
+                                <button onClick={() => handleEdit(comment.id)}>
+                                  <FaEdit className="dropdown-icon" />
+                                  Edit
+                                </button>
+                                <button onClick={() => handleDelete(comment.id)}>
+                                  <FaTrash className="dropdown-icon" />
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
