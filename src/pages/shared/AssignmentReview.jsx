@@ -26,11 +26,18 @@ const roleMap = {
 };
 
 const currentUserRole = (localStorage.getItem("role") || "student").toLowerCase();
-
 const getCurrentUserId = () => {
   try {
     const user = JSON.parse(localStorage.getItem("user") || "{}");
-    return String(user.id || user.user_id || user.student_id || user.username || "");
+    return String(
+      user.id ||
+      user.user_id ||
+      user.lecturer_id ||
+      user.instructor_id ||
+      user.student_id ||
+      user.username ||
+      ""
+    );
   } catch {
     return "";
   }
@@ -46,8 +53,23 @@ const normalizeReviewComment = (
   rawComment,
   { isPrivate = false, currentUserId = "", fallbackRole = "student", studentIds = new Set() } = {}
 ) => {
-  const authorId = rawComment?.user_id ?? rawComment?.user?.id ?? rawComment?.author_id ?? null;
-  const authorRoleFromApi = normalizeRole(rawComment?.user?.role || rawComment?.role);
+  const apiAuthorId =
+  rawComment?.user_id ??
+  rawComment?.user?.id ??
+  rawComment?.author_id ??
+  rawComment?.lecturer_id ??
+  rawComment?.instructor_id ??
+  null;
+
+  const authorRoleFromApi = normalizeRole(
+    rawComment?.user?.role || rawComment?.role
+  );
+const authorId =
+  apiAuthorId !== null && apiAuthorId !== undefined
+    ? String(apiAuthorId)
+    : authorRoleFromApi === fallbackRole
+    ? String(currentUserId)
+    : null;
 
   const studentIdCandidates = [
     rawComment?.student_id,
@@ -1112,8 +1134,12 @@ const AssignmentReview = () => {
                   <div className="assignment-review-comments-list">
                     {publicMessages.map((comment) => {
                       const canManageComment =
-                        ["lecturer", "ta"].includes(currentUserRole) &&
-                        String(comment.authorId || "") === String(currentUserId || "");
+                      ["lecturer", "ta"].includes(currentUserRole) &&
+                      (
+                        String(comment.authorId || "") === String(currentUserId || "") ||
+                        String(comment.authorName || "").trim().toLowerCase() ===
+                        String(user?.name || "").trim().toLowerCase()
+                      );
                       const isEditingComment = editingPublicCommentId === comment.id;
 
                       return (
@@ -1369,8 +1395,12 @@ const AssignmentReview = () => {
                   <div className="assignment-review-comments-list">
                     {getPrivateMessages(selectedStudent.id).map((comment) => {
                       const canManageComment =
-                        (currentUserRole === "lecturer" || currentUserRole === "ta") &&
-                        String(comment.authorId || "") === String(currentUserId || "");
+                      (currentUserRole === "lecturer" || currentUserRole === "ta") &&
+                      (
+                        String(comment.authorId || "") === String(currentUserId || "") ||
+                        String(comment.authorName || "").trim().toLowerCase() ===
+                        String(user?.name || "").trim().toLowerCase()
+                      );
                       const isEditingComment = editingPrivateCommentId === comment.id;
 
                       return (

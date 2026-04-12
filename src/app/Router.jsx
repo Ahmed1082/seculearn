@@ -50,9 +50,6 @@ const Router = () => (
     <Route element={<LecturerLayout />}>
       <Route path="/lecturer" element={<LecturerOverview />} />
       <Route path="/lecturer/courses" element={<LecturerCourses />} />
-      {/* Dynamic Course ID */}
-      {/* <Route path="/lecturer/courses/:courseId" element={<LecturerCourseDetails />} />
-      <Route path="/lecturer/contentDetails" element={<LecturerContentDetails />} /> */}
 
        {/* Course Details */}
       <Route path="/lecturer/courses/:courseId" element={<LecturerCourseDetails />} />
@@ -75,9 +72,11 @@ const Router = () => (
     <Route element={<TALayout />}>
       <Route path="/ta" element={<TAOverview />} />
       <Route path="/ta/courses" element={<TACourses />} />
-      {/* Dynamic Course ID */}
-      {/* <Route path="/ta/courses/:courseId" element={<TACourseDetails />} />
-      <Route path="/ta/contentDetails" element={<TAContentDetails />} /> */}
+   
+      <Route
+        path="/ta/courses/:courseId/lecture/:lectureId"
+        element={<TAContentDetails />}
+      />
 
       {/* Course Details */}
       <Route path="/ta/courses/:courseId" element={<TACourseDetails />} />
@@ -98,14 +97,6 @@ const Router = () => (
     <Route element={<StudentLayout />}>
       <Route path="/student" element={<StudentCourses />} />
       <Route path="/student/courses" element={<StudentCourses />} />
-      {/* Dynamic Course ID */}
-      {/* <Route path="/student/courses/:courseId" element={<StudentCourseDetails />} />
-      <Route path="/student/contentDetails" element={<StudentContentDetails />} />
-      <Route path="/student/lecture/:lectureId/:assignmentId" element={<StudentSubmitAssignment unitType="lecture" />} />
-      <Route path="/student/lecture/submitQuizzes" element={<StudentSubmitLectureQuizzes />} />
-      <Route path="/student/section/:sectionId/:assignmentId" element={<StudentSubmitAssignment unitType="section" />} />
-      <Route path="/student/section/submitQuizzes" element={<StudentSubmitSectionQuizzes />} />
-       */}
 
        {/* Course Details */}
       <Route path="/student/courses/:courseId" element={<StudentCourseDetails />} />

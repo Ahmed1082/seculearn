@@ -60,17 +60,20 @@ const getDisplayName = () => {
 const getCurrentUserId = () => {
   try {
     const stored = localStorage.getItem("user");
-    if (!stored) return "student";
+    if (!stored) return "";
     const user = JSON.parse(stored);
     return String(
       user.id ||
-        user.student_id ||
-        user.user_id ||
-        user.username ||
-        "student"
+      user.user_id ||
+      user.student_id ||
+      user.lecturer_id ||
+      user.instructor_id ||
+      user.ta_id ||
+      user.username ||
+      ""
     );
   } catch {
-    return "student";
+    return "";
   }
 };
 
@@ -234,15 +237,39 @@ const extractGradeMeta = (assignment) => {
   };
 };
 
-const normalizeComment = (comment, fallbackName = "User", fallbackRole = "student") => {
-  const userId = comment?.user_id ?? comment?.user?.id ?? null;
+const normalizeComment = (
+  comment,
+  fallbackName = "User",
+  fallbackRole = "student"
+) => {
+  const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+  const currentUserId =
+    storedUser.id ||
+    storedUser.user_id ||
+    storedUser.student_id ||
+    storedUser.lecturer_id ||
+    storedUser.instructor_id ||
+    storedUser.ta_id ||
+    null;
+
+  const userId =
+    comment?.user_id ??
+    comment?.user?.id ??
+    currentUserId;
+
   return {
     id: comment?.id ?? createClientId("comment"),
     message: comment?.message || comment?.text || "",
     user_id: userId,
     user: {
       id: userId,
-      role: String(comment?.user?.role || comment?.role || fallbackRole || "student").toLowerCase(),
+      role: String(
+        comment?.user?.role ||
+        comment?.role ||
+        fallbackRole ||
+        "student"
+      ).toLowerCase(),
       name:
         comment?.user?.name ||
         comment?.user?.username ||
@@ -320,15 +347,47 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
   const [assignment, setAssignment] = useState(null);
 
-  const isCommentOwnedByCurrentUser = useCallback(
-    (comment) => {
-      const ownerId = comment?.user_id ?? comment?.user?.id;
-      if (ownerId === null || ownerId === undefined || String(ownerId) === "") return true;
-      return String(ownerId) === String(currentUserId);
-    },
-    [currentUserId]
-  );
+  const isCommentOwnedByCurrentUser = useCallback((comment) => {
+    if (!comment) return false;
 
+    const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+
+    const currentId = String(
+      storedUser.id ||
+      storedUser.user_id ||
+      storedUser.student_id ||
+      storedUser.lecturer_id ||
+      storedUser.instructor_id ||
+      storedUser.ta_id ||
+      ""
+    );
+
+    const currentName = String(
+      storedUser.name ||
+      storedUser.full_name ||
+      storedUser.username ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+    const ownerId = String(comment?.user_id ?? comment?.user?.id ?? "").trim();
+    const ownerName = String(
+      comment?.user?.name || comment?.name || ""
+    )
+      .trim()
+      .toLowerCase();
+
+    if (ownerId && currentId && ownerId === currentId) {
+      return true;
+    }
+
+    if (ownerName && currentName && ownerName === currentName) {
+      return true;
+    }
+
+    return false;
+  }, []);
   const createObjectUrl = useCallback((file) => {
     const url = URL.createObjectURL(file);
     objectUrlsRef.current.add(url);
