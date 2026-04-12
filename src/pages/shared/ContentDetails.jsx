@@ -440,6 +440,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
     : LECTURE_ASSIGNMENT_FILE_ACCEPT;
   const unitLabel = isSectionView ? "Section" : "Lecture";
   const unitLabelLower = unitLabel.toLowerCase();
+  const addQuizPath = `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}/add-quiz`;
   const resolvedTitle = isSectionView
     ? activeSectionTitle || stateSectionTitle || lectureData.title
     : lectureTitleFromState || lectureData.title;
@@ -1779,87 +1780,110 @@ const ContentDetails = ({ role = "lecturer" }) => {
             onToggle={toggleSection}
           >
             <div className="lecture-details-card-list">
-              {lectureData.quizzes.map((quiz) => (
-                <article key={quiz.id} className="lecture-details-card">
-                  {(() => {
-                    const personalStatus = getPersonalStatus(quiz);
-                    const personalStatusLabel =
-                      personalStatus === "done"
-                        ? "Done"
-                        : personalStatus === "missed"
-                          ? "Missed"
-                          : "Pending";
-                    const personalScore = getPersonalQuizScore(quiz);
+              {lectureData.quizzes.map((quiz) => {
+                const contentBasePath = `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}`;
+                const studentExamPath = `${contentBasePath}/exam/${quiz.id}`;
+                const quizReviewPath = `${contentBasePath}/quizreview/${quiz.id}`;
 
-                    return (
-                      <>
-                  <div className="lecture-details-card-head">
-                    <h3>
-                      {quiz.title}
-                      {!canManageLecture && personalScore !== null && (
-                        <span className="lecture-details-student-score">
-                          Score: {personalScore}%
+                return (
+                  <article
+                    key={quiz.id}
+                    className={`lecture-details-card ${role === "student" ? "is-clickable" : ""}`}
+                    onClick={role === "student" ? () => navigate(studentExamPath) : undefined}
+                  >
+                    {(() => {
+                      const personalStatus = getPersonalStatus(quiz);
+                      const personalStatusLabel =
+                        personalStatus === "done"
+                          ? "Done"
+                          : personalStatus === "missed"
+                            ? "Missed"
+                            : "Pending";
+                      const personalScore = getPersonalQuizScore(quiz);
+
+                      return (
+                        <>
+                    <div className="lecture-details-card-head">
+                      <h3>
+                        {quiz.title}
+                        {!canManageLecture && personalScore !== null && (
+                          <span className="lecture-details-student-score">
+                            Score: {personalScore}%
+                          </span>
+                        )}
+                      </h3>
+
+                      {canManageLecture &&
+                        !(quizDialogOpen && quizDialogMode === "edit" && quizEditingId === quiz.id) && (
+                          <button
+                            type="button"
+                            className="lecture-details-icon-btn"
+                            onClick={() => openQuizEditDialog(quiz)}
+                            aria-label={`Edit ${quiz.title}`}
+                          >
+                            <FaRegEdit size={12} />
+                          </button>
+                        )}
+                    </div>
+
+                    {canManageLecture ? (
+                      <div className="lecture-details-status-row">
+                        <p className="status done">
+                          <FiCheckCircle />
+                          <strong>Done:</strong>
+                          <span>{getNames(quiz.doneStudentIds)}</span>
+                        </p>
+                        <p className="status missed">
+                          <FiMinusCircle />
+                          <strong>Missed:</strong>
+                          <span>{getNames(quiz.missedStudentIds)}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="lecture-details-student-status-row">
+                        <span className={`lecture-details-student-pill ${personalStatus}`}>
+                          {personalStatus === "done" ? <FiCheckCircle /> : <FiClock />}
+                          {personalStatusLabel}
                         </span>
-                      )}
-                    </h3>
+                      </div>
+                    )}
 
-                    {canManageLecture &&
-                      !(quizDialogOpen && quizDialogMode === "edit" && quizEditingId === quiz.id) && (
-                        <button
-                          type="button"
-                          className="lecture-details-icon-btn"
-                          onClick={() => openQuizEditDialog(quiz)}
-                          aria-label={`Edit ${quiz.title}`}
-                        >
-                          <FaRegEdit size={12} />
-                        </button>
-                      )}
-                  </div>
+                    {(quiz.timeLimit || quiz.questionCount || quiz.shuffleQuestions) && (
+                      <div className="lecture-details-quiz-meta">
+                        {quiz.timeLimit && <span>Time: {quiz.timeLimit} min</span>}
+                        {quiz.questionCount && (
+                          <span>Questions: {quiz.questionCount}</span>
+                        )}
+                        {quiz.shuffleQuestions && <span>Shuffled</span>}
+                      </div>
+                    )}
 
-                  {canManageLecture ? (
-                    <div className="lecture-details-status-row">
-                      <p className="status done">
-                        <FiCheckCircle />
-                        <strong>Done:</strong>
-                        <span>{getNames(quiz.doneStudentIds)}</span>
-                      </p>
-                      <p className="status missed">
-                        <FiMinusCircle />
-                        <strong>Missed:</strong>
-                        <span>{getNames(quiz.missedStudentIds)}</span>
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="lecture-details-student-status-row">
-                      <span className={`lecture-details-student-pill ${personalStatus}`}>
-                        {personalStatus === "done" ? <FiCheckCircle /> : <FiClock />}
-                        {personalStatusLabel}
-                      </span>
-                    </div>
-                  )}
-
-                  {(quiz.timeLimit || quiz.questionCount || quiz.shuffleQuestions) && (
-                    <div className="lecture-details-quiz-meta">
-                      {quiz.timeLimit && <span>Time: {quiz.timeLimit} min</span>}
-                      {quiz.questionCount && (
-                        <span>Questions: {quiz.questionCount}</span>
-                      )}
-                      {quiz.shuffleQuestions && <span>Shuffled</span>}
-                    </div>
-                  )}
-
-                  {(canManageLecture
-                    ? Object.keys(quiz.results || {}).length > 0
-                    : personalScore !== null) && (
-                    <button type="button" className="lecture-details-link-btn">
-                      View Results <span>&rarr;</span>
-                    </button>
-                  )}
-                      </>
-                    );
-                  })()}
-                </article>
-              ))}
+                    {(canManageLecture
+                      ? Object.keys(quiz.results || {}).length > 0
+                      : personalScore !== null) && (
+                      <button
+                        type="button"
+                        className={`lecture-details-link-btn ${role !== "lecturer" && role !== "ta" ? "disabled" : ""}`}
+                        onClick={
+                          canManageLecture
+                            ? () =>
+                                navigate(quizReviewPath, {
+                                  state: { quizTitle: quiz.title },
+                                })
+                            : (event) => event.stopPropagation()
+                        }
+                        disabled={!canManageLecture}
+                        aria-disabled={!canManageLecture}
+                      >
+                        View Results <span>&rarr;</span>
+                      </button>
+                    )}
+                        </>
+                      );
+                    })()}
+                  </article>
+                );
+              })}
             </div>
 
             {canManageLecture && (
@@ -1868,7 +1892,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                   <button
                     type="button"
                     className="primary"
-                    onClick={openQuizDialog}
+                    onClick={() => navigate(addQuizPath)}
                   >
                     <FiPlus size={14} />
                     Add Quiz

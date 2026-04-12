@@ -49,6 +49,10 @@
   color: var(--accent-end);
 }
 
+.is-clickable {
+  cursor: pointer;
+}
+
 .lecture-details-title {
   font-size: clamp(25px, 2vw, 32px);
   font-weight: 700;
@@ -320,6 +324,12 @@
 
 .lecture-details-link-btn:hover span {
   transform: translateX(3px);
+}
+
+.lecture-details-link-btn.disabled,
+.lecture-details-link-btn:disabled {
+  color: rgba(148, 163, 184, 0.9);
+  cursor: default;
 }
 
 .lecture-details-icon-btn {

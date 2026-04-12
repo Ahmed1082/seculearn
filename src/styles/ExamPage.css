@@ -1,0 +1,78 @@
+.exam-page {
+  padding: 32px 20px;
+  display: flex;
+  justify-content: center;
+}
+
+.exam-shell {
+  width: min(980px, 100%);
+}
+
+.exam-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  margin-bottom: 24px;
+}
+
+.exam-card {
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+}
+
+.exam-card-header {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.exam-card-header h1 {
+  margin: 0;
+  font-size: 1.9rem;
+}
+
+.exam-card-header p {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.exam-meta {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.exam-meta-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  border-radius: 16px;
+  padding: 18px;
+}
+
+.exam-meta-item strong {
+  display: block;
+  color: #fff;
+}
+
+.exam-meta-item span {
+  color: #94a3b8;
+}
+
+.exam-placeholder {
+  background: rgba(15, 23, 42, 0.82);
+  border: 1px dashed rgba(148, 163, 184, 0.3);
+  border-radius: 18px;
+  padding: 28px;
+  color: #cbd5e1;
+  line-height: 1.8;
+}
