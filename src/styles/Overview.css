@@ -616,3 +616,220 @@
     align-items: flex-start;
   }
 }
+
+/* Overview palette integration (match AssignmentReview / QuizReview) */
+.lecturer-overview-page {
+  --members-bg: #111;
+  --members-bg-alt: #151515;
+  --members-border: #00e5ff;
+  --members-accent: #54f4fc;
+  --members-accent-deep: #186eb4;
+  --members-text: #fff;
+  --members-muted: #aaa;
+  --members-hover: #181818;
+  --members-purple: #c084fc;
+  --members-danger: #ff6e8d;
+  --members-sky: #2d8ff0;
+  color: var(--members-text);
+}
+
+.overview-welcome,
+.overview-subtitle,
+.overview-stat-label,
+.overview-progress-head h3,
+.overview-progress-card p,
+.overview-performance-main p,
+.overview-performance-metrics span,
+.overview-activity-item span {
+  color: var(--members-muted);
+}
+
+.overview-heading {
+  background: linear-gradient(180deg, var(--members-accent-deep), var(--members-accent));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.overview-courses-btn {
+  background: linear-gradient(90deg, var(--members-accent-deep), var(--members-accent));
+  color: #0a0a0a;
+}
+
+.overview-courses-btn:hover {
+  box-shadow: 0 12px 24px rgba(84, 244, 252, 0.25);
+}
+
+.overview-stat-card {
+  border-color: rgba(0, 229, 255, 0.35);
+  background: var(--members-bg-alt);
+}
+
+.overview-stat-courses {
+  background: rgba(24, 110, 180, 0.14);
+  border-color: rgba(84, 244, 252, 0.42);
+}
+
+.overview-stat-lectures {
+  background: rgba(192, 132, 252, 0.12);
+  border-color: rgba(192, 132, 252, 0.55);
+}
+
+.overview-stat-score {
+  background: rgba(84, 244, 252, 0.1);
+  border-color: rgba(84, 244, 252, 0.45);
+}
+
+.overview-stat-students {
+  background: rgba(45, 143, 240, 0.12);
+  border-color: rgba(45, 143, 240, 0.5);
+}
+
+.overview-stat-value {
+  color: var(--members-text);
+}
+
+.overview-stat-icon {
+  background: rgba(24, 110, 180, 0.15);
+  border: 1px solid rgba(24, 110, 180, 0.4);
+  color: var(--members-accent);
+}
+
+.overview-progress-card {
+  border-color: rgba(0, 229, 255, 0.32);
+  background: var(--members-bg-alt);
+}
+
+.overview-progress-head span {
+  color: var(--members-accent);
+  background: rgba(84, 244, 252, 0.14);
+  border-color: rgba(84, 244, 252, 0.45);
+}
+
+.overview-progress-track {
+  background: #232323;
+}
+
+.overview-progress-fill {
+  background: linear-gradient(90deg, var(--members-accent-deep), var(--members-accent));
+}
+
+.overview-performance-card h2,
+.overview-activity-card h2 {
+  color: var(--members-text);
+}
+
+.overview-performance-card h2 svg,
+.overview-activity-card h2 svg {
+  color: var(--members-accent);
+}
+
+.overview-performance-item {
+  background: var(--members-bg-alt);
+  border-color: rgba(0, 229, 255, 0.28);
+}
+
+.overview-performance-main h3 {
+  color: var(--members-text);
+}
+
+.overview-performance-main h3::after {
+  color: var(--members-muted);
+}
+
+.overview-performance-metrics div:first-child strong {
+  color: var(--members-accent);
+}
+
+.overview-performance-metrics div:last-child strong {
+  color: var(--members-purple);
+}
+
+.overview-activity-list {
+  border-color: rgba(0, 229, 255, 0.28);
+  background: var(--members-bg-alt);
+}
+
+.overview-activity-item {
+  border-bottom-color: rgba(0, 229, 255, 0.16);
+}
+
+.overview-activity-item p {
+  color: var(--members-text);
+}
+
+.overview-activity-icon.success {
+  color: var(--members-accent);
+  background: rgba(24, 110, 180, 0.15);
+}
+
+.overview-activity-icon.info {
+  color: var(--members-purple);
+  background: rgba(192, 132, 252, 0.15);
+}
+
+.overview-activity-icon.danger {
+  color: var(--members-danger);
+  background: rgba(255, 110, 141, 0.14);
+}
+
+.overview-activity-icon.accent {
+  color: var(--members-sky);
+  background: rgba(45, 143, 240, 0.16);
+}
+
+.overview-activity-icon.sky {
+  color: #9fd7ff;
+  background: rgba(45, 143, 240, 0.2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .overview-progress-card:hover {
+    border-color: var(--members-accent);
+    box-shadow: 0 0 10px rgba(84, 244, 252, 0.16);
+  }
+
+  .overview-performance-item:hover {
+    border-color: var(--members-border);
+    background: var(--members-hover);
+    box-shadow: 0 12px 24px rgba(84, 244, 252, 0.1);
+  }
+
+  .overview-performance-item:hover .overview-performance-main h3 {
+    color: var(--members-accent);
+    text-shadow: 0 0 10px rgba(84, 244, 252, 0.2);
+  }
+
+  .overview-performance-item:hover .overview-performance-main h3::after {
+    color: var(--members-accent);
+  }
+
+  .overview-performance-item:hover .overview-performance-main p {
+    color: #c9d2de;
+  }
+
+  .overview-performance-item:hover .overview-performance-metrics strong {
+    text-shadow: 0 0 10px rgba(84, 244, 252, 0.16);
+  }
+
+  .overview-activity-item:hover {
+    background: rgba(24, 110, 180, 0.2);
+  }
+
+  .overview-activity-item:hover .overview-activity-icon {
+    box-shadow: 0 0 0 1px rgba(0, 229, 255, 0.35), 0 8px 18px rgba(84, 244, 252, 0.12);
+  }
+
+  .overview-activity-item:hover p {
+    color: var(--members-text);
+  }
+
+  .overview-activity-item:hover span {
+    color: #c9d2de;
+  }
+}
+
+.overview-performance-item:focus-visible {
+  outline-color: var(--members-border);
+}
