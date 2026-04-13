@@ -112,6 +112,66 @@ const getDefaultQuizForm = () => ({
   shuffleQuestions: false,
 });
 
+const getQuizStorageKey = ({ courseId, lectureId, sectionId }) => {
+  const unitType = sectionId ? "section" : "lecture";
+  const unitId = sectionId || lectureId || "unknown";
+  return `seculearn-quizzes:${courseId || "unknown"}:${unitType}:${unitId}`;
+};
+
+const readStoredQuizzes = (storageKey) => {
+  if (!storageKey) return [];
+
+  try {
+    const rawValue = localStorage.getItem(storageKey);
+    if (!rawValue) return [];
+
+    const parsedValue = JSON.parse(rawValue);
+    return Array.isArray(parsedValue) ? parsedValue : [];
+  } catch {
+    return [];
+  }
+};
+
+const mergeStoredQuizzes = (baseQuizzes = [], storedQuizzes = []) => {
+  const mergedQuizzes = new Map();
+  const deletedQuizIds = new Set(
+    storedQuizzes
+      .filter((quiz) => quiz?.deleted && quiz?.id)
+      .map((quiz) => String(quiz.id))
+  );
+
+  baseQuizzes.forEach((quiz) => {
+    if (deletedQuizIds.has(String(quiz.id))) return;
+    mergedQuizzes.set(String(quiz.id), quiz);
+  });
+
+  storedQuizzes.forEach((quiz) => {
+    if (!quiz?.id) return;
+    if (quiz.deleted) {
+      mergedQuizzes.delete(String(quiz.id));
+      return;
+    }
+    const existingQuiz = mergedQuizzes.get(String(quiz.id)) || {};
+    mergedQuizzes.set(String(quiz.id), {
+      ...existingQuiz,
+      ...quiz,
+      id: quiz.id,
+      doneStudentIds: Array.isArray(quiz.doneStudentIds)
+        ? quiz.doneStudentIds
+        : existingQuiz.doneStudentIds || [],
+      missedStudentIds: Array.isArray(quiz.missedStudentIds)
+        ? quiz.missedStudentIds
+        : existingQuiz.missedStudentIds || [],
+      results:
+        quiz.results && typeof quiz.results === "object"
+          ? quiz.results
+          : existingQuiz.results || {},
+    });
+  });
+
+  return Array.from(mergedQuizzes.values());
+};
+
 const mockStudentIds = new Set([
   ...lectureSeed.assignments.flatMap((assignment) => [
     ...assignment.doneStudentIds.map((id) => String(id)),
@@ -438,6 +498,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const assignmentFileAccept = isSectionView
     ? SECTION_ASSIGNMENT_FILE_ACCEPT
     : LECTURE_ASSIGNMENT_FILE_ACCEPT;
+  const quizStorageKey = useMemo(
+    () => getQuizStorageKey({ courseId, lectureId, sectionId }),
+    [courseId, lectureId, sectionId]
+  );
   const unitLabel = isSectionView ? "Section" : "Lecture";
   const unitLabelLower = unitLabel.toLowerCase();
   const addQuizPath = `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}/add-quiz`;
@@ -523,6 +587,27 @@ const ContentDetails = ({ role = "lecturer" }) => {
         : lectureTitleFromState || prev.title || lectureSeed.title,
     }));
   }, [isSectionView, lectureId, lectureTitleFromState, stateSectionTitle]);
+
+  useEffect(() => {
+    const applyStoredQuizzes = () => {
+      const storedQuizzes = readStoredQuizzes(quizStorageKey);
+
+      setLectureData((prev) => ({
+        ...prev,
+        quizzes: mergeStoredQuizzes(prev.quizzes, storedQuizzes),
+      }));
+    };
+
+    applyStoredQuizzes();
+
+    const handleStorageUpdate = (event) => {
+      if (event.key !== quizStorageKey) return;
+      applyStoredQuizzes();
+    };
+
+    window.addEventListener("storage", handleStorageUpdate);
+    return () => window.removeEventListener("storage", handleStorageUpdate);
+  }, [quizStorageKey]);
 
   useEffect(() => {
     if (shouldUseUploadsApi) {
@@ -1032,6 +1117,19 @@ const ContentDetails = ({ role = "lecturer" }) => {
       shuffleQuestions: !!quiz.shuffleQuestions,
     });
     setQuizDialogOpen(true);
+  };
+
+  const openQuizBuilderPage = (quiz = null) => {
+    if (!canManageLecture) return;
+
+    if (!quiz?.id) {
+      navigate(addQuizPath);
+      return;
+    }
+
+    navigate(`${addQuizPath}?quizId=${encodeURIComponent(quiz.id)}`, {
+      state: { quiz },
+    });
   };
 
   const closeQuizDialog = () => {
@@ -1784,6 +1882,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                 const contentBasePath = `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}`;
                 const studentExamPath = `${contentBasePath}/exam/${quiz.id}`;
                 const quizReviewPath = `${contentBasePath}/quizreview/${quiz.id}`;
+                const displayQuizTitle = `Quiz ${lectureData.quizzes.findIndex((item) => item.id === quiz.id) + 1}: ${quiz.title}`;
 
                 return (
                   <article
@@ -1805,7 +1904,17 @@ const ContentDetails = ({ role = "lecturer" }) => {
                         <>
                     <div className="lecture-details-card-head">
                       <h3>
-                        {quiz.title}
+                        {canManageLecture ? (
+                          <button
+                            type="button"
+                            className="lecture-details-title-btn"
+                            onClick={() => openQuizBuilderPage(quiz)}
+                          >
+                            {displayQuizTitle}
+                          </button>
+                        ) : (
+                          displayQuizTitle
+                        )}
                         {!canManageLecture && personalScore !== null && (
                           <span className="lecture-details-student-score">
                             Score: {personalScore}%
@@ -1818,8 +1927,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           <button
                             type="button"
                             className="lecture-details-icon-btn"
-                            onClick={() => openQuizEditDialog(quiz)}
-                            aria-label={`Edit ${quiz.title}`}
+                            onClick={() => openQuizBuilderPage(quiz)}
+                            aria-label={`Edit ${displayQuizTitle}`}
                           >
                             <FaRegEdit size={12} />
                           </button>
@@ -1848,19 +1957,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                       </div>
                     )}
 
-                    {(quiz.timeLimit || quiz.questionCount || quiz.shuffleQuestions) && (
-                      <div className="lecture-details-quiz-meta">
-                        {quiz.timeLimit && <span>Time: {quiz.timeLimit} min</span>}
-                        {quiz.questionCount && (
-                          <span>Questions: {quiz.questionCount}</span>
-                        )}
-                        {quiz.shuffleQuestions && <span>Shuffled</span>}
-                      </div>
-                    )}
-
-                    {(canManageLecture
-                      ? Object.keys(quiz.results || {}).length > 0
-                      : personalScore !== null) && (
+                    {(canManageLecture || personalScore !== null) && (
                       <button
                         type="button"
                         className={`lecture-details-link-btn ${role !== "lecturer" && role !== "ta" ? "disabled" : ""}`}
@@ -1868,7 +1965,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           canManageLecture
                             ? () =>
                                 navigate(quizReviewPath, {
-                                  state: { quizTitle: quiz.title },
+                                  state: { quizTitle: displayQuizTitle },
                                 })
                             : (event) => event.stopPropagation()
                         }
@@ -1892,7 +1989,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                   <button
                     type="button"
                     className="primary"
-                    onClick={() => navigate(addQuizPath)}
+                    onClick={() => openQuizBuilderPage()}
                   >
                     <FiPlus size={14} />
                     Add Quiz

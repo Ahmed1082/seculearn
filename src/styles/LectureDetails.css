@@ -203,6 +203,21 @@
   color: var(--text-main);
 }
 
+.lecture-details-title-btn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.lecture-details-title-btn:hover {
+  color: var(--accent-end);
+}
+
 .lecture-details-status-row {
   margin-top: 8px;
   display: flex;

@@ -93,7 +93,7 @@ const Router = () => (
       <Route path="/ta/assignmentreview/:assignmentId" element={<AssignmentReview />} />
     </Route>
 
-    {/* ================= Student ================= */}
+    {/* ================= Student ================= */}   
     <Route element={<StudentLayout />}>
       <Route path="/student" element={<StudentCourses />} />
       <Route path="/student/courses" element={<StudentCourses />} />
@@ -104,12 +104,12 @@ const Router = () => (
       {/* Lecture Content */}
       <Route path="/student/courses/:courseId/lecture/:lectureId" element={<StudentContentDetails />} />
       <Route path="/student/courses/:courseId/lecture/:lectureId/exam/:quizId" element={<StudentExamPage />} />
-      <Route path="/student/courses/:courseId/lecture/:lectureId/quizreview/:quizId" element={<QuizReview role="student" />} />
+      {/* <Route path="/student/courses/:courseId/lecture/:lectureId/quizreview/:quizId" element={<QuizReview role="student" />} /> */}
 
       {/* Section Content */}
       <Route path="/student/courses/:courseId/section/:sectionId" element={<StudentContentDetails />} />
       <Route path="/student/courses/:courseId/section/:sectionId/exam/:quizId" element={<StudentExamPage />} />
-      <Route path="/student/courses/:courseId/section/:sectionId/quizreview/:quizId" element={<QuizReview role="student" />} />
+      {/* <Route path="/student/courses/:courseId/section/:sectionId/quizreview/:quizId" element={<QuizReview role="student" />} /> */}
 
       {/* Submit Assignment */}
       <Route
