@@ -861,6 +861,58 @@
   gap: 7px;
 }
 
+.lecture-assignment-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-main);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.lecture-assignment-checkbox input {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(0, 229, 255, 0.32);
+  border-radius: 4px;
+  background: var(--surface-soft);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.lecture-assignment-checkbox input::after {
+  content: "";
+  width: 4px;
+  height: 8px;
+  border: solid transparent;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.lecture-assignment-checkbox input:checked {
+  background: rgba(84, 244, 252, 0.18);
+  border-color: var(--accent-end);
+}
+
+.lecture-assignment-checkbox input:checked::after {
+  border-color: var(--accent-end);
+}
+
+.lecture-assignment-checkbox input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(84, 244, 252, 0.18);
+}
+
+.lecture-assignment-checkbox span {
+  color: #e8f2ff;
+}
+
 .lecture-assignment-files-list li {
   border: 1px solid rgba(0, 229, 255, 0.24);
   background: var(--surface-soft);

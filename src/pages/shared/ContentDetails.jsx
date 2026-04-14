@@ -103,6 +103,7 @@ const getDefaultAssignmentForm = () => ({
   dueDate: "",
   maxScore: 100,
   files: [],
+  closeSubmissionsAfterDueDate: false,
 });
 
 const getDefaultQuizForm = () => ({
@@ -116,6 +117,67 @@ const getQuizStorageKey = ({ courseId, lectureId, sectionId }) => {
   const unitType = sectionId ? "section" : "lecture";
   const unitId = sectionId || lectureId || "unknown";
   return `seculearn-quizzes:${courseId || "unknown"}:${unitType}:${unitId}`;
+};
+
+const getAssignmentSettingsStorageKey = (assignmentId) =>
+  `seculearn-assignment-settings:${String(assignmentId || "unknown")}`;
+
+const normalizeAssignmentSettings = (settings = {}) => ({
+  closeSubmissionsAfterDueDate: Boolean(
+    settings?.closeSubmissionsAfterDueDate ??
+      settings?.close_submissions_after_due_date ??
+      settings?.close_on_deadline
+  ),
+  acceptingSubmissions:
+    typeof settings?.acceptingSubmissions === "boolean"
+      ? settings.acceptingSubmissions
+      : typeof settings?.accepting_submissions === "boolean"
+        ? settings.accepting_submissions
+        : typeof settings?.is_accepting === "boolean"
+          ? settings.is_accepting
+        : true,
+  dueDate:
+    typeof settings?.dueDate === "string"
+      ? settings.dueDate
+      : typeof settings?.due_date === "string"
+        ? String(settings.due_date).trim().replace(" ", "T").slice(0, 16)
+        : "",
+});
+
+const readStoredAssignmentSettings = (assignmentId) => {
+  if (!assignmentId) return normalizeAssignmentSettings();
+
+  try {
+    const rawValue = localStorage.getItem(
+      getAssignmentSettingsStorageKey(assignmentId)
+    );
+    if (!rawValue) return normalizeAssignmentSettings();
+
+    return normalizeAssignmentSettings(JSON.parse(rawValue));
+  } catch {
+    return normalizeAssignmentSettings();
+  }
+};
+
+const writeStoredAssignmentSettings = (assignmentId, partialSettings = {}) => {
+  if (!assignmentId) return normalizeAssignmentSettings(partialSettings);
+
+  const nextSettings = normalizeAssignmentSettings({
+    ...readStoredAssignmentSettings(assignmentId),
+    ...partialSettings,
+  });
+
+  localStorage.setItem(
+    getAssignmentSettingsStorageKey(assignmentId),
+    JSON.stringify(nextSettings)
+  );
+
+  return nextSettings;
+};
+
+const removeStoredAssignmentSettings = (assignmentId) => {
+  if (!assignmentId) return;
+  localStorage.removeItem(getAssignmentSettingsStorageKey(assignmentId));
 };
 
 const readStoredQuizzes = (storageKey) => {
@@ -798,6 +860,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
     const attachmentPath = assignment?.file_path || "";
     const attachmentName =
       getApiFileDisplayName(assignment, attachmentPath) || "assignment.pdf";
+    const storedSettings = readStoredAssignmentSettings(assignment?.id);
 
     return {
       id: `assignment-${assignment.id}`,
@@ -806,6 +869,17 @@ const ContentDetails = ({ role = "lecturer" }) => {
       description: assignment.description || "",
       dueDate: toDateTimeInputValue(assignment.due_date),
       maxScore: Number(assignment.points) || 100,
+      closeSubmissionsAfterDueDate: Boolean(
+        assignment?.close_on_deadline ??
+          assignment?.close_submissions_after_due_date ??
+          storedSettings.closeSubmissionsAfterDueDate
+      ),
+      acceptingSubmissions:
+        typeof assignment?.is_accepting === "boolean"
+          ? assignment.is_accepting
+          : typeof assignment?.accepting_submissions === "boolean"
+            ? assignment.accepting_submissions
+          : storedSettings.acceptingSubmissions,
       attachments: attachmentPath
         ? [
             {
@@ -843,16 +917,19 @@ const ContentDetails = ({ role = "lecturer" }) => {
       const payload = Array.isArray(response?.data?.data)
         ? response.data.data
         : [];
+      const mappedAssignments = payload.map(mapSectionAssignmentToCard);
 
       setLectureData((prev) => ({
         ...prev,
-        assignments: payload.map(mapSectionAssignmentToCard),
+        assignments: mappedAssignments,
       }));
+      return mappedAssignments;
     } catch (error) {
       setSectionAssignmentsError(
         error?.response?.data?.message || "Failed to load assignments."
       );
       setLectureData((prev) => ({ ...prev, assignments: [] }));
+      return [];
     } finally {
       setIsFetchingSectionAssignments(false);
     }
@@ -995,6 +1072,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
             headers: buildApiHeaders(token),
           }
         );
+        removeStoredAssignmentSettings(assignmentToDelete.apiId);
         await fetchSectionAssignments();
         cancelEdit();
       } catch (error) {
@@ -1024,6 +1102,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
             revokeEntryUrl(attachment);
           }
         });
+        removeStoredAssignmentSettings(id);
 
         return {
           ...prev,
@@ -1065,6 +1144,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
       description: assignment.description || "",
       dueDate: assignment.dueDate || "",
       maxScore: Number(assignment.maxScore) || 100,
+      closeSubmissionsAfterDueDate:
+        !!assignment.closeSubmissionsAfterDueDate,
       files: Array.isArray(assignment.attachments)
         ? assignment.attachments.map((attachment) =>
             typeof attachment === "string"
@@ -1238,6 +1319,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
         formData.append("description", assignmentForm.description.trim());
         formData.append("points", String(Number(assignmentForm.maxScore) || 100));
         formData.append(
+          "close_on_deadline",
+          assignmentForm.closeSubmissionsAfterDueDate ? "1" : "0"
+        );
+        formData.append(
           "due_date",
           assignmentForm.dueDate ? toApiDateTime(assignmentForm.dueDate) : ""
         );
@@ -1263,14 +1348,57 @@ const ContentDetails = ({ role = "lecturer" }) => {
               headers: buildApiHeaders(token),
             }
           );
+          writeStoredAssignmentSettings(assignmentToUpdate.apiId, {
+            closeSubmissionsAfterDueDate:
+              assignmentForm.closeSubmissionsAfterDueDate,
+            dueDate: assignmentForm.dueDate,
+            acceptingSubmissions:
+              assignmentToUpdate.acceptingSubmissions ?? true,
+          });
         } else {
           formData.append(assignmentOwnerField, String(contentApiId));
-          await axios.post(createAssignmentEndpoint, formData, {
+          const createResponse = await axios.post(createAssignmentEndpoint, formData, {
             headers: buildApiHeaders(token),
           });
+
+          const createdAssignmentId =
+            createResponse?.data?.data?.id ??
+            createResponse?.data?.data?.assignment_id ??
+            createResponse?.data?.assignment?.id ??
+            createResponse?.data?.assignment_id ??
+            createResponse?.data?.id ??
+            null;
+
+          if (createdAssignmentId) {
+            writeStoredAssignmentSettings(createdAssignmentId, {
+              closeSubmissionsAfterDueDate:
+                assignmentForm.closeSubmissionsAfterDueDate,
+              dueDate: assignmentForm.dueDate,
+              acceptingSubmissions: true,
+            });
+          }
         }
 
-        await fetchSectionAssignments();
+        const nextAssignments = await fetchSectionAssignments();
+        if (!isEditMode) {
+          const createdAssignment = nextAssignments.find(
+            (assignment) =>
+              assignment.title === trimmed &&
+              assignment.dueDate === assignmentForm.dueDate &&
+              Number(assignment.maxScore) ===
+                (Number(assignmentForm.maxScore) || 100)
+          );
+
+          if (createdAssignment?.apiId) {
+            writeStoredAssignmentSettings(createdAssignment.apiId, {
+              closeSubmissionsAfterDueDate:
+                assignmentForm.closeSubmissionsAfterDueDate,
+              dueDate: assignmentForm.dueDate,
+              acceptingSubmissions:
+                createdAssignment.acceptingSubmissions ?? true,
+            });
+          }
+        }
         closeAssignmentDialog();
       } catch (error) {
         setSectionAssignmentsError(
@@ -1283,16 +1411,27 @@ const ContentDetails = ({ role = "lecturer" }) => {
       return;
     }
 
+    const nextAssignmentId = `a-${Date.now()}`;
+    writeStoredAssignmentSettings(nextAssignmentId, {
+      closeSubmissionsAfterDueDate:
+        assignmentForm.closeSubmissionsAfterDueDate,
+      dueDate: assignmentForm.dueDate,
+      acceptingSubmissions: true,
+    });
+
     setLectureData((prev) => ({
       ...prev,
       assignments: [
         ...prev.assignments,
         {
-          id: `a-${Date.now()}`,
+          id: nextAssignmentId,
           title: trimmed,
           description: assignmentForm.description.trim(),
           dueDate: assignmentForm.dueDate,
           maxScore: Number(assignmentForm.maxScore) || 100,
+          closeSubmissionsAfterDueDate:
+            assignmentForm.closeSubmissionsAfterDueDate,
+          acceptingSubmissions: true,
           attachments: assignmentForm.files.map((file) => ({
             name: file.name,
             url: file.url,
@@ -1385,6 +1524,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
           headers: buildApiHeaders(token),
         }
       );
+      removeStoredAssignmentSettings(assignmentToDelete.apiId);
       await fetchSectionAssignments();
       closeAssignmentDialog();
     } catch (error) {
@@ -1689,7 +1829,12 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           courseTitle: courseTitle,
                           lectureTitle: pageTitle,
                           assignmentTitle: assignment.title,
-                          maxScore: assignment.maxScore
+                          maxScore: assignment.maxScore,
+                          dueDate: assignment.dueDate || "",
+                          closeSubmissionsAfterDueDate:
+                            !!assignment.closeSubmissionsAfterDueDate,
+                          acceptingSubmissions:
+                            assignment.acceptingSubmissions ?? true,
                         }
                       });
                     } else if (role === "ta") {
@@ -1701,7 +1846,12 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           courseTitle: courseTitle,
                           lectureTitle: pageTitle,
                           assignmentTitle: assignment.title,
-                          maxScore: assignment.maxScore
+                          maxScore: assignment.maxScore,
+                          dueDate: assignment.dueDate || "",
+                          closeSubmissionsAfterDueDate:
+                            !!assignment.closeSubmissionsAfterDueDate,
+                          acceptingSubmissions:
+                            assignment.acceptingSubmissions ?? true,
                         },
                       });
                     }
@@ -2166,6 +2316,20 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     <p className="lecture-content-hint">{sectionAssignmentsError}</p>
                   )}
                 </div>
+
+                <label className="lecture-assignment-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={assignmentForm.closeSubmissionsAfterDueDate}
+                    onChange={(event) =>
+                      updateAssignmentFormValue(
+                        "closeSubmissionsAfterDueDate",
+                        event.target.checked
+                      )
+                    }
+                  />
+                  <span>Close submissions after due date</span>
+                </label>
 
                 {isAssignmentFormValid && (
                   <p className="lecture-assignment-status-note">

@@ -281,10 +281,21 @@
   justify-content: space-between;
 }
 
+.assignment-review-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .assignment-review-toggle-row p {
   font-size: 24px;
   font-weight: 700;
   color: #ebf2ff;
+}
+
+.assignment-review-toggle-note {
+  color: #8ea4cb;
+  font-size: 13px;
 }
 
 .assignment-review-switch {
@@ -299,6 +310,11 @@
   cursor: pointer;
   justify-content: flex-start;
   transition: background 0.2s ease;
+}
+
+.assignment-review-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .assignment-review-switch span {
