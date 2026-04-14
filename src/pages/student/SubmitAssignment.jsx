@@ -177,6 +177,21 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const parseAssignmentDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(String(value).trim().replace(" ", "T"));
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const readAssignmentBoolean = (assignment, ...keys) => {
+  for (const key of keys) {
+    if (typeof assignment?.[key] === "boolean") return assignment[key];
+    if (assignment?.[key] === 1 || assignment?.[key] === "1") return true;
+    if (assignment?.[key] === 0 || assignment?.[key] === "0") return false;
+  }
+  return null;
+};
+
 const formatGradeDate = (value) => {
   if (!value) return "";
 
@@ -575,6 +590,10 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   ]);
 
   const handleAddWork = () => {
+    if (isSubmissionClosed) {
+      setSubmitError(submissionClosedMessage || "Submissions are closed.");
+      return;
+    }
     fileInputRef.current?.click();
   };
 
@@ -611,6 +630,11 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   };
 
   const handleFileChange = (event) => {
+    if (isSubmissionClosed) {
+      setSubmitError(submissionClosedMessage || "Submissions are closed.");
+      event.target.value = "";
+      return;
+    }
     const files = Array.from(event.target.files || []).map((file) => ({
       file,
       name: file.name,
@@ -651,6 +675,10 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
   const handleSubmit = async () => {
     setSubmitError("");
+    if (isSubmissionClosed) {
+      setSubmitError(submissionClosedMessage || "Submissions are closed.");
+      return;
+    }
     if (selectedFiles.length === 0) {
       setSubmitError("No file selected.");
       return;
@@ -998,6 +1026,26 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const assignmentFilePath = assignment?.file_path || "";
   const assignmentFileName = getApiFileDisplayName(assignment, assignmentFilePath);
   const assignmentFileUrl = toAssignmentFileUrl(assignmentFilePath);
+  const isAcceptingSubmissions =
+    readAssignmentBoolean(assignment, "is_accepting", "accepting_submissions") ??
+    true;
+  const closeOnDeadline =
+    readAssignmentBoolean(
+      assignment,
+      "close_on_deadline",
+      "close_submissions_after_due_date"
+    ) ?? false;
+  const parsedDueDate = parseAssignmentDate(assignment?.due_date);
+  const isDueDatePassed = parsedDueDate
+    ? parsedDueDate.getTime() < Date.now()
+    : false;
+  const isSubmissionClosed =
+    !isAcceptingSubmissions || (closeOnDeadline && isDueDatePassed);
+  const submissionClosedMessage = !isAcceptingSubmissions
+    ? "Submissions are currently closed for this assignment."
+    : closeOnDeadline && isDueDatePassed
+      ? "Submissions are closed because the deadline has passed."
+      : "";
 
   return (
     <div className={isSection ? "sectionassignments" : "lectureassignments"}>
@@ -1198,13 +1246,26 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
               {!isSubmitted ? (
                 <>
-                  <button className="primary-btn full" onClick={handleAddWork}>
+                  <button
+                    className="primary-btn full"
+                    onClick={handleAddWork}
+                    disabled={isSubmissionClosed}
+                  >
                     <FaPlus /> Add Work
                   </button>
 
-                  <button className="primary-btn full" onClick={handleSubmit}>
+                  <button
+                    className="primary-btn full"
+                    onClick={handleSubmit}
+                    disabled={isSubmissionClosed}
+                  >
                     Submit
                   </button>
+                  {isSubmissionClosed && (
+                    <p className="form-error" style={{ color: "#e17055", marginTop: 8 }}>
+                      {submissionClosedMessage}
+                    </p>
+                  )}
                   {submitError && (
                     <p className="form-error" style={{ color: "#e17055", marginTop: 8 }}>
                       {submitError}
