@@ -129,20 +129,43 @@ const readPrivateThreadMap = (assignmentId) => {
 const getAssignmentSettingsStorageKey = (assignmentId) =>
   `seculearn-assignment-settings:${String(assignmentId || "unknown")}`;
 
+const toBooleanOrNull = (value) => {
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+  return null;
+};
+
+const readBooleanValue = (source, ...keys) => {
+  for (const key of keys) {
+    const parsed = toBooleanOrNull(source?.[key]);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+};
+
+const unwrapApiObject = (payload) => {
+  if (payload?.data && typeof payload.data === "object" && !Array.isArray(payload.data)) {
+    return payload.data;
+  }
+  return payload && typeof payload === "object" ? payload : {};
+};
+
 const normalizeAssignmentSettings = (settings = {}) => ({
-  closeSubmissionsAfterDueDate: Boolean(
-    settings?.closeSubmissionsAfterDueDate ??
-      settings?.close_submissions_after_due_date ??
-      settings?.close_on_deadline
-  ),
+  closeSubmissionsAfterDueDate:
+    readBooleanValue(
+      settings,
+      "closeSubmissionsAfterDueDate",
+      "close_submissions_after_due_date",
+      "close_on_deadline"
+    ) ?? false,
   acceptingSubmissions:
-    typeof settings?.acceptingSubmissions === "boolean"
-      ? settings.acceptingSubmissions
-      : typeof settings?.accepting_submissions === "boolean"
-        ? settings.accepting_submissions
-        : typeof settings?.is_accepting === "boolean"
-          ? settings.is_accepting
-        : true,
+    readBooleanValue(
+      settings,
+      "acceptingSubmissions",
+      "accepting_submissions",
+      "is_accepting"
+    ) ?? true,
   dueDate:
     typeof settings?.dueDate === "string"
       ? settings.dueDate
@@ -279,18 +302,16 @@ const AssignmentReview = () => {
   const [filterType, setFilterType] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [acceptingSubmissions, setAcceptingSubmissions] = useState(
-    typeof acceptingSubmissionsFromState === "boolean"
-      ? acceptingSubmissionsFromState
-      : initialStoredAssignmentSettings.acceptingSubmissions
+    toBooleanOrNull(acceptingSubmissionsFromState) ??
+      initialStoredAssignmentSettings.acceptingSubmissions
   );
   const [assignmentDueDate, setAssignmentDueDate] = useState(
     assignmentDueDateFromState || initialStoredAssignmentSettings.dueDate || ""
   );
   const [closeSubmissionsAfterDueDate, setCloseSubmissionsAfterDueDate] =
     useState(
-      typeof closeAfterDueFromState === "boolean"
-        ? closeAfterDueFromState
-        : initialStoredAssignmentSettings.closeSubmissionsAfterDueDate
+      toBooleanOrNull(closeAfterDueFromState) ??
+        initialStoredAssignmentSettings.closeSubmissionsAfterDueDate
     );
   const [statusOverrides, setStatusOverrides] = useState({});
   const [excusedByStudent, setExcusedByStudent] = useState({});
@@ -308,6 +329,7 @@ const AssignmentReview = () => {
   const [activePrivateMenuId, setActivePrivateMenuId] = useState(null);
   const [editingPrivateCommentId, setEditingPrivateCommentId] = useState(null);
   const [privateEditDraft, setPrivateEditDraft] = useState("");
+  const [isTogglingAccepting, setIsTogglingAccepting] = useState(false);
   const currentUserId = useMemo(() => getCurrentUserId(), []);
   const privateThreadMapRef = useRef({});
   const isDueDatePassed = useMemo(() => {
@@ -330,14 +352,12 @@ const AssignmentReview = () => {
     const storedSettings = readStoredAssignmentSettings(assignmentId);
     setAssignmentDueDate(assignmentDueDateFromState || storedSettings.dueDate || "");
     setCloseSubmissionsAfterDueDate(
-      typeof closeAfterDueFromState === "boolean"
-        ? closeAfterDueFromState
-        : storedSettings.closeSubmissionsAfterDueDate
+      toBooleanOrNull(closeAfterDueFromState) ??
+        storedSettings.closeSubmissionsAfterDueDate
     );
     setAcceptingSubmissions(
-      typeof acceptingSubmissionsFromState === "boolean"
-        ? acceptingSubmissionsFromState
-        : storedSettings.acceptingSubmissions
+      toBooleanOrNull(acceptingSubmissionsFromState) ??
+        storedSettings.acceptingSubmissions
     );
   }, [
     acceptingSubmissionsFromState,
@@ -406,7 +426,7 @@ const AssignmentReview = () => {
         `${API_BASE_URL}/api/dr-ta/assignment/${assignmentId}/get-assignment-submissions`,
         { headers: buildApiHeaders(token) }
       );
-      const data = res.data || {};
+      const data = unwrapApiObject(res.data);
       const storedSettings = readStoredAssignmentSettings(assignmentId);
       const nextDueDate =
         (typeof data?.due_date === "string"
@@ -416,21 +436,17 @@ const AssignmentReview = () => {
         storedSettings.dueDate ||
         "";
       const nextCloseAfterDue =
-        typeof data?.close_on_deadline === "boolean"
-          ? data.close_on_deadline
-          : typeof data?.close_submissions_after_due_date === "boolean"
-            ? data.close_submissions_after_due_date
-          : typeof closeAfterDueFromState === "boolean"
-            ? closeAfterDueFromState
-            : storedSettings.closeSubmissionsAfterDueDate;
+        readBooleanValue(
+          data,
+          "close_on_deadline",
+          "close_submissions_after_due_date"
+        ) ??
+        toBooleanOrNull(closeAfterDueFromState) ??
+        storedSettings.closeSubmissionsAfterDueDate;
       const nextAcceptingSubmissions =
-        typeof data?.is_accepting === "boolean"
-          ? data.is_accepting
-          : typeof data.accepting_submissions === "boolean"
-            ? data.accepting_submissions
-          : typeof acceptingSubmissionsFromState === "boolean"
-            ? acceptingSubmissionsFromState
-            : storedSettings.acceptingSubmissions;
+        readBooleanValue(data, "is_accepting", "accepting_submissions") ??
+        toBooleanOrNull(acceptingSubmissionsFromState) ??
+        storedSettings.acceptingSubmissions;
 
       if (data.stats) setAssignmentStats(data.stats);
       setAssignmentDueDate(nextDueDate);
@@ -496,7 +512,7 @@ const AssignmentReview = () => {
         {},
         { headers: buildApiHeaders(token) }
       );
-      return res?.data || null;
+      return unwrapApiObject(res?.data);
     } catch (err) {
       console.error("Failed to toggle accepting submissions", err);
       return null;
@@ -519,15 +535,17 @@ const AssignmentReview = () => {
   };
 
   const returnSubmissionApi = async (submissionId) => {
-    if (!submissionId) return;
+    if (!submissionId) return null;
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(
+      const res = await axios.delete(
         `${API_BASE_URL}/api/dr-ta/submission/${submissionId}/return`,
         { headers: buildApiHeaders(token) }
       );
+      return unwrapApiObject(res.data);
     } catch (err) {
       console.error("Failed to return submission", err);
+      return null;
     }
   };
 
@@ -942,7 +960,7 @@ const AssignmentReview = () => {
 
     const submissionId = student.submission.submission_id;
     if (submissionId) {
-      await returnSubmissionApi(submissionId);
+      const returnResult = await returnSubmissionApi(submissionId);
       await fetchAssignmentSubmissions();
       setStudentsList((prev) =>
         prev.map((s) =>
@@ -1268,32 +1286,39 @@ const AssignmentReview = () => {
                     type="button"
                     className={`assignment-review-switch ${isAcceptingSubmissions ? "is-on" : ""}`}
                     onClick={async () => {
+                      if (isTogglingAccepting) return;
                       const nextValue = !isAcceptingSubmissions;
-                      setAcceptingSubmissions(nextValue);
-                      const toggleResponse = await toggleAcceptingApi();
-                      const nextCloseAfterDue =
-                        typeof toggleResponse?.close_on_deadline === "boolean"
-                          ? toggleResponse.close_on_deadline
-                          : typeof toggleResponse?.close_submissions_after_due_date === "boolean"
-                            ? toggleResponse.close_submissions_after_due_date
-                            : closeSubmissionsAfterDueDate;
-                      const nextAccepting =
-                        typeof toggleResponse?.is_accepting === "boolean"
-                          ? toggleResponse.is_accepting
-                          : typeof toggleResponse?.accepting_submissions === "boolean"
-                            ? toggleResponse.accepting_submissions
-                            : nextValue;
+                      const previousAccepting = acceptingSubmissions;
+                      const previousCloseAfterDue = closeSubmissionsAfterDueDate;
 
-                      setCloseSubmissionsAfterDueDate(nextCloseAfterDue);
-                      setAcceptingSubmissions(nextAccepting);
-                      writeStoredAssignmentSettings(assignmentId, {
-                        dueDate: assignmentDueDate,
-                        closeSubmissionsAfterDueDate: nextCloseAfterDue,
-                        acceptingSubmissions: nextAccepting,
-                      });
-                      await fetchAssignmentSubmissions();
+                      setIsTogglingAccepting(true);
+                      setAcceptingSubmissions(nextValue);
+                      try {
+                        const toggleResponse = await toggleAcceptingApi();
+                        if (!toggleResponse) {
+                          setAcceptingSubmissions(previousAccepting);
+                          setCloseSubmissionsAfterDueDate(previousCloseAfterDue);
+                          return;
+                        }
+
+                        const nextCloseAfterDue =
+                          toggleResponse?.close_on_deadline == 1;
+                        const nextAccepting =
+                          toggleResponse?.is_accepting == 1;
+
+                        setCloseSubmissionsAfterDueDate(nextCloseAfterDue);
+                        setAcceptingSubmissions(nextAccepting);
+                        writeStoredAssignmentSettings(assignmentId, {
+                          dueDate: assignmentDueDate,
+                          closeSubmissionsAfterDueDate: nextCloseAfterDue,
+                          acceptingSubmissions: nextAccepting,
+                        });
+                        await fetchAssignmentSubmissions();
+                      } finally {
+                        setIsTogglingAccepting(false);
+                      }
                     }}
-                    disabled={isSubmissionWindowForcedClosed}
+                    disabled={isTogglingAccepting}
                     aria-label="Toggle accepting submissions"
                     aria-pressed={isAcceptingSubmissions}
                   >

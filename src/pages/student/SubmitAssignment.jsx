@@ -172,6 +172,30 @@ const hasSubmissionBinding = (assignment) =>
     Object.prototype.hasOwnProperty.call(assignment, "student_submission") ||
     Object.prototype.hasOwnProperty.call(assignment, "my_submission"));
 
+const isReturnedSubmission = (assignment) => {
+  if (!assignment) return false;
+
+  const candidates = [
+    assignment?.submission,
+    assignment?.student_submission,
+    assignment?.my_submission,
+    assignment?.data?.submission,
+    assignment?.data?.student_submission,
+    assignment?.data?.my_submission,
+  ].filter(Boolean);
+
+  return candidates.some((candidate) =>
+    Boolean(
+      candidate?.returned_at ||
+      candidate?.return_at ||
+      candidate?.status === "returned" ||
+      candidate?.submission_status === "returned" ||
+      candidate?.is_returned === 1 ||
+      candidate?.is_returned === true
+    )
+  );
+};
+
 const toNumberOrNull = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -538,17 +562,26 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
         setAssignment(loadedAssignment);
 
         const existingSubmission = extractExistingSubmissionMeta(loadedAssignment);
+        const returnedSubmission = isReturnedSubmission(loadedAssignment);
+
         if (existingSubmission?.url || existingSubmission?.id) {
-          if (existingSubmission?.id) setSubmissionId(existingSubmission.id);
-          const nextSubmittedFile = {
-            name: existingSubmission.name || "Submitted file",
-            url: existingSubmission.url || "",
-            isLocal: false,
-          };
-          setSubmittedFile(nextSubmittedFile);
-          setIsSubmitted(true);
-          cacheSubmittedFile(nextSubmittedFile, existingSubmission.id);
-        } else if (!hasSubmissionBinding(loadedAssignment)) {
+          if (returnedSubmission) {
+            clearCachedSubmission();
+            setSubmittedFile(null);
+            setSubmissionId(null);
+            setIsSubmitted(false);
+          } else {
+            if (existingSubmission?.id) setSubmissionId(existingSubmission.id);
+            const nextSubmittedFile = {
+              name: existingSubmission.name || "Submitted file",
+              url: existingSubmission.url || "",
+              isLocal: false,
+            };
+            setSubmittedFile(nextSubmittedFile);
+            setIsSubmitted(true);
+            cacheSubmittedFile(nextSubmittedFile, existingSubmission.id);
+          }
+        } else if (!token) {
           const cachedSubmission = readCachedSubmission();
           if (cachedSubmission?.url || cachedSubmission?.name || cachedSubmission?.id) {
             if (cachedSubmission?.id) setSubmissionId(cachedSubmission.id);

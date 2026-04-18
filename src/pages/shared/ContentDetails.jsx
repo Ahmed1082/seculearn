@@ -104,6 +104,7 @@ const getDefaultAssignmentForm = () => ({
   maxScore: 100,
   files: [],
   closeSubmissionsAfterDueDate: false,
+  acceptingSubmissions: true,
 });
 
 const getDefaultQuizForm = () => ({
@@ -122,20 +123,36 @@ const getQuizStorageKey = ({ courseId, lectureId, sectionId }) => {
 const getAssignmentSettingsStorageKey = (assignmentId) =>
   `seculearn-assignment-settings:${String(assignmentId || "unknown")}`;
 
+const toBooleanOrNull = (value) => {
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+  return null;
+};
+
+const readBooleanValue = (source, ...keys) => {
+  for (const key of keys) {
+    const parsed = toBooleanOrNull(source?.[key]);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+};
+
 const normalizeAssignmentSettings = (settings = {}) => ({
-  closeSubmissionsAfterDueDate: Boolean(
-    settings?.closeSubmissionsAfterDueDate ??
-      settings?.close_submissions_after_due_date ??
-      settings?.close_on_deadline
-  ),
+  closeSubmissionsAfterDueDate:
+    readBooleanValue(
+      settings,
+      "closeSubmissionsAfterDueDate",
+      "close_submissions_after_due_date",
+      "close_on_deadline"
+    ) ?? false,
   acceptingSubmissions:
-    typeof settings?.acceptingSubmissions === "boolean"
-      ? settings.acceptingSubmissions
-      : typeof settings?.accepting_submissions === "boolean"
-        ? settings.accepting_submissions
-        : typeof settings?.is_accepting === "boolean"
-          ? settings.is_accepting
-        : true,
+    readBooleanValue(
+      settings,
+      "acceptingSubmissions",
+      "accepting_submissions",
+      "is_accepting"
+    ) ?? true,
   dueDate:
     typeof settings?.dueDate === "string"
       ? settings.dueDate
@@ -869,17 +886,18 @@ const ContentDetails = ({ role = "lecturer" }) => {
       description: assignment.description || "",
       dueDate: toDateTimeInputValue(assignment.due_date),
       maxScore: Number(assignment.points) || 100,
-      closeSubmissionsAfterDueDate: Boolean(
-        assignment?.close_on_deadline ??
-          assignment?.close_submissions_after_due_date ??
-          storedSettings.closeSubmissionsAfterDueDate
-      ),
+      closeSubmissionsAfterDueDate:
+        readBooleanValue(
+          assignment,
+          "close_on_deadline",
+          "close_submissions_after_due_date"
+        ) ?? storedSettings.closeSubmissionsAfterDueDate,
       acceptingSubmissions:
-        typeof assignment?.is_accepting === "boolean"
-          ? assignment.is_accepting
-          : typeof assignment?.accepting_submissions === "boolean"
-            ? assignment.accepting_submissions
-          : storedSettings.acceptingSubmissions,
+        readBooleanValue(
+          assignment,
+          "is_accepting",
+          "accepting_submissions"
+        ) ?? storedSettings.acceptingSubmissions,
       attachments: attachmentPath
         ? [
             {
@@ -1320,7 +1338,11 @@ const ContentDetails = ({ role = "lecturer" }) => {
         formData.append("points", String(Number(assignmentForm.maxScore) || 100));
         formData.append(
           "close_on_deadline",
-          assignmentForm.closeSubmissionsAfterDueDate ? "1" : "0"
+          assignmentForm.closeSubmissionsAfterDueDate ? 1 : 0
+        );
+        formData.append(
+          "is_accepting",
+          assignmentForm.acceptingSubmissions ? 1 : 0
         );
         formData.append(
           "due_date",
@@ -1348,12 +1370,17 @@ const ContentDetails = ({ role = "lecturer" }) => {
               headers: buildApiHeaders(token),
             }
           );
+          const currentStoredSettings = readStoredAssignmentSettings(
+            assignmentToUpdate.apiId
+          );
           writeStoredAssignmentSettings(assignmentToUpdate.apiId, {
             closeSubmissionsAfterDueDate:
               assignmentForm.closeSubmissionsAfterDueDate,
             dueDate: assignmentForm.dueDate,
             acceptingSubmissions:
-              assignmentToUpdate.acceptingSubmissions ?? true,
+              assignmentForm.acceptingSubmissions ??
+              currentStoredSettings.acceptingSubmissions ??
+              true,
           });
         } else {
           formData.append(assignmentOwnerField, String(contentApiId));
@@ -1374,7 +1401,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
               closeSubmissionsAfterDueDate:
                 assignmentForm.closeSubmissionsAfterDueDate,
               dueDate: assignmentForm.dueDate,
-              acceptingSubmissions: true,
+              acceptingSubmissions:
+                assignmentForm.acceptingSubmissions ?? true,
             });
           }
         }
@@ -1416,7 +1444,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
       closeSubmissionsAfterDueDate:
         assignmentForm.closeSubmissionsAfterDueDate,
       dueDate: assignmentForm.dueDate,
-      acceptingSubmissions: true,
+      acceptingSubmissions: assignmentForm.acceptingSubmissions ?? true,
     });
 
     setLectureData((prev) => ({
@@ -1431,7 +1459,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
           maxScore: Number(assignmentForm.maxScore) || 100,
           closeSubmissionsAfterDueDate:
             assignmentForm.closeSubmissionsAfterDueDate,
-          acceptingSubmissions: true,
+          acceptingSubmissions: assignmentForm.acceptingSubmissions ?? true,
           attachments: assignmentForm.files.map((file) => ({
             name: file.name,
             url: file.url,
