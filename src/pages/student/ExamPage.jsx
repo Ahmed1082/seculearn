@@ -45,9 +45,9 @@ const fallbackQuizzes = [
     shuffleQuestions: false,
     shuffleOptions: false,
     showResults: true,
-    doneStudentIds: ["s1", "s2", "s3", "s4", "s5", "s6"],
+    doneStudentIds: ["s2", "s3", "s4", "s5", "s6"],
     missedStudentIds: ["s7", "s8"],
-    results: { s1: 90, s2: 85, s3: 78, s4: 92, s5: 88, s6: 70 },
+    results: { s2: 85, s3: 78, s4: 92, s5: 88, s6: 70 },
   },
   {
     id: "q2",
@@ -59,9 +59,9 @@ const fallbackQuizzes = [
     shuffleQuestions: false,
     shuffleOptions: false,
     showResults: true,
-    doneStudentIds: ["s1", "s2", "s3", "s4", "s6"],
+    doneStudentIds: ["s2", "s3", "s4", "s6"],
     missedStudentIds: ["s7"],
-    results: { s1: 94, s2: 84, s3: 73, s4: 91, s6: 69 },
+    results: { s2: 84, s3: 73, s4: 91, s6: 69 },
   },
   {
     id: "q3",
@@ -73,9 +73,9 @@ const fallbackQuizzes = [
     shuffleQuestions: true,
     shuffleOptions: false,
     showResults: true,
-    doneStudentIds: ["s1", "s4", "s5"],
+    doneStudentIds: ["s4", "s5"],
     missedStudentIds: ["s2", "s8"],
-    results: { s1: 96, s4: 90, s5: 86 },
+    results: { s4: 90, s5: 86 },
   },
 ];
 
@@ -435,11 +435,19 @@ const ExamPage = () => {
   const [selectedAnswers, setSelectedAnswers] = useState(
     resolvedAttempt?.answers || {}
   );
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const initialTime = Number(quizData?.timeLimit) > 0 ? Number(quizData.timeLimit) * 60 : 30 * 60;
+  const [timeLeft, setTimeLeft] = useState(initialTime);
 
   useEffect(() => {
     setAttemptData(resolvedAttempt);
     setSelectedAnswers(resolvedAttempt?.answers || {});
   }, [resolvedAttempt]);
+
+  useEffect(() => {
+    setCurrentQuestionIndex(0);
+    setTimeLeft(initialTime);
+  }, [quizId, initialTime]);
 
   const preparedQuestions = useMemo(() => {
     const sourceQuestions =
@@ -479,13 +487,50 @@ const ExamPage = () => {
     typeof quizData?.showResults === "boolean" ? quizData.showResults : true;
   const isSubmitted = Boolean(attemptData);
   const isReviewMode = isSubmitted && showResults;
-  const isLocked = status === "missed" || (status === "done" && !isSubmitted);
+  const isTimedOut = timeLeft <= 0 && !isSubmitted;
+  const isLocked =
+    status === "missed" ||
+    (status === "done" && !isSubmitted) ||
+    isTimedOut;
   const isReadyToSubmit =
     !isLocked &&
     preparedQuestions.length > 0 &&
     answeredCount === preparedQuestions.length &&
     !isSubmitted;
   const passingScore = Number(quizData?.passingScore) > 0 ? quizData.passingScore : 60;
+
+  useEffect(() => {
+    if (isSubmitted || status === "missed") return undefined;
+
+    const timer = window.setInterval(() => {
+      setTimeLeft((prev) => Math.max(prev - 1, 0));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [isSubmitted, status]);
+
+  const activeQuestion = preparedQuestions[currentQuestionIndex] || null;
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const sec = seconds % 60;
+    return `${minutes}:${String(sec).padStart(2, "0")}`;
+  };
+
+  const handlePrevQuestion = () => {
+    setCurrentQuestionIndex((prev) => Math.max(prev - 1, 0));
+  };
+
+  const handleNextQuestion = () => {
+    setCurrentQuestionIndex((prev) =>
+      Math.min(prev + 1, preparedQuestions.length - 1)
+    );
+  };
+
+  const jumpToQuestion = (index) => {
+    if (index < 0 || index >= preparedQuestions.length) return;
+    setCurrentQuestionIndex(index);
+  };
   const courseName =
     fallbackCourses[courseId]?.name ||
     fallbackCourses[fallbackLectures[lectureId]?.courseId]?.name ||
@@ -643,9 +688,15 @@ const ExamPage = () => {
             <div className="exam-header-top">
               <h1>{quizData?.title || `Quiz ${quizId}`}</h1>
 
-              <div className={`exam-status-pill ${statusConfig.className}`}>
-                <StatusIcon size={12} />
-                <span>{statusConfig.label}</span>
+              <div className="exam-header-actions">
+                <div className={`exam-status-pill ${statusConfig.className}`}>
+                  <StatusIcon size={12} />
+                  <span>{statusConfig.label}</span>
+                </div>
+                <div className="exam-timer-pill">
+                  <FiClock size={14} />
+                  <span>{formatTime(timeLeft)}</span>
+                </div>
               </div>
             </div>
 
@@ -655,176 +706,40 @@ const ExamPage = () => {
           </div>
         </header>
 
-        <section className="exam-stats-grid">
-          {statCards.map((stat) => {
-            const StatIcon = stat.icon;
-
-            return (
-              <article key={stat.label} className={stat.className}>
-                <div className="exam-stat-icon" style={{ color: stat.accent }}>
-                  <StatIcon size={15} />
-                </div>
-                <strong style={{ color: stat.accent }}>{stat.value}</strong>
-                <span>{stat.label}</span>
-              </article>
-            );
-          })}
-        </section>
-
-        <section className="exam-trend-card">
-          <div className="exam-trend-icon">
-            <FiTrendingUp size={14} />
-          </div>
-
-          <div className="exam-trend-content">
-            <div className="exam-trend-top">
-              <h2>Progress</h2>
-              <span>
-                {answeredCount}/{preparedQuestions.length} answered
-              </span>
+        <section className="exam-progress-panel">
+          <div className="exam-progress-meta">
+            <div className="exam-progress-title">
+              Question {Math.min(currentQuestionIndex + 1, preparedQuestions.length)} of {preparedQuestions.length}
             </div>
-
-            <div className="exam-bars">
-              {preparedQuestions.length > 0 ? (
-                preparedQuestions.map((question, index) => {
-                  const answered = Boolean(selectedAnswers[question.id]);
-
-                  return (
-                    <div
-                      key={question.id}
-                      className={`exam-bar ${answered ? "is-answered" : ""}`}
-                      style={{
-                        height: `${Math.max(8, Math.round(((question.points || 1) / Math.max(totalPoints, 1)) * 34))}px`,
-                      }}
-                      title={`Question ${index + 1}`}
-                    />
-                  );
-                })
-              ) : (
-                <p className="exam-trend-empty">No questions available for this quiz yet.</p>
-              )}
+            <div className="exam-progress-subtitle">
+              {answeredCount}/{preparedQuestions.length} answered
             </div>
           </div>
 
-          <div className="exam-trend-average">
-            <strong>{preparedQuestions.length ? `${progressValue}%` : "-"}</strong>
-            <span>ready</span>
-          </div>
-        </section>
-
-        <div className="exam-overview-grid">
-          <section className="exam-hero-card">
-            <div className="exam-hero-copy">
-              <span className="exam-hero-badge">
-                <FiBookOpen size={12} />
-                Quiz Overview
-              </span>
-              <h2>
-                {isSubmitted
-                  ? showResults && quizScore !== null
-                    ? `${scoreLabel(quizScore)} result`
-                    : "Submission saved"
-                  : status === "missed"
-                    ? "Quiz window closed"
-                    : "Ready to start"}
-              </h2>
-              <p>
-                {isSubmitted
-                  ? showResults
-                    ? `You completed this quiz. Your current result is ${quizScore}% with a passing target of ${passingScore}%.`
-                    : "Your submission is recorded. Results will be available when your lecturer enables them."
-                  : status === "missed"
-                    ? "This quiz is no longer available for submission in the current mock flow."
-                    : "Answer each question below, then submit once every answer is selected."}
-              </p>
-
-              <div className="exam-hero-actions">
-                {!isSubmitted && status !== "missed" && (
-                  <button
-                    type="button"
-                    className={`exam-primary-btn ${!isReadyToSubmit ? "is-disabled" : ""}`}
-                    onClick={handleSubmitQuiz}
-                    disabled={!isReadyToSubmit}
-                  >
-                    <FiPlay size={14} />
-                    Submit Quiz
-                  </button>
-                )}
-
+          <div className="exam-progress-steps">
+            {preparedQuestions.map((question, index) => {
+              const selected = Boolean(selectedAnswers[question.id]);
+              const completed = index < currentQuestionIndex || selected;
+              return (
                 <button
+                  key={question.id}
                   type="button"
-                  className="exam-secondary-btn"
-                  onClick={() => navigate(backPath)}
+                  onClick={() => jumpToQuestion(index)}
+                  className={`exam-progress-step ${index === currentQuestionIndex ? "is-active" : ""} ${selected ? "is-answered" : ""}`}
                 >
-                  <FiArrowLeft size={14} />
-                  Return
+                  {index + 1}
                 </button>
-              </div>
-            </div>
-
-            <div className="exam-score-panel">
-              <div
-                className="exam-score-ring"
-                style={{
-                  background:
-                    quizScore !== null
-                      ? `conic-gradient(${scoreColor(quizScore)} ${Math.round(quizScore * 3.6)}deg, rgba(21, 21, 21, 0.92) 0deg)`
-                      : "conic-gradient(#c084fc 0deg, rgba(21, 21, 21, 0.92) 0deg)",
-                }}
-              >
-                <div className="exam-score-ring-inner">
-                  <strong style={{ color: quizScore !== null ? scoreColor(quizScore) : "#c084fc" }}>
-                    {quizScore !== null ? `${quizScore}%` : `${progressValue}%`}
-                  </strong>
-                  <span>{quizScore !== null ? "score" : "complete"}</span>
-                </div>
-              </div>
-
-              <small>
-                {quizScore !== null
-                  ? scoreLabel(quizScore)
-                  : `${preparedQuestions.length - answeredCount} question${preparedQuestions.length - answeredCount === 1 ? "" : "s"} left`}
-              </small>
-            </div>
-          </section>
-
-          <aside className="exam-side-card">
-            <header>
-              <FiShield size={15} />
-              <h3>Exam Details</h3>
-            </header>
-
-            <div className="exam-detail-list">
-              <div>
-                <span>Course</span>
-                <strong>{courseName}</strong>
-              </div>
-              <div>
-                <span>{isSectionView ? "Section" : "Lecture"}</span>
-                <strong>{unitTitle}</strong>
-              </div>
-              <div>
-                <span>Shuffle Questions</span>
-                <strong>{quizData?.shuffleQuestions ? "On" : "Off"}</strong>
-              </div>
-              <div>
-                <span>Shuffle Options</span>
-                <strong>{quizData?.shuffleOptions ? "On" : "Off"}</strong>
-              </div>
-              <div>
-                <span>Points</span>
-                <strong>{totalPoints}</strong>
-              </div>
-            </div>
-          </aside>
-        </div>
+              );
+            })}
+          </div>
+        </section>
 
         {preparedQuestions.length === 0 ? (
           <section className="exam-empty-card">
             <FiHelpCircle size={24} />
             <p>This quiz does not have questions yet. Add questions from the quiz builder first.</p>
           </section>
-        ) : (
+        ) : isReviewMode ? (
           <section className="exam-questions-list">
             {preparedQuestions.map((question, index) => (
               <article key={question.id} className="exam-question-card">
@@ -833,19 +748,17 @@ const ExamPage = () => {
 
                   <div className="exam-question-meta">
                     <span>{question.points} pt</span>
-                    {isReviewMode && (
-                      <span
-                        className={
-                          selectedAnswers[question.id] === question.correctOptionId
-                            ? "is-correct"
-                            : "is-wrong"
-                        }
-                      >
-                        {selectedAnswers[question.id] === question.correctOptionId
-                          ? "Correct"
-                          : "Incorrect"}
-                      </span>
-                    )}
+                    <span
+                      className={
+                        selectedAnswers[question.id] === question.correctOptionId
+                          ? "is-correct"
+                          : "is-wrong"
+                      }
+                    >
+                      {selectedAnswers[question.id] === question.correctOptionId
+                        ? "Correct"
+                        : "Incorrect"}
+                    </span>
                   </div>
                 </div>
 
@@ -860,8 +773,7 @@ const ExamPage = () => {
                         key={option.id}
                         type="button"
                         className={`exam-option-row ${optionState}`}
-                        onClick={() => handleSelectAnswer(question.id, option.id)}
-                        disabled={isLocked || isSubmitted}
+                        disabled
                       >
                         <span className="exam-option-letter">
                           {String.fromCharCode(65 + optionIndex)}
@@ -872,11 +784,94 @@ const ExamPage = () => {
                   })}
                 </div>
 
-                {isReviewMode && question.explanation && (
+                {question.explanation && (
                   <p className="exam-explanation">{question.explanation}</p>
                 )}
               </article>
             ))}
+          </section>
+        ) : (
+          <section className="exam-questions-list">
+            <article className="exam-question-card">
+              <div className="exam-question-top">
+                <span className="exam-question-number">Q{currentQuestionIndex + 1}</span>
+
+                <div className="exam-question-meta">
+                  <span>{activeQuestion?.points || 0} pt</span>
+                  <span>{answeredCount}/{preparedQuestions.length} answered</span>
+                </div>
+              </div>
+
+              <h3>{activeQuestion?.text}</h3>
+
+              <div className="exam-options-list">
+                {activeQuestion?.options?.map((option, optionIndex) => {
+                  const optionState = renderQuestionState(activeQuestion, option);
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`exam-option-row ${optionState}`}
+                      onClick={() => handleSelectAnswer(activeQuestion.id, option.id)}
+                      disabled={isLocked || isSubmitted}
+                    >
+                      <span className="exam-option-letter">
+                        {String.fromCharCode(65 + optionIndex)}
+                      </span>
+                      <span className="exam-option-text">{option.text}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </article>
+
+            <div className="exam-question-footer">
+              <div className="exam-question-nav">
+                {preparedQuestions.map((question, index) => {
+                  const answered = Boolean(selectedAnswers[question.id]);
+                  return (
+                    <button
+                      key={question.id}
+                      type="button"
+                      className={`exam-nav-step ${index === currentQuestionIndex ? "is-active" : ""} ${answered ? "is-answered" : ""}`}
+                      onClick={() => jumpToQuestion(index)}
+                    >
+                      {index + 1}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="exam-question-actions">
+                <button
+                  type="button"
+                  className="exam-secondary-btn"
+                  onClick={handlePrevQuestion}
+                  disabled={currentQuestionIndex === 0}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  className="exam-primary-btn"
+                  onClick={
+                    currentQuestionIndex === preparedQuestions.length - 1
+                      ? handleSubmitQuiz
+                      : handleNextQuestion
+                  }
+                  disabled={
+                    currentQuestionIndex === preparedQuestions.length - 1
+                      ? !isReadyToSubmit
+                      : false
+                  }
+                >
+                  {currentQuestionIndex === preparedQuestions.length - 1
+                    ? `Submit Quiz (${answeredCount}/${preparedQuestions.length})`
+                    : "Next"}
+                </button>
+              </div>
+            </div>
           </section>
         )}
       </div>
