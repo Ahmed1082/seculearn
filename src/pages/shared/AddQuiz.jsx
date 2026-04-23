@@ -301,11 +301,12 @@ const AddQuiz = ({ role = "lecturer" }) => {
 
         if (isCancelled) return;
 
-        const rawQuizzes = Array.isArray(response?.quizzes)
-          ? response.quizzes
-          : Array.isArray(response)
-            ? response
-            : [];
+        const rawQuizzes =
+          (Array.isArray(response?.quizzes) && response.quizzes) ||
+          (Array.isArray(response?.data) && response.data) ||
+          (Array.isArray(response?.quizzes_list) && response.quizzes_list) ||
+          (Array.isArray(response?.quizzesList) && response.quizzesList) ||
+          (Array.isArray(response) ? response : []);
         const matchedQuiz = rawQuizzes.find(
           (quiz) => String(quiz?.id) === String(editingQuizId)
         );
