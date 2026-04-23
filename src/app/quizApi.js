@@ -31,6 +31,27 @@ const appendQueryParams = (url, params = {}) => {
 const extractErrorMessage = (payload, fallbackMessage) => {
   if (typeof payload === "string" && payload.trim()) return payload.trim();
 
+  // Laravel-style validation errors: { message, errors: { field: [msg] } }
+  if (payload && typeof payload === "object" && payload.errors) {
+    const errors = payload.errors;
+
+    // Sometimes backend wraps a single message inside errors.message
+    if (typeof errors?.message === "string" && errors.message.trim()) {
+      return errors.message.trim();
+    }
+
+    if (errors && typeof errors === "object") {
+      for (const value of Object.values(errors)) {
+        if (Array.isArray(value) && typeof value[0] === "string" && value[0].trim()) {
+          return value[0].trim();
+        }
+        if (typeof value === "string" && value.trim()) {
+          return value.trim();
+        }
+      }
+    }
+  }
+
   const candidate =
     payload?.message ||
     payload?.error ||

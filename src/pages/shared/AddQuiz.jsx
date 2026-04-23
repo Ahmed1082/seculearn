@@ -107,7 +107,7 @@ const toApiQuestion = (question) => {
   return {
     question_text: question.text,
     question_type:
-      question.type === "true-false" ? "true-false" : "multiple_choice",
+      question.type === "true-false" ? "true_false" : "mcq",
     points: question.points,
     explanation: question.explanation || "",
     options: question.options.map((opt) => ({

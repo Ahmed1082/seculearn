@@ -144,11 +144,12 @@ const StudentAllQuizzes = () => {
                   { lecture_id: lecture.id },
                   token
                 );
-                const rawItems = Array.isArray(quizList?.quizzes)
-                  ? quizList.quizzes
-                  : Array.isArray(quizList)
-                    ? quizList
-                    : [];
+                const rawItems =
+                  (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
+                  (Array.isArray(quizList?.data) && quizList.data) ||
+                  (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
+                  (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
+                  (Array.isArray(quizList) ? quizList : []);
 
                 return rawItems.map((quiz) =>
                   normalizeApiQuiz(
@@ -178,11 +179,12 @@ const StudentAllQuizzes = () => {
                   { section_id: section.id },
                   token
                 );
-                const rawItems = Array.isArray(quizList?.quizzes)
-                  ? quizList.quizzes
-                  : Array.isArray(quizList)
-                    ? quizList
-                    : [];
+                const rawItems =
+                  (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
+                  (Array.isArray(quizList?.data) && quizList.data) ||
+                  (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
+                  (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
+                  (Array.isArray(quizList) ? quizList : []);
 
                 return rawItems.map((quiz) =>
                   normalizeApiQuiz(

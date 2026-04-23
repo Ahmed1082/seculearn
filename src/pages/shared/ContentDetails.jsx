@@ -737,11 +737,12 @@ const ContentDetails = ({ role = "lecturer" }) => {
           token
         );
 
-        const raw = Array.isArray(response?.quizzes)
-          ? response.quizzes
-          : Array.isArray(response)
-            ? response
-            : [];
+        const raw =
+          (Array.isArray(response?.quizzes) && response.quizzes) ||
+          (Array.isArray(response?.data) && response.data) ||
+          (Array.isArray(response?.quizzes_list) && response.quizzes_list) ||
+          (Array.isArray(response?.quizzesList) && response.quizzesList) ||
+          (Array.isArray(response) ? response : []);
 
         const normalized = raw.map(mapApiQuizToCard);
 
