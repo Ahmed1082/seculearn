@@ -1059,24 +1059,26 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const assignmentFilePath = assignment?.file_path || "";
   const assignmentFileName = getApiFileDisplayName(assignment, assignmentFilePath);
   const assignmentFileUrl = toAssignmentFileUrl(assignmentFilePath);
-  const isAcceptingSubmissions =
-    readAssignmentBoolean(assignment, "is_accepting", "accepting_submissions") ??
-    true;
   const closeOnDeadline =
     readAssignmentBoolean(
       assignment,
       "close_on_deadline",
       "close_submissions_after_due_date"
     ) ?? false;
+
   const parsedDueDate = parseAssignmentDate(assignment?.due_date);
   const isDueDatePassed = parsedDueDate
     ? parsedDueDate.getTime() < Date.now()
     : false;
+
+  const isOpenFromApi = assignment?.is_open;
   const isSubmissionClosed =
-    !isAcceptingSubmissions || (closeOnDeadline && isDueDatePassed);
-  const submissionClosedMessage = !isAcceptingSubmissions
-    ? "Submissions are currently closed for this assignment."
-    : closeOnDeadline && isDueDatePassed
+    isOpenFromApi !== undefined
+      ? isOpenFromApi === false
+      : closeOnDeadline && isDueDatePassed;
+
+  const submissionClosedMessage =
+    isSubmissionClosed
       ? "Submissions are closed because the deadline has passed."
       : "";
 

@@ -13,11 +13,32 @@ const CourseDetails = ({ role }) => {
   const permissions = {
     canManageLectures: role === "lecturer",
     canManageSections: role === "ta",
+    canManageCTF: role === "lecturer" || role === "ta",
   };
 
   const [course, setCourse] = useState(null);
   const [lectures, setLectures] = useState([]);
   const [sections, setSections] = useState([]);
+  const [ctfs, setCtfs] = useState([
+    {
+      id: 1,
+      title: "Hidden in Plain Sight",
+      description: "Analyze PCAP file",
+      difficulty: "Easy",
+      points: 100,
+      solved: true,
+      flag: "pcap_master_2024"
+    },
+    {
+      id: 2,
+      title: "Firewall Bypass",
+      description: "Bypass firewall rules",
+      difficulty: "Medium",
+      points: 250,
+      solved: false,
+      flag: "firewall_bypass_2024"
+    },
+  ]);
 
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
@@ -132,6 +153,20 @@ const CourseDetails = ({ role }) => {
 
           setSections((prev) => [...prev, res.data]);
         }
+      }
+      
+      // ===== CTF =====
+      if (modalType === "ctf" && permissions.canManageCTF) {
+        const newCTF = {
+          id: Date.now(),
+          title: title,
+          description: "New Challenge",
+          difficulty: "Easy",
+          points: 100,
+          solved: false,
+        };
+
+        setCtfs((prev) => [...prev, newCTF]);
       }
 
       setShowModal(false);
@@ -386,7 +421,8 @@ const CourseDetails = ({ role }) => {
       {/* ================= MODAL ================= */}
       {showModal &&
         ((modalType === "lecture" && permissions.canManageLectures) ||
-          (modalType === "section" && permissions.canManageSections)) && (
+         (modalType === "section" && permissions.canManageSections) ||
+         (modalType === "ctf" && permissions.canManageCTF)) && (
           <AddItemModal
             type={modalType}
             editingItem={editingItem}
@@ -404,6 +440,118 @@ const CourseDetails = ({ role }) => {
             serverError={serverError}
           />
         )}
+
+        {/* ================= CTF ================= */}
+      <div className="section-block">
+
+        <div className="ctf-header-row">
+          <div className="block-title ctf-block-title">
+            <h2 className="block-txt">CTF Challenges</h2>
+          </div>
+
+          {permissions.canManageCTF && (
+            <button
+              className="add-btn"
+              onClick={() => {
+                navigate(`/${role}/courses/${courseId}/ctf/create`);
+              }}
+            >
+              <span className="plus">+</span>
+              <span className="btn-text">Add CTF</span>
+            </button>
+          )}
+        </div>
+
+        <div className="ctf-grid">
+          {ctfs.map((ctf) => (
+            <div
+              key={ctf.id}
+              className={`ctf-card ${
+                !permissions.canManageCTF && ctf.solved ? "solved" : ""
+              }`}
+              onClick={() => {
+                if (permissions.canManageCTF) {
+                  navigate(`/${role}/courses/${courseId}/ctf/${ctf.id}`);
+                }
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              <div className="ctf-header">
+                <div className="title-row">
+                  <h3>{ctf.title}</h3>
+
+                  <span className={`badge ${ctf.difficulty.toLowerCase()}`}>
+                    {ctf.difficulty}
+                  </span>
+                </div>
+
+                <span className="points">🏆 {ctf.points} pts</span>
+              </div>
+
+              <p className="ctf-category">Network Security</p>
+
+              <p className="ctf-desc">
+                Find a way to bypass the misconfigured firewall rules and access the restricted endpoint.
+              </p>
+
+              <div className="ctf-footer">
+                {!permissions.canManageCTF && (
+                  <>
+                    {ctf.solved ? (
+                      /* 🟢 SOLVED */
+                      <>
+                        <div className="row hint-row">
+                          <span className="hint">💡 Show Hint (-50% points)</span>
+                        </div>
+
+                        <div className="row bottom-row">
+                          <span className="solves">🏳 1 solve</span>
+
+                          <span className="completed">
+                            ✔ Challenge completed — {ctf.points} points earned
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      /* 🔵 NOT SOLVED */
+                      <>
+                        <div className="row hint-row">
+                          <span className="hint">💡 Show Hint (-50% points)</span>
+                        </div>
+
+                        <div className="row bottom-row">
+                          <span className="solves">🏳 1 solve</span>
+
+                          <button
+                            className="open-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/student/courses/${courseId}/ctf/${ctf.id}`);
+                            }}
+                          >
+                            Open challenge →
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+
+                {/* 👨‍🏫 Doctor */}
+                {permissions.canManageCTF && (
+                  <div className="row instructor-row">
+                    <span className="solves">🏳 1 solve</span>
+                    <span className="flag">flag{`{${ctf.flag}}`}</span>
+                  </div>
+                )}
+
+              </div>
+            </div>        
+          ))}
+          
+        </div>
+      </div>
+      
     </div>
   );
 };
