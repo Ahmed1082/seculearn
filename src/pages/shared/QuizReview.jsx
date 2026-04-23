@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { getQuizResultsDashboard, getStudentQuizDetails } from "../../app/quizApi";
 import {
   FiArrowLeft,
   FiBarChart2,
@@ -7,243 +8,20 @@ import {
   FiClock,
   FiEye,
   FiHelpCircle,
+  FiRefreshCw,
   FiUsers,
   FiXCircle,
 } from "react-icons/fi";
 import "../../styles/QuizReview.css";
 
-const students = [
-  { id: "s1", name: "Ahmed Ali", studentId: "STU001" },
-  { id: "s2", name: "Sara Hassan", studentId: "STU002" },
-  { id: "s3", name: "Omar Khalil", studentId: "STU003" },
-  { id: "s4", name: "Fatima Nour", studentId: "STU004" },
-  { id: "s5", name: "Youssef Amin", studentId: "STU005" },
-  { id: "s6", name: "Layla Ibrahim", studentId: "STU006" },
-  { id: "s7", name: "Kareem Fahmy", studentId: "STU007" },
-  { id: "s8", name: "Nadia Sayed", studentId: "STU008" },
-  { id: "s9", name: "Tarek Mostafa", studentId: "STU009" },
-  { id: "s10", name: "Hana Zaki", studentId: "STU010" },
-];
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
 
-const courses = [
-  { id: "c1", name: "Introduction to Cybersecurity" },
-  { id: "c2", name: "Introduction to Cryptography" },
-  { id: "c3", name: "Ethical Hacking" },
-];
-
-const lectures = [
-  { id: "l1", courseId: "c1", title: "Lecture 1: Threat Landscape Overview" },
-  { id: "l2", courseId: "c1", title: "Lecture 2: Common Attack Vectors" },
-  { id: "l3", courseId: "c2", title: "Lecture 1: Classical Ciphers" },
-  { id: "l4", courseId: "c3", title: "Lecture 1: Reconnaissance" },
-];
-
-const quizzes = [
-  {
-    id: "q1",
-    lectureId: "l1",
-    title: "Quiz 1: Threat Basics",
-    doneStudentIds: ["s1", "s2", "s3", "s4", "s5", "s6"],
-    missedStudentIds: ["s7", "s8"],
-    results: { s1: 90, s2: 85, s3: 78, s4: 92, s5: 88, s6: 70 },
-  },
-  {
-    id: "q2",
-    lectureId: "l2",
-    title: "Quiz 2: Attack Types",
-    doneStudentIds: ["s1", "s2", "s3", "s4", "s6"],
-    missedStudentIds: ["s7"],
-    results: { s1: 94, s2: 84, s3: 73, s4: 91, s6: 69 },
-  },
-  {
-    id: "q3",
-    lectureId: "l3",
-    title: "Quiz 3: Defense Strategies",
-    doneStudentIds: ["s1", "s4", "s5"],
-    missedStudentIds: ["s2", "s8"],
-    results: { s1: 96, s4: 90, s5: 86 },
-  },
-];
-
-const quizQuestions = {
-  q1: [
-    {
-      id: "q1_1",
-      question: "What is the primary goal of a threat actor performing reconnaissance?",
-      options: [
-        "Destroying data",
-        "Gathering information about the target",
-        "Installing ransomware",
-        "Creating backdoors",
-      ],
-      correctAnswer: 1,
-    },
-    {
-      id: "q1_2",
-      question: "Which of the following is an example of a social engineering attack?",
-      options: ["SQL injection", "Phishing email", "Buffer overflow", "DDoS attack"],
-      correctAnswer: 1,
-    },
-    {
-      id: "q1_3",
-      question: "What does APT stand for in cybersecurity?",
-      options: [
-        "Advanced Persistent Threat",
-        "Automated Penetration Testing",
-        "Active Protocol Transfer",
-        "Application Protection Technology",
-      ],
-      correctAnswer: 0,
-    },
-    {
-      id: "q1_4",
-      question: "Which type of malware encrypts files and demands payment?",
-      options: ["Trojan", "Worm", "Ransomware", "Adware"],
-      correctAnswer: 2,
-    },
-    {
-      id: "q1_5",
-      question: "What is a zero-day vulnerability?",
-      options: [
-        "A bug found on day zero of development",
-        "A vulnerability with no available patch",
-        "A vulnerability that lasts zero days",
-        "A harmless software bug",
-      ],
-      correctAnswer: 1,
-    },
-  ],
-  q2: [
-    {
-      id: "q2_1",
-      question: "What is credential stuffing?",
-      options: [
-        "Changing passwords frequently",
-        "Reusing leaked credentials on many sites",
-        "Encrypting login traffic",
-        "A type of firewall rule",
-      ],
-      correctAnswer: 1,
-    },
-    {
-      id: "q2_2",
-      question: "What is the main purpose of MFA?",
-      options: [
-        "Increase password length",
-        "Allow guest access",
-        "Reduce login friction",
-        "Add more than one verification factor",
-      ],
-      correctAnswer: 3,
-    },
-    {
-      id: "q2_3",
-      question: "Which attack targets web forms with malicious scripts?",
-      options: ["XSS", "ARP spoofing", "Port scanning", "Brute force only"],
-      correctAnswer: 0,
-    },
-    {
-      id: "q2_4",
-      question: "Which protocol should replace HTTP for secure communication?",
-      options: ["FTP", "SMTP", "HTTPS", "SNMP"],
-      correctAnswer: 2,
-    },
-  ],
-  q3: [
-    {
-      id: "q3_1",
-      question: "What is least privilege?",
-      options: [
-        "Users get all access by default",
-        "Users get only required permissions",
-        "Admins have no restrictions",
-        "Disable account auditing",
-      ],
-      correctAnswer: 1,
-    },
-    {
-      id: "q3_2",
-      question: "What is a common indicator of compromise?",
-      options: [
-        "Unexpected outbound traffic",
-        "Updated antivirus definitions",
-        "Low CPU usage",
-        "Stable login patterns",
-      ],
-      correctAnswer: 0,
-    },
-    {
-      id: "q3_3",
-      question: "Which control is preventive?",
-      options: ["Forensic investigation", "Backup validation", "Firewall policy", "Incident report"],
-      correctAnswer: 2,
-    },
-    {
-      id: "q3_4",
-      question: "What is the first step in incident response?",
-      options: ["Containment", "Recovery", "Preparation", "Eradication"],
-      correctAnswer: 2,
-    },
-  ],
-};
-
-const quizAttempts = [
-  {
-    quizId: "q1",
-    studentId: "s1",
-    answers: { q1_1: 1, q1_2: 1, q1_3: 0, q1_4: 2, q1_5: 1 },
-  },
-  {
-    quizId: "q1",
-    studentId: "s2",
-    answers: { q1_1: 1, q1_2: 1, q1_3: 0, q1_4: 2, q1_5: 0 },
-  },
-  {
-    quizId: "q1",
-    studentId: "s3",
-    answers: { q1_1: 1, q1_2: 1, q1_3: 1, q1_4: 2, q1_5: 0 },
-  },
-  {
-    quizId: "q1",
-    studentId: "s4",
-    answers: { q1_1: 1, q1_2: 1, q1_3: 0, q1_4: 2, q1_5: 1 },
-  },
-  {
-    quizId: "q1",
-    studentId: "s5",
-    answers: { q1_1: 1, q1_2: 0, q1_3: 0, q1_4: 2, q1_5: 1 },
-  },
-  {
-    quizId: "q1",
-    studentId: "s6",
-    answers: { q1_1: 0, q1_2: 1, q1_3: 0, q1_4: 2, q1_5: 1 },
-  },
-  {
-    quizId: "q2",
-    studentId: "s1",
-    answers: { q2_1: 1, q2_2: 3, q2_3: 0, q2_4: 2 },
-  },
-  {
-    quizId: "q2",
-    studentId: "s2",
-    answers: { q2_1: 0, q2_2: 3, q2_3: 0, q2_4: 2 },
-  },
-  {
-    quizId: "q2",
-    studentId: "s3",
-    answers: { q2_1: 1, q2_2: 2, q2_3: 0, q2_4: 1 },
-  },
-  {
-    quizId: "q3",
-    studentId: "s1",
-    answers: { q3_1: 1, q3_2: 0, q3_3: 2, q3_4: 2 },
-  },
-  {
-    quizId: "q3",
-    studentId: "s4",
-    answers: { q3_1: 1, q3_2: 0, q3_3: 2, q3_4: 1 },
-  },
-];
+const buildApiHeaders = (token) => ({
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  "ngrok-skip-browser-warning": "true",
+});
 
 const scoreColor = (score) => {
   if (score >= 90) return "#54f4fc";
@@ -262,134 +40,122 @@ const QuizReview = ({ role = "lecturer" }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { courseId, lectureId, sectionId, quizId } = useParams();
-  const [selectedStudentId, setSelectedStudentId] = useState(null);
-
   const isSectionView = Boolean(sectionId);
-  const stateQuizTitle = location.state?.quizTitle;
   const basePath = courseId
     ? `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}`
     : `/${role}/courses`;
 
-  const selectedQuiz = useMemo(() => {
-    const foundQuiz = quizzes.find((quiz) => quiz.id === quizId);
-    if (foundQuiz) return foundQuiz;
+  const token = localStorage.getItem("token");
 
-    const fallbackQuiz = quizzes[0];
+  // ── state ───────────────────────────────────────────────
+  const [loadState, setLoadState] = useState("loading"); // loading | ready | error
+  const [errorMsg, setErrorMsg] = useState("");
+  const [dashboard, setDashboard] = useState(null); // API #41 response
+  const [selectedStudentId, setSelectedStudentId] = useState(null);
+  const [studentDetail, setStudentDetail] = useState(null); // API #42 response
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+
+  // ── fetch dashboard (API #41) ───────────────────────────
+  const fetchDashboard = useCallback(async () => {
+    setLoadState("loading");
+    setErrorMsg("");
+    try {
+      const data = await getQuizResultsDashboard(quizId, token);
+      setDashboard(data);
+      setLoadState("ready");
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to load quiz results.");
+      setLoadState("error");
+    }
+  }, [quizId, token]);
+
+  useEffect(() => {
+    fetchDashboard();
+  }, [fetchDashboard]);
+
+  // ── fetch student detail (API #42) ─────────────────────
+  const fetchStudentDetail = useCallback(
+    async (studentId) => {
+      setDetailLoading(true);
+      setDetailError("");
+      setStudentDetail(null);
+      try {
+        const data = await getStudentQuizDetails(quizId, studentId, token);
+        setStudentDetail(data);
+      } catch (err) {
+        setDetailError(err.message || "Failed to load student details.");
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [quizId, token]
+  );
+
+  const handleSelectStudent = (studentId) => {
+    setSelectedStudentId(studentId);
+    fetchStudentDetail(studentId);
+  };
+
+  // ── derived data from dashboard ────────────────────────
+  const stats = useMemo(() => {
+    if (!dashboard) return null;
     return {
-      ...fallbackQuiz,
-      id: quizId || fallbackQuiz.id,
-      lectureId: lectureId || fallbackQuiz.lectureId,
-      title: stateQuizTitle || `Quiz ${quizId || fallbackQuiz.id}`,
+      completed: dashboard.completed ?? dashboard.done ?? 0,
+      missed: dashboard.missed ?? 0,
+      pending: dashboard.pending ?? 0,
+      average: dashboard.average ?? dashboard.avg_score ?? null,
+      high: dashboard.high ?? dashboard.highest_score ?? null,
+      low: dashboard.low ?? dashboard.lowest_score ?? null,
     };
-  }, [lectureId, quizId, stateQuizTitle]);
+  }, [dashboard]);
 
-  const questions = useMemo(
-    () => quizQuestions[selectedQuiz.id] || quizQuestions.q1,
-    [selectedQuiz.id]
-  );
+  const studentList = useMemo(() => {
+    if (!dashboard) return [];
+    return (dashboard.students || []).map((s) => ({
+      id: String(s.id || s.student_id),
+      name: s.name || s.student_name || `Student ${s.id}`,
+      studentCode: s.student_id || s.code || "",
+      status: s.status || "pending",
+      score: s.score ?? s.percentage ?? null,
+    }));
+  }, [dashboard]);
 
-  const attempts = useMemo(
-    () =>
-      quizAttempts.filter((attempt) => String(attempt.quizId) === String(selectedQuiz.id)),
-    [selectedQuiz.id]
-  );
+  const questionStats = useMemo(() => {
+    if (!dashboard) return [];
+    return (dashboard.question_stats || dashboard.questions || []).map((q, i) => ({
+      id: String(q.id || i),
+      label: q.question_text || q.text || `Q${i + 1}`,
+      correct: q.correct_count ?? q.correct ?? 0,
+      total: q.total_count ?? q.total ?? 1,
+      pct: q.correct_percentage ?? q.pct ?? Math.round(((q.correct_count ?? q.correct ?? 0) / (q.total_count ?? q.total ?? 1)) * 100),
+    }));
+  }, [dashboard]);
 
-  const doneStudents = useMemo(
-    () =>
-      students.filter((student) =>
-        (selectedQuiz.doneStudentIds || []).includes(student.id)
+  // ── student detail derived ──────────────────────────────
+  const detailQuestions = useMemo(() => {
+    if (!studentDetail) return [];
+    return (studentDetail.questions || studentDetail.answers || []).map((item, i) => ({
+      id: String(item.question_id || item.id || i),
+      text: item.question_text || item.text || "",
+      options: (item.options || []).map((opt) => ({
+        id: String(opt.id),
+        text: opt.option_text || opt.text || "",
+        isCorrect: Boolean(opt.is_correct),
+      })),
+      selectedOptionId: String(
+        item.student_answer_id || item.selected_option_id || ""
       ),
-    [selectedQuiz.doneStudentIds]
-  );
+      isCorrect: Boolean(item.is_correct),
+      explanation: item.explanation || "",
+    }));
+  }, [studentDetail]);
 
-  const missedStudents = useMemo(
-    () =>
-      students.filter((student) =>
-        (selectedQuiz.missedStudentIds || []).includes(student.id)
-      ),
-    [selectedQuiz.missedStudentIds]
-  );
-
-  const pendingStudents = useMemo(
-    () =>
-      students.filter(
-        (student) =>
-          !(selectedQuiz.doneStudentIds || []).includes(student.id) &&
-          !(selectedQuiz.missedStudentIds || []).includes(student.id)
-      ),
-    [selectedQuiz.doneStudentIds, selectedQuiz.missedStudentIds]
-  );
-
-  const scores = useMemo(
-    () => Object.values(selectedQuiz.results || {}).map((score) => Number(score)),
-    [selectedQuiz.results]
-  );
-
-  const avgScore = scores.length
-    ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
-    : null;
-  const highScore = scores.length ? Math.max(...scores) : null;
-  const lowScore = scores.length ? Math.min(...scores) : null;
-
-  const questionStats = useMemo(
-    () =>
-      questions.map((question) => {
-        let total = 0;
-        let correct = 0;
-
-        attempts.forEach((attempt) => {
-          if (
-            Object.prototype.hasOwnProperty.call(attempt.answers || {}, question.id)
-          ) {
-            total += 1;
-            if (attempt.answers[question.id] === question.correctAnswer) {
-              correct += 1;
-            }
-          }
-        });
-
-        if (!total) {
-          return { ...question, correct: 1, total: 1, pct: 100 };
-        }
-
-        return {
-          ...question,
-          correct,
-          total,
-          pct: Math.round((correct / total) * 100),
-        };
-      }),
-    [attempts, questions]
-  );
-
-  const selectedStudent = selectedStudentId
-    ? students.find((student) => student.id === selectedStudentId) || null
-    : null;
-
-  const selectedAttempt = selectedStudentId
-    ? attempts.find((attempt) => attempt.studentId === selectedStudentId) || null
-    : null;
-
-  const selectedScore =
-    selectedStudentId && selectedQuiz.results
-      ? selectedQuiz.results[selectedStudentId]
-      : null;
-
-  const lectureFromQuiz =
-    lectures.find((lecture) => lecture.id === (lectureId || selectedQuiz.lectureId)) ||
-    lectures.find((lecture) => lecture.id === selectedQuiz.lectureId) ||
-    null;
-
-  const courseName =
-    location.state?.courseTitle ||
-    courses.find((course) => course.id === courseId)?.name ||
-    courses.find((course) => course.id === lectureFromQuiz?.courseId)?.name ||
-    "Introduction to Cybersecurity";
-
-  const lectureTitle =
-    location.state?.lectureTitle ||
-    lectureFromQuiz?.title ||
-    (isSectionView ? "Section 1" : "Lecture 1");
+  const selectedStudent = studentList.find((s) => s.id === String(selectedStudentId));
+  const quizTitle =
+    dashboard?.quiz_title ||
+    location.state?.quizTitle ||
+    `Quiz ${quizId}`;
 
   const handleBack = () => {
     if (courseId) {
@@ -398,6 +164,50 @@ const QuizReview = ({ role = "lecturer" }) => {
     }
     navigate(-1);
   };
+
+  // ── loading ─────────────────────────────────────────────
+  if (loadState === "loading") {
+    return (
+      <section className="quiz-review-page">
+        <div className="quiz-review-shell">
+          <button type="button" className="quiz-review-back-btn" onClick={handleBack}>
+            <FiArrowLeft />
+            Back
+          </button>
+          <div className="quiz-review-empty-card">
+            <FiHelpCircle />
+            <p>Loading quiz results...</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (loadState === "error") {
+    return (
+      <section className="quiz-review-page">
+        <div className="quiz-review-shell">
+          <button type="button" className="quiz-review-back-btn" onClick={handleBack}>
+            <FiArrowLeft />
+            Back
+          </button>
+          <div className="quiz-review-empty-card">
+            <FiHelpCircle />
+            <p>{errorMsg}</p>
+            <button
+              type="button"
+              className="quiz-review-back-btn"
+              style={{ marginTop: 12 }}
+              onClick={fetchDashboard}
+            >
+              <FiRefreshCw size={14} />
+              Retry
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="quiz-review-page">
@@ -411,40 +221,50 @@ const QuizReview = ({ role = "lecturer" }) => {
           <span className="quiz-review-header-icon" aria-hidden="true">
             <FiHelpCircle />
           </span>
-
           <div className="quiz-review-header-copy">
-            <h1>{selectedQuiz.title}</h1>
+            <h1>{quizTitle}</h1>
             <p>
-              {courseName} | {lectureTitle.split(":")[0]} | {questions.length} questions
+              {dashboard?.course_title || location.state?.courseTitle || ""}{dashboard?.course_title || location.state?.courseTitle ? " | " : ""}
+              {dashboard?.lecture_title || location.state?.lectureTitle || ""}
+              {questionStats.length > 0 ? ` | ${questionStats.length} questions` : ""}
             </p>
           </div>
         </header>
 
         <section className="quiz-review-stats-grid">
           <article className="quiz-review-stat-card completed">
-            <strong>{doneStudents.length}</strong>
+            <strong>{stats?.completed ?? 0}</strong>
             <span>Completed</span>
           </article>
 
           <article className="quiz-review-stat-card missed">
-            <strong>{missedStudents.length}</strong>
+            <strong>{stats?.missed ?? 0}</strong>
             <span>Missed</span>
           </article>
 
           <article className="quiz-review-stat-card pending">
-            <strong>{pendingStudents.length}</strong>
+            <strong>{stats?.pending ?? 0}</strong>
             <span>Pending</span>
           </article>
 
           <article className="quiz-review-stat-card average">
-            <strong style={{ color: avgScore === null ? "#8ea4c8" : scoreColor(avgScore) }}>
-              {avgScore === null ? "-" : `${avgScore}%`}
+            <strong
+              style={{
+                color:
+                  stats?.average === null
+                    ? "#8ea4c8"
+                    : scoreColor(stats.average),
+              }}
+            >
+              {stats?.average === null ? "-" : `${stats.average}%`}
             </strong>
             <span>Average</span>
           </article>
 
           <article className="quiz-review-stat-card high-low">
-            <strong>{highScore === null ? "-" : `${highScore}/${lowScore}`}</strong>
+            <strong>
+              {stats?.high === null ? "-" : `${stats.high}/${stats.low}`}
+            </strong>
             <span>High / Low</span>
           </article>
         </section>
@@ -456,49 +276,55 @@ const QuizReview = ({ role = "lecturer" }) => {
                 <FiUsers />
                 <h2>Students</h2>
               </div>
-              <span>{students.length}</span>
+              <span>{studentList.length}</span>
             </header>
 
             <div className="quiz-review-students-list">
-              {students.map((student) => {
-                const isDone = (selectedQuiz.doneStudentIds || []).includes(student.id);
-                const isMissed = (selectedQuiz.missedStudentIds || []).includes(student.id);
-                const isSelected = selectedStudentId === student.id;
-                const studentScore = selectedQuiz.results?.[student.id];
+              {studentList.length === 0 ? (
+                <p style={{ padding: "12px 16px", opacity: 0.5 }}>
+                  No student data available.
+                </p>
+              ) : (
+                studentList.map((student) => {
+                  const isDone = student.status === "completed" || student.status === "done";
+                  const isMissed = student.status === "missed";
+                  const isSelected = selectedStudentId === student.id;
 
-                return (
-                  <button
-                    key={student.id}
-                    type="button"
-                    className={`quiz-review-student-item ${isSelected ? "is-selected" : ""}`}
-                    onClick={() => setSelectedStudentId(student.id)}
-                  >
-                    <span className="quiz-review-student-info">
-                      <strong>{student.name}</strong>
-                      <small>{student.studentId}</small>
-                    </span>
+                  return (
+                    <button
+                      key={student.id}
+                      type="button"
+                      className={`quiz-review-student-item ${isSelected ? "is-selected" : ""}`}
+                      onClick={() => handleSelectStudent(student.id)}
+                    >
+                      <span className="quiz-review-student-info">
+                        <strong>{student.name}</strong>
+                        {student.studentCode && (
+                          <small>{student.studentCode}</small>
+                        )}
+                      </span>
 
-                    <span className="quiz-review-student-state">
-                      {isDone && typeof studentScore === "number" && (
-                        <span
-                          className="quiz-review-student-score"
-                          style={{ color: scoreColor(studentScore) }}
-                        >
-                          {studentScore}%
-                        </span>
-                      )}
-
-                      {isDone ? (
-                        <FiCheckCircle className="state-done" />
-                      ) : isMissed ? (
-                        <FiXCircle className="state-missed" />
-                      ) : (
-                        <FiClock className="state-pending" />
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
+                      <span className="quiz-review-student-state">
+                        {isDone && typeof student.score === "number" && (
+                          <span
+                            className="quiz-review-student-score"
+                            style={{ color: scoreColor(student.score) }}
+                          >
+                            {student.score}%
+                          </span>
+                        )}
+                        {isDone ? (
+                          <FiCheckCircle className="state-done" />
+                        ) : isMissed ? (
+                          <FiXCircle className="state-missed" />
+                        ) : (
+                          <FiClock className="state-pending" />
+                        )}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </aside>
 
@@ -508,12 +334,23 @@ const QuizReview = ({ role = "lecturer" }) => {
                 <FiEye />
                 <p>Select a student to view their answers</p>
               </div>
-            ) : !selectedAttempt ? (
+            ) : detailLoading ? (
+              <div className="quiz-review-empty-card">
+                <FiHelpCircle />
+                <p>Loading student details...</p>
+              </div>
+            ) : detailError ? (
+              <div className="quiz-review-no-attempt-card">
+                <FiHelpCircle />
+                <strong>{selectedStudent?.name}</strong>
+                <p>{detailError}</p>
+              </div>
+            ) : detailQuestions.length === 0 ? (
               <div className="quiz-review-no-attempt-card">
                 <FiHelpCircle />
                 <strong>{selectedStudent?.name}</strong>
                 <p>
-                  {(selectedQuiz.missedStudentIds || []).includes(selectedStudentId)
+                  {selectedStudent?.status === "missed"
                     ? "This student missed the quiz."
                     : "This student has not taken the quiz yet."}
                 </p>
@@ -523,10 +360,12 @@ const QuizReview = ({ role = "lecturer" }) => {
                 <header className="quiz-review-selected-header">
                   <div className="quiz-review-selected-copy">
                     <strong>{selectedStudent?.name}</strong>
-                    <small>{selectedStudent?.studentId}</small>
+                    {selectedStudent?.studentCode && (
+                      <small>{selectedStudent.studentCode}</small>
+                    )}
                   </div>
 
-                  {typeof selectedScore === "number" && (
+                  {typeof selectedStudent?.score === "number" && (
                     <div className="quiz-review-score-ring">
                       <svg viewBox="0 0 36 36" aria-hidden="true">
                         <circle cx="18" cy="18" r="16" className="ring-track" />
@@ -536,93 +375,98 @@ const QuizReview = ({ role = "lecturer" }) => {
                           r="16"
                           className="ring-progress"
                           style={{
-                            stroke: scoreColor(selectedScore),
-                            strokeDasharray: `${Math.min(Math.max(selectedScore, 0), 100) * 1.005} 100.5`,
+                            stroke: scoreColor(selectedStudent.score),
+                            strokeDasharray: `${Math.min(Math.max(selectedStudent.score, 0), 100) * 1.005} 100.5`,
                           }}
                         />
                       </svg>
-                      <span style={{ color: scoreColor(selectedScore) }}>{selectedScore}%</span>
+                      <span style={{ color: scoreColor(selectedStudent.score) }}>
+                        {selectedStudent.score}%
+                      </span>
                     </div>
                   )}
                 </header>
 
                 <div className="quiz-review-answers-list">
-                  {questions.map((question, questionIndex) => {
-                    const selectedAnswer = selectedAttempt.answers?.[question.id];
-                    const isQuestionCorrect = selectedAnswer === question.correctAnswer;
+                  {detailQuestions.map((q, qIndex) => (
+                    <article
+                      key={q.id}
+                      className={`quiz-review-question-card ${q.isCorrect ? "is-correct" : "is-wrong"}`}
+                    >
+                      <div className="quiz-review-question-top">
+                        <span className="quiz-review-question-number">
+                          {qIndex + 1}
+                        </span>
+                        <p>{q.text}</p>
+                      </div>
 
-                    return (
-                      <article
-                        key={question.id}
-                        className={`quiz-review-question-card ${isQuestionCorrect ? "is-correct" : "is-wrong"}`}
-                      >
-                        <div className="quiz-review-question-top">
-                          <span className="quiz-review-question-number">
-                            {questionIndex + 1}
-                          </span>
-                          <p>{question.question}</p>
-                        </div>
+                      <div className="quiz-review-options-list">
+                        {q.options.map((opt) => {
+                          const isSelected = q.selectedOptionId === opt.id;
+                          const isAnswer = opt.isCorrect;
+                          const rowClass = [
+                            "quiz-review-option-row",
+                            isAnswer ? "is-answer" : "",
+                            isSelected && !isAnswer ? "is-selected-wrong" : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" ");
 
-                        <div className="quiz-review-options-list">
-                          {question.options.map((option, optionIndex) => {
-                            const isSelected = selectedAnswer === optionIndex;
-                            const isAnswer = question.correctAnswer === optionIndex;
-                            const rowClassName = [
-                              "quiz-review-option-row",
-                              isAnswer ? "is-answer" : "",
-                              isSelected && !isAnswer ? "is-selected-wrong" : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" ");
+                          return (
+                            <div key={opt.id} className={rowClass}>
+                              {isAnswer ? (
+                                <FiCheckCircle />
+                              ) : isSelected ? (
+                                <FiXCircle />
+                              ) : (
+                                <span className="option-placeholder" />
+                              )}
+                              <span>{opt.text}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                            return (
-                              <div key={`${question.id}-${optionIndex}`} className={rowClassName}>
-                                {isAnswer ? (
-                                  <FiCheckCircle />
-                                ) : isSelected ? (
-                                  <FiXCircle />
-                                ) : (
-                                  <span className="option-placeholder" />
-                                )}
-                                <span>{option}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </article>
-                    );
-                  })}
+                      {q.explanation && (
+                        <p className="quiz-review-explanation">
+                          {q.explanation}
+                        </p>
+                      )}
+                    </article>
+                  ))}
                 </div>
               </div>
             )}
           </section>
         </div>
 
-        <section className="quiz-review-analysis-card">
-          <header>
-            <FiBarChart2 />
-            <h2>Question Analysis</h2>
-          </header>
+        {questionStats.length > 0 && (
+          <section className="quiz-review-analysis-card">
+            <header>
+              <FiBarChart2 />
+              <h2>Question Analysis</h2>
+            </header>
 
-          <div className="quiz-review-analysis-list">
-            {questionStats.map((stat, index) => (
-              <article key={stat.id} className="quiz-review-analysis-item">
-                <span className="quiz-review-analysis-label">Q{index + 1}</span>
+            <div className="quiz-review-analysis-list">
+              {questionStats.map((stat, index) => (
+                <article key={stat.id} className="quiz-review-analysis-item">
+                  <span className="quiz-review-analysis-label">Q{index + 1}</span>
 
-                <span className="quiz-review-analysis-track">
-                  <span
-                    className={`quiz-review-analysis-fill ${getBarColorClass(stat.pct)}`}
-                    style={{ width: `${stat.pct}%` }}
-                  />
-                </span>
+                  <span className="quiz-review-analysis-track">
+                    <span
+                      className={`quiz-review-analysis-fill ${getBarColorClass(stat.pct)}`}
+                      style={{ width: `${stat.pct}%` }}
+                    />
+                  </span>
 
-                <span className="quiz-review-analysis-score">
-                  {stat.correct}/{stat.total}
-                </span>
-              </article>
-            ))}
-          </div>
-        </section>
+                  <span className="quiz-review-analysis-score">
+                    {stat.correct}/{stat.total}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </section>
   );

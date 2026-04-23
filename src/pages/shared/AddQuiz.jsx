@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
+  createQuiz,
+  getQuizzesList,
+  updateQuiz,
+  deleteQuiz as apiDeleteQuiz,
+} from "../../app/quizApi";
+import {
   ArrowLeft,
   Check,
   CheckCircle2,
@@ -23,122 +29,127 @@ const createId = () =>
     ? crypto.randomUUID()
     : `quiz-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
-const createOption = (text = "") => ({
-  id: createId(),
-  text,
-});
+const createOption = (text = "") => ({ id: createId(), text });
 
 const createQuestion = () => ({
   id: createId(),
   text: "",
-  type: "multiple-choice",
-  options: [
-    createOption(),
-    createOption(),
-    createOption(),
-    createOption(),
-  ],
+  type: "multiple_choice",
+  options: [createOption(), createOption(), createOption(), createOption()],
   correctOptionId: "",
   explanation: "",
   points: 1,
 });
 
-const getInitialQuestions = () => {
-  const firstQuestion = createQuestion();
-  return [firstQuestion];
-};
+const getInitialQuestions = () => [createQuestion()];
 
 const sanitizeNumber = (value, min, max, fallback) => {
-  const numericValue = Number(value);
-  if (Number.isNaN(numericValue)) return fallback;
-  return Math.min(max, Math.max(min, numericValue));
+  const n = Number(value);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
 };
-
-const getQuizStorageKey = ({ courseId, lectureId, sectionId }) => {
-  const unitType = sectionId ? "section" : "lecture";
-  const unitId = sectionId || lectureId || "unknown";
-  return `seculearn-quizzes:${courseId || "unknown"}:${unitType}:${unitId}`;
-};
-
-const readStoredQuizzes = (storageKey) => {
-  if (!storageKey) return [];
-
-  try {
-    const rawValue = localStorage.getItem(storageKey);
-    if (!rawValue) return [];
-
-    const parsedValue = JSON.parse(rawValue);
-    return Array.isArray(parsedValue) ? parsedValue : [];
-  } catch {
-    return [];
-  }
-};
-
-const writeStoredQuizzes = (storageKey, quizzes) => {
-  if (!storageKey) return;
-  localStorage.setItem(storageKey, JSON.stringify(quizzes));
-};
-
-const buildDeletedQuizRecord = (quizId) => ({
-  id: quizId,
-  deleted: true,
-  updatedAt: Date.now(),
-});
 
 const normalizeQuestion = (question) => {
-  const normalizedType =
-    question?.type === "true-false" ? "true-false" : "multiple-choice";
+  const type =
+    question?.type === "true-false" ? "true-false" : "multiple_choice";
 
-  let normalizedOptions = Array.isArray(question?.options)
-    ? question.options.map((option, index) => ({
-        id: option?.id || createId(),
+  let options = Array.isArray(question?.options)
+    ? question.options.map((opt, i) => ({
+        id: opt?.id || createId(),
         text:
-          typeof option?.text === "string"
-            ? option.text
-            : normalizedType === "true-false"
-              ? index === 0
+          typeof opt?.text === "string"
+            ? opt.text
+            : type === "true-false"
+              ? i === 0
                 ? "True"
                 : "False"
               : "",
       }))
     : [];
 
-  if (normalizedType === "true-false") {
-    normalizedOptions = [
-      createOption(normalizedOptions[0]?.text || "True"),
-      createOption(normalizedOptions[1]?.text || "False"),
+  if (type === "true-false") {
+    options = [
+      createOption(options[0]?.text || "True"),
+      createOption(options[1]?.text || "False"),
     ];
   }
 
-  if (!normalizedOptions.length) {
-    normalizedOptions =
-      normalizedType === "true-false"
+  if (!options.length) {
+    options =
+      type === "true-false"
         ? [createOption("True"), createOption("False")]
         : [createOption(), createOption(), createOption(), createOption()];
   }
 
-  if (normalizedType === "multiple-choice" && normalizedOptions.length < 4) {
-    normalizedOptions = [
-      ...normalizedOptions,
-      ...Array.from({ length: 4 - normalizedOptions.length }, () =>
-        createOption()
-      ),
+  if (type === "multiple_choice" && options.length < 4) {
+    options = [
+      ...options,
+      ...Array.from({ length: 4 - options.length }, () => createOption()),
     ];
   }
 
-  const hasCorrectOption = normalizedOptions.some(
-    (option) => option.id === question?.correctOptionId
-  );
+  const hasCorrect = options.some((o) => o.id === question?.correctOptionId);
 
   return {
     id: question?.id || createId(),
     text: typeof question?.text === "string" ? question.text : "",
-    type: normalizedType,
-    options: normalizedOptions,
-    correctOptionId: hasCorrectOption ? question.correctOptionId : "",
+    type,
+    options,
+    correctOptionId: hasCorrect ? question.correctOptionId : "",
     explanation:
       typeof question?.explanation === "string" ? question.explanation : "",
     points: sanitizeNumber(question?.points, 1, 100, 1),
+  };
+};
+
+// Map frontend question shape to API payload shape
+const toApiQuestion = (question) => {
+  return {
+    question_text: question.text,
+    question_type:
+      question.type === "true-false" ? "true-false" : "multiple_choice",
+    points: question.points,
+    explanation: question.explanation || "",
+    options: question.options.map((opt) => ({
+      option_text: opt.text,
+      is_correct: opt.id === question.correctOptionId,
+    })),
+  };
+};
+
+const isApiQuestionShape = (question) =>
+  typeof question?.question_text === "string" ||
+  typeof question?.question_type === "string" ||
+  (Array.isArray(question?.options) &&
+    question.options.some(
+      (option) =>
+        typeof option?.option_text === "string" ||
+        typeof option?.is_correct === "boolean"
+    ));
+
+const normalizeBuilderQuestion = (question, index) =>
+  isApiQuestionShape(question)
+    ? fromApiQuestion(question, index)
+    : normalizeQuestion(question);
+
+// Map API response question back to frontend shape
+const fromApiQuestion = (apiQ, index) => {
+  const options = (apiQ.options || []).map((opt) => ({
+    id: String(opt.id),
+    text: opt.option_text || opt.text || "",
+  }));
+  const correctOption = (apiQ.options || []).find(
+    (opt) => opt.is_correct
+  );
+  return {
+    id: String(apiQ.id || `q-${index}`),
+    text: apiQ.question_text || "",
+    type:
+      apiQ.question_type === "true_false" ? "true-false" : "multiple_choice",
+    options,
+    correctOptionId: correctOption ? String(correctOption.id) : "",
+    explanation: apiQ.explanation || "",
+    points: Number(apiQ.points) || 1,
   };
 };
 
@@ -154,10 +165,9 @@ const AddQuiz = ({ role = "lecturer" }) => {
     [location.search]
   );
   const editingQuizId = queryParams.get("quizId") || "";
-  const quizStorageKey = useMemo(
-    () => getQuizStorageKey({ courseId, lectureId, sectionId }),
-    [courseId, lectureId, sectionId]
-  );
+  const isEditingQuiz = Boolean(editingQuizId);
+
+  const token = localStorage.getItem("token");
 
   const initialQuestions = useMemo(() => getInitialQuestions(), []);
   const [title, setTitle] = useState("");
@@ -174,108 +184,199 @@ const AddQuiz = ({ role = "lecturer" }) => {
   const [previewIndex, setPreviewIndex] = useState(0);
   const [previewAnswers, setPreviewAnswers] = useState({});
   const [statusMessage, setStatusMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
+  const [isEditingQuizLoaded, setIsEditingQuizLoaded] = useState(
+    !isEditingQuiz
+  );
 
   const totalPoints = useMemo(
     () =>
       questions.reduce(
-        (sum, question) =>
-          sum + sanitizeNumber(question.points, 1, 100, 1),
+        (sum, q) => sum + sanitizeNumber(q.points, 1, 100, 1),
         0
       ),
     [questions]
   );
 
-  const getQuizValidationMessage = () => {
-    if (!title.trim()) return "Please enter the quiz title.";
-    if (sanitizeNumber(timeLimit, 1, 180, 30) <= 0) {
-      return "Please enter a valid time limit.";
-    }
-    if (questions.length === 0) return "Please add at least one question.";
-
-    const invalidQuestionIndex = questions.findIndex((question) => {
-      if (!question.text.trim()) return true;
-      if (!question.correctOptionId) return true;
-      if (question.options.length < 2) return true;
-      return question.options.some((option) => !option.text.trim());
-    });
-
-    if (invalidQuestionIndex >= 0) {
-      return `Please complete question ${invalidQuestionIndex + 1} and choose its correct answer.`;
-    }
-
-    return "";
-  };
-
-  const quizValidationMessage = getQuizValidationMessage();
-  const isQuizValid = !quizValidationMessage;
-  const isEditingQuiz = Boolean(editingQuizId);
-
+  // Load existing quiz data when editing
   useEffect(() => {
-    const storedQuiz = readStoredQuizzes(quizStorageKey).find(
-      (quiz) => String(quiz?.id) === String(editingQuizId)
-    );
-    const routeQuiz =
-      location.state && typeof location.state === "object"
-        ? location.state.quiz
-        : null;
-    const sourceQuiz =
-      storedQuiz ||
-      (routeQuiz && String(routeQuiz?.id) === String(editingQuizId)
-        ? routeQuiz
-        : null);
+    let isCancelled = false;
 
-    if (!sourceQuiz) {
+    const applyQuizData = (quizData) => {
+      const normalizedQuestions = Array.isArray(quizData?.questions)
+        ? quizData.questions.map((question, index) =>
+            normalizeBuilderQuestion(question, index)
+          )
+        : [];
+
+      setTitle(quizData?.title || "");
+      setTimeLimit(
+        sanitizeNumber(
+          quizData?.timeLimit ?? quizData?.duration_minutes,
+          1,
+          180,
+          30
+        )
+      );
+      setPassingScore(
+        sanitizeNumber(
+          quizData?.passingScore ?? quizData?.passing_percentage,
+          0,
+          100,
+          60
+        )
+      );
+      setShuffleQuestions(Boolean(quizData?.shuffleQuestions));
+      setShuffleOptions(Boolean(quizData?.shuffleOptions));
+      setShowResults(
+        typeof quizData?.showResults === "boolean" ? quizData.showResults : true
+      );
+
+      if (normalizedQuestions.length > 0) {
+        setQuestions(normalizedQuestions);
+        setExpandedQuestion(normalizedQuestions[0]?.id || null);
+        setIsEditingQuizLoaded(true);
+        setStatusMessage("");
+        return true;
+      }
+
+      const next = getInitialQuestions();
+      setQuestions(next);
+      setExpandedQuestion(next[0]?.id || null);
+      setIsEditingQuizLoaded(false);
+      setStatusMessage(
+        "Quiz details were not returned by the API, so editing is disabled for this quiz right now."
+      );
+      return false;
+    };
+
+    if (!isEditingQuiz) {
       setTitle("");
       setTimeLimit(30);
       setPassingScore(60);
       setShuffleQuestions(false);
       setShuffleOptions(false);
       setShowResults(true);
-      const nextQuestions = getInitialQuestions();
-      setQuestions(nextQuestions);
-      setExpandedQuestion(nextQuestions[0]?.id || null);
+      const next = getInitialQuestions();
+      setQuestions(next);
+      setExpandedQuestion(next[0]?.id || null);
       setStatusMessage("");
+      setIsSubmitting(false);
+      setIsLoadingQuiz(false);
+      setIsEditingQuizLoaded(true);
       return;
     }
 
-    const normalizedQuestions = Array.isArray(sourceQuiz.questions)
-      ? sourceQuiz.questions.map((question) => normalizeQuestion(question))
-      : getInitialQuestions();
+    // Try from route state first (passed when navigating to edit)
+    const routeQuiz =
+      location.state?.quiz &&
+      String(location.state.quiz.id) === String(editingQuizId)
+        ? location.state.quiz
+        : null;
 
-    setTitle(sourceQuiz.title || "");
-    setTimeLimit(sanitizeNumber(sourceQuiz.timeLimit, 1, 180, 30));
-    setPassingScore(sanitizeNumber(sourceQuiz.passingScore, 0, 100, 60));
-    setShuffleQuestions(Boolean(sourceQuiz.shuffleQuestions));
-    setShuffleOptions(Boolean(sourceQuiz.shuffleOptions));
-    setShowResults(
-      typeof sourceQuiz.showResults === "boolean" ? sourceQuiz.showResults : true
+    const hasRouteQuestions =
+      Array.isArray(routeQuiz?.questions) && routeQuiz.questions.length > 0;
+
+    if (routeQuiz && hasRouteQuestions) {
+      applyQuizData(routeQuiz);
+      return;
+    }
+
+    if (routeQuiz) {
+      applyQuizData(routeQuiz);
+    }
+
+    const fetchQuizDetails = async () => {
+      setIsLoadingQuiz(true);
+      if (!routeQuiz) {
+        setStatusMessage("Loading quiz details...");
+      }
+
+      try {
+        const response = await getQuizzesList(
+          sectionId ? { section_id: sectionId } : { lecture_id: lectureId },
+          token
+        );
+
+        if (isCancelled) return;
+
+        const rawQuizzes = Array.isArray(response?.quizzes)
+          ? response.quizzes
+          : Array.isArray(response)
+            ? response
+            : [];
+        const matchedQuiz = rawQuizzes.find(
+          (quiz) => String(quiz?.id) === String(editingQuizId)
+        );
+
+        if (!matchedQuiz) {
+          setIsEditingQuizLoaded(false);
+          setStatusMessage("Could not find this quiz in the API response.");
+          return;
+        }
+
+        applyQuizData(matchedQuiz);
+      } catch (error) {
+        if (isCancelled) return;
+        setIsEditingQuizLoaded(false);
+        setStatusMessage(error.message || "Failed to load quiz details.");
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingQuiz(false);
+        }
+      }
+    };
+
+    fetchQuizDetails();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [editingQuizId, isEditingQuiz, lectureId, location.state, sectionId, token]);
+
+  const getQuizValidationMessage = () => {
+    if (!title.trim()) return "Please enter the quiz title.";
+    if (sanitizeNumber(timeLimit, 1, 180, 30) <= 0)
+      return "Please enter a valid time limit.";
+    if (questions.length === 0) return "Please add at least one question.";
+
+    const badIndex = questions.findIndex(
+      (q) =>
+        !q.text.trim() ||
+        !q.correctOptionId ||
+        q.options.length < 2 ||
+        q.options.some((o) => !o.text.trim())
     );
-    setQuestions(normalizedQuestions);
-    setExpandedQuestion(normalizedQuestions[0]?.id || null);
-    setStatusMessage("");
-  }, [editingQuizId, location.state, quizStorageKey]);
+
+    if (badIndex >= 0)
+      return `Please complete question ${badIndex + 1} and choose its correct answer.`;
+
+    return "";
+  };
+
+  const quizValidationMessage = getQuizValidationMessage();
+  const isQuizValid = !quizValidationMessage;
 
   const updateQuestion = (questionId, updates) => {
     setStatusMessage("");
     setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === questionId ? { ...question, ...updates } : question
-      )
+      prev.map((q) => (q.id === questionId ? { ...q, ...updates } : q))
     );
   };
 
   const updateOption = (questionId, optionId, text) => {
     setStatusMessage("");
     setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === questionId
+      prev.map((q) =>
+        q.id === questionId
           ? {
-              ...question,
-              options: question.options.map((option) =>
-                option.id === optionId ? { ...option, text } : option
+              ...q,
+              options: q.options.map((o) =>
+                o.id === optionId ? { ...o, text } : o
               ),
             }
-          : question
+          : q
       )
     );
   };
@@ -283,13 +384,10 @@ const AddQuiz = ({ role = "lecturer" }) => {
   const addOption = (questionId) => {
     setStatusMessage("");
     setQuestions((prev) =>
-      prev.map((question) =>
-        question.id === questionId
-          ? {
-              ...question,
-              options: [...question.options, createOption()],
-            }
-          : question
+      prev.map((q) =>
+        q.id === questionId
+          ? { ...q, options: [...q.options, createOption()] }
+          : q
       )
     );
   };
@@ -297,58 +395,45 @@ const AddQuiz = ({ role = "lecturer" }) => {
   const removeOption = (questionId, optionId) => {
     setStatusMessage("");
     setQuestions((prev) =>
-      prev.map((question) => {
-        if (question.id !== questionId) return question;
-
-        const nextOptions = question.options.filter(
-          (option) => option.id !== optionId
-        );
-
+      prev.map((q) => {
+        if (q.id !== questionId) return q;
+        const nextOptions = q.options.filter((o) => o.id !== optionId);
         return {
-          ...question,
+          ...q,
           options: nextOptions,
           correctOptionId:
-            question.correctOptionId === optionId
-              ? ""
-              : question.correctOptionId,
+            q.correctOptionId === optionId ? "" : q.correctOptionId,
         };
       })
     );
   };
 
   const addQuestion = () => {
-    const nextQuestion = createQuestion();
-    setQuestions((prev) => [...prev, nextQuestion]);
-    setExpandedQuestion(nextQuestion.id);
+    const next = createQuestion();
+    setQuestions((prev) => [...prev, next]);
+    setExpandedQuestion(next.id);
     setStatusMessage("");
   };
 
   const duplicateQuestion = (questionId) => {
-    const sourceQuestion = questions.find((question) => question.id === questionId);
-    if (!sourceQuestion) return;
-
-    const nextOptions = sourceQuestion.options.map((option) =>
-      createOption(option.text)
-    );
-    const duplicatedQuestion = {
-      ...sourceQuestion,
+    const src = questions.find((q) => q.id === questionId);
+    if (!src) return;
+    const nextOptions = src.options.map((o) => createOption(o.text));
+    const dup = {
+      ...src,
       id: createId(),
       options: nextOptions,
-      correctOptionId:
-        sourceQuestion.correctOptionId && sourceQuestion.options.length
-          ? nextOptions[sourceQuestion.options.findIndex(
-              (option) => option.id === sourceQuestion.correctOptionId
-            )]?.id || ""
-          : "",
+      correctOptionId: src.correctOptionId
+        ? nextOptions[
+            src.options.findIndex((o) => o.id === src.correctOptionId)
+          ]?.id || ""
+        : "",
     };
-
-    const sourceIndex = questions.findIndex(
-      (question) => question.id === questionId
-    );
-    const nextQuestions = [...questions];
-    nextQuestions.splice(sourceIndex + 1, 0, duplicatedQuestion);
-    setQuestions(nextQuestions);
-    setExpandedQuestion(duplicatedQuestion.id);
+    const srcIndex = questions.findIndex((q) => q.id === questionId);
+    const next = [...questions];
+    next.splice(srcIndex + 1, 0, dup);
+    setQuestions(next);
+    setExpandedQuestion(dup.id);
     setStatusMessage("");
   };
 
@@ -357,38 +442,26 @@ const AddQuiz = ({ role = "lecturer" }) => {
       setStatusMessage("Quiz must contain at least one question.");
       return;
     }
-
-    const nextQuestions = questions.filter(
-      (question) => question.id !== questionId
-    );
-    setQuestions(nextQuestions);
+    const next = questions.filter((q) => q.id !== questionId);
+    setQuestions(next);
     setStatusMessage("");
-
-    if (expandedQuestion === questionId) {
-      setExpandedQuestion(nextQuestions[0]?.id || null);
-    }
+    if (expandedQuestion === questionId) setExpandedQuestion(next[0]?.id || null);
   };
 
   const changeQuestionType = (questionId, nextType) => {
     if (nextType === "true-false") {
-      const trueOption = createOption("True");
-      const falseOption = createOption("False");
+      const t = createOption("True");
+      const f = createOption("False");
       updateQuestion(questionId, {
         type: nextType,
-        options: [trueOption, falseOption],
+        options: [t, f],
         correctOptionId: "",
       });
       return;
     }
-
     updateQuestion(questionId, {
       type: nextType,
-      options: [
-        createOption(),
-        createOption(),
-        createOption(),
-        createOption(),
-      ],
+      options: [createOption(), createOption(), createOption(), createOption()],
       correctOptionId: "",
     });
   };
@@ -400,85 +473,62 @@ const AddQuiz = ({ role = "lecturer" }) => {
     setStatusMessage("");
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+
+    if (isEditingQuiz && !isEditingQuizLoaded) {
+      setStatusMessage(
+        "This quiz cannot be updated until its full question details are loaded from the API."
+      );
+      return;
+    }
 
     if (!isQuizValid) {
       setStatusMessage(quizValidationMessage);
       return;
     }
 
-    const safeQuestions = questions.map((question) => ({
-      ...question,
-      points: sanitizeNumber(question.points, 1, 100, 1),
-    }));
-    const storedQuizzes = readStoredQuizzes(quizStorageKey);
-    const existingQuiz = storedQuizzes.find(
-      (quiz) => String(quiz?.id) === String(editingQuizId)
-    );
-    const nextQuizId =
-      editingQuizId ||
-      existingQuiz?.id ||
-      (location.state?.quiz?.id ? String(location.state.quiz.id) : createId());
-    const quizRecord = {
-      ...(existingQuiz || {}),
-      id: nextQuizId,
+    setIsSubmitting(true);
+    setStatusMessage("");
+
+    const payload = {
       title: title.trim(),
-      timeLimit: sanitizeNumber(timeLimit, 1, 180, 30),
-      passingScore: sanitizeNumber(passingScore, 0, 100, 60),
-      shuffleQuestions: Boolean(shuffleQuestions),
-      shuffleOptions: Boolean(shuffleOptions),
-      showResults: Boolean(showResults),
-      questionCount: safeQuestions.length,
-      questions: safeQuestions,
-      totalPoints,
-      doneStudentIds: Array.isArray(existingQuiz?.doneStudentIds)
-        ? existingQuiz.doneStudentIds
-        : [],
-      missedStudentIds: Array.isArray(existingQuiz?.missedStudentIds)
-        ? existingQuiz.missedStudentIds
-        : [],
-      results:
-        existingQuiz && typeof existingQuiz.results === "object"
-          ? existingQuiz.results
-          : {},
-      updatedAt: Date.now(),
+      duration_minutes: sanitizeNumber(timeLimit, 1, 180, 30),
+      passing_percentage: sanitizeNumber(passingScore, 0, 100, 60),
+      ...(sectionId
+        ? { section_id: Number(sectionId) }
+        : { lecture_id: Number(lectureId) }),
+      questions: questions.map(toApiQuestion),
     };
 
-    const nextStoredQuizzes = existingQuiz
-      ? storedQuizzes.map((quiz) =>
-          String(quiz?.id) === String(nextQuizId) ? quizRecord : quiz
-        )
-      : [...storedQuizzes, quizRecord];
-
-    writeStoredQuizzes(quizStorageKey, nextStoredQuizzes);
-
-    navigate(contentPath);
+    try {
+      if (isEditingQuiz) {
+        await updateQuiz(editingQuizId, payload, token);
+      } else {
+        await createQuiz(payload, token);
+      }
+      navigate(contentPath);
+    } catch (err) {
+      setStatusMessage(err.message || "Failed to save quiz. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteQuiz = () => {
+  const handleDeleteQuiz = async () => {
     if (!isEditingQuiz || !editingQuizId) return;
 
-    const storedQuizzes = readStoredQuizzes(quizStorageKey);
-    const storedQuizIndex = storedQuizzes.findIndex(
-      (quiz) => String(quiz?.id) === String(editingQuizId)
-    );
+    setIsSubmitting(true);
+    setStatusMessage("");
 
-    const nextStoredQuizzes =
-      storedQuizIndex >= 0
-        ? storedQuizzes.map((quiz, index) =>
-            index === storedQuizIndex
-              ? {
-                  ...quiz,
-                  deleted: true,
-                  updatedAt: Date.now(),
-                }
-              : quiz
-          )
-        : [...storedQuizzes, buildDeletedQuizRecord(editingQuizId)];
-
-    writeStoredQuizzes(quizStorageKey, nextStoredQuizzes);
-    navigate(contentPath);
+    try {
+      await apiDeleteQuiz(editingQuizId, token);
+      navigate(contentPath);
+    } catch (err) {
+      setStatusMessage(err.message || "Failed to delete quiz.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const currentPreviewQuestion = questions[previewIndex];
@@ -496,7 +546,6 @@ const AddQuiz = ({ role = "lecturer" }) => {
               <ArrowLeft size={16} />
               Exit Preview
             </button>
-
             <span className="add-quiz-preview-badge">Preview Mode</span>
           </div>
 
@@ -511,7 +560,9 @@ const AddQuiz = ({ role = "lecturer" }) => {
                 <Hash size={14} />
                 {questions.length} question{questions.length !== 1 ? "s" : ""}
               </span>
-              <span>{totalPoints} point{totalPoints !== 1 ? "s" : ""}</span>
+              <span>
+                {totalPoints} point{totalPoints !== 1 ? "s" : ""}
+              </span>
             </div>
           </div>
 
@@ -533,7 +584,6 @@ const AddQuiz = ({ role = "lecturer" }) => {
                 const optionLabel = String.fromCharCode(65 + optionIndex);
                 const isSelected =
                   previewAnswers[currentPreviewQuestion.id] === option.id;
-
                 return (
                   <button
                     key={option.id}
@@ -567,21 +617,16 @@ const AddQuiz = ({ role = "lecturer" }) => {
             </button>
 
             <div className="add-quiz-preview-pagination">
-              {questions.map((question, index) => {
-                const isActive = index === previewIndex;
-                const isAnswered = Boolean(previewAnswers[question.id]);
-
-                return (
-                  <button
-                    key={question.id}
-                    type="button"
-                    className={`add-quiz-preview-page-dot ${isActive ? "is-active" : ""} ${isAnswered ? "is-answered" : ""}`}
-                    onClick={() => setPreviewIndex(index)}
-                  >
-                    {index + 1}
-                  </button>
-                );
-              })}
+              {questions.map((q, index) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  className={`add-quiz-preview-page-dot ${index === previewIndex ? "is-active" : ""} ${previewAnswers[q.id] ? "is-answered" : ""}`}
+                  onClick={() => setPreviewIndex(index)}
+                >
+                  {index + 1}
+                </button>
+              ))}
             </div>
 
             {previewIndex < questions.length - 1 ? (
@@ -647,8 +692,8 @@ const AddQuiz = ({ role = "lecturer" }) => {
                 <input
                   type="text"
                   value={title}
-                  onChange={(event) => {
-                    setTitle(event.target.value);
+                  onChange={(e) => {
+                    setTitle(e.target.value);
                     setStatusMessage("");
                   }}
                   placeholder="e.g. Midterm Quiz: Network Security Fundamentals"
@@ -667,8 +712,8 @@ const AddQuiz = ({ role = "lecturer" }) => {
                     min={1}
                     max={180}
                     value={timeLimit}
-                    onChange={(event) => {
-                      setTimeLimit(Number(event.target.value || 0));
+                    onChange={(e) => {
+                      setTimeLimit(Number(e.target.value || 0));
                       setStatusMessage("");
                     }}
                     onBlur={() =>
@@ -684,8 +729,8 @@ const AddQuiz = ({ role = "lecturer" }) => {
                     min={0}
                     max={100}
                     value={passingScore}
-                    onChange={(event) => {
-                      setPassingScore(Number(event.target.value || 0));
+                    onChange={(e) => {
+                      setPassingScore(Number(e.target.value || 0));
                       setStatusMessage("");
                     }}
                     onBlur={() =>
@@ -727,11 +772,11 @@ const AddQuiz = ({ role = "lecturer" }) => {
               <div className="add-quiz-question-list">
                 {questions.map((question, index) => {
                   const isExpanded = expandedQuestion === question.id;
-                  const hasCorrectAnswer = Boolean(question.correctOptionId);
-                  const isQuestionComplete =
+                  const hasCorrect = Boolean(question.correctOptionId);
+                  const isComplete =
                     question.text.trim() &&
-                    hasCorrectAnswer &&
-                    question.options.every((option) => option.text.trim());
+                    hasCorrect &&
+                    question.options.every((o) => o.text.trim());
 
                   return (
                     <article
@@ -747,24 +792,22 @@ const AddQuiz = ({ role = "lecturer" }) => {
                       >
                         <GripVertical size={15} className="add-quiz-drag-icon" />
                         <span
-                          className={`add-quiz-question-index ${isQuestionComplete ? "is-complete" : ""}`}
+                          className={`add-quiz-question-index ${isComplete ? "is-complete" : ""}`}
                         >
-                          {isQuestionComplete ? (
-                            <CheckCircle2 size={15} />
-                          ) : (
-                            index + 1
-                          )}
+                          {isComplete ? <CheckCircle2 size={15} /> : index + 1}
                         </span>
 
                         <div className="add-quiz-question-summary">
-                          <strong>{question.text || `Question ${index + 1}`}</strong>
+                          <strong>
+                            {question.text || `Question ${index + 1}`}
+                          </strong>
                           <span>
                             {question.type === "true-false"
                               ? "True / False"
                               : `${question.options.length} options`}{" "}
                             - {question.points} pt
                             {question.points !== 1 ? "s" : ""}
-                            {!hasCorrectAnswer ? " - No correct answer" : ""}
+                            {!hasCorrect ? " - No correct answer" : ""}
                           </span>
                         </div>
 
@@ -782,11 +825,11 @@ const AddQuiz = ({ role = "lecturer" }) => {
                               <span>Question Type</span>
                               <select
                                 value={question.type}
-                                onChange={(event) =>
-                                  changeQuestionType(question.id, event.target.value)
+                                onChange={(e) =>
+                                  changeQuestionType(question.id, e.target.value)
                                 }
                               >
-                                <option value="multiple-choice">
+                                <option value="multiple_choice">
                                   Multiple Choice
                                 </option>
                                 <option value="true-false">True / False</option>
@@ -800,9 +843,9 @@ const AddQuiz = ({ role = "lecturer" }) => {
                                 min={1}
                                 max={100}
                                 value={question.points}
-                                onChange={(event) =>
+                                onChange={(e) =>
                                   updateQuestion(question.id, {
-                                    points: Number(event.target.value || 0),
+                                    points: Number(e.target.value || 0),
                                   })
                                 }
                                 onBlur={() =>
@@ -826,10 +869,8 @@ const AddQuiz = ({ role = "lecturer" }) => {
                             <textarea
                               rows={4}
                               value={question.text}
-                              onChange={(event) =>
-                                updateQuestion(question.id, {
-                                  text: event.target.value,
-                                })
+                              onChange={(e) =>
+                                updateQuestion(question.id, { text: e.target.value })
                               }
                               placeholder="Enter your question here..."
                             />
@@ -840,12 +881,14 @@ const AddQuiz = ({ role = "lecturer" }) => {
                               <span>
                                 Answer Options <em>*</em>
                               </span>
-                              <small>Click the circle to mark the correct answer</small>
+                              <small>
+                                Click the circle to mark the correct answer
+                              </small>
                             </div>
 
                             <div className="add-quiz-options-list">
                               {question.options.map((option, optionIndex) => {
-                                const optionLabel = String.fromCharCode(
+                                const label = String.fromCharCode(
                                   65 + optionIndex
                                 );
                                 const isCorrect =
@@ -870,24 +913,28 @@ const AddQuiz = ({ role = "lecturer" }) => {
                                           : "Mark as correct"
                                       }
                                     >
-                                      {isCorrect ? <Check size={15} /> : optionLabel}
+                                      {isCorrect ? (
+                                        <Check size={15} />
+                                      ) : (
+                                        label
+                                      )}
                                     </button>
 
                                     <input
                                       type="text"
                                       value={option.text}
-                                      onChange={(event) =>
+                                      onChange={(e) =>
                                         updateOption(
                                           question.id,
                                           option.id,
-                                          event.target.value
+                                          e.target.value
                                         )
                                       }
-                                      placeholder={`Option ${optionLabel}`}
+                                      placeholder={`Option ${label}`}
                                       disabled={question.type === "true-false"}
                                     />
 
-                                    {question.type === "multiple-choice" &&
+                                    {question.type === "multiple_choice" &&
                                       question.options.length > 2 && (
                                         <button
                                           type="button"
@@ -895,7 +942,7 @@ const AddQuiz = ({ role = "lecturer" }) => {
                                           onClick={() =>
                                             removeOption(question.id, option.id)
                                           }
-                                          aria-label={`Remove option ${optionLabel}`}
+                                          aria-label={`Remove option ${label}`}
                                         >
                                           <Trash2 size={14} />
                                         </button>
@@ -905,7 +952,7 @@ const AddQuiz = ({ role = "lecturer" }) => {
                               })}
                             </div>
 
-                            {question.type === "multiple-choice" &&
+                            {question.type === "multiple_choice" &&
                               question.options.length < 6 && (
                                 <button
                                   type="button"
@@ -923,9 +970,9 @@ const AddQuiz = ({ role = "lecturer" }) => {
                             <textarea
                               rows={3}
                               value={question.explanation}
-                              onChange={(event) =>
+                              onChange={(e) =>
                                 updateQuestion(question.id, {
-                                  explanation: event.target.value,
+                                  explanation: e.target.value,
                                 })
                               }
                               placeholder="Explain why this answer is correct..."
@@ -1000,18 +1047,17 @@ const AddQuiz = ({ role = "lecturer" }) => {
               <div className="add-quiz-completion-block">
                 <p>Completion</p>
                 <div className="add-quiz-completion-list">
-                  {questions.map((question, index) => {
+                  {questions.map((q, index) => {
                     const isDone =
-                      question.text.trim() &&
-                      question.correctOptionId &&
-                      question.options.every((option) => option.text.trim());
-
+                      q.text.trim() &&
+                      q.correctOptionId &&
+                      q.options.every((o) => o.text.trim());
                     return (
                       <button
-                        key={question.id}
+                        key={q.id}
                         type="button"
                         className="add-quiz-completion-item"
-                        onClick={() => setExpandedQuestion(question.id)}
+                        onClick={() => setExpandedQuestion(q.id)}
                       >
                         <span
                           className={`add-quiz-completion-indicator ${isDone ? "is-done" : ""}`}
@@ -1019,7 +1065,7 @@ const AddQuiz = ({ role = "lecturer" }) => {
                           {isDone ? <CheckCircle2 size={13} /> : index + 1}
                         </span>
                         <span className="add-quiz-completion-text">
-                          Q{index + 1}: {question.text || "Untitled"}
+                          Q{index + 1}: {q.text || "Untitled"}
                         </span>
                       </button>
                     );
@@ -1070,15 +1116,27 @@ const AddQuiz = ({ role = "lecturer" }) => {
               <button
                 type="submit"
                 className="add-quiz-submit-btn"
+                disabled={
+                  isSubmitting ||
+                  isLoadingQuiz ||
+                  (isEditingQuiz && !isEditingQuizLoaded)
+                }
               >
                 <Save size={15} />
-                {isEditingQuiz ? "Save Quiz" : "Create Quiz"}
+                {isLoadingQuiz
+                  ? "Loading..."
+                  : isSubmitting
+                  ? "Saving..."
+                  : isEditingQuiz
+                    ? "Save Quiz"
+                    : "Create Quiz"}
               </button>
 
               <button
                 type="button"
                 className="add-quiz-cancel-btn"
                 onClick={() => navigate(contentPath)}
+                disabled={isSubmitting}
               >
                 Cancel
               </button>
@@ -1088,9 +1146,10 @@ const AddQuiz = ({ role = "lecturer" }) => {
                   type="button"
                   className="add-quiz-delete-btn"
                   onClick={handleDeleteQuiz}
+                  disabled={isSubmitting || isLoadingQuiz}
                 >
                   <Trash2 size={15} />
-                  Delete Quiz
+                  {isSubmitting ? "Deleting..." : "Delete Quiz"}
                 </button>
               )}
 

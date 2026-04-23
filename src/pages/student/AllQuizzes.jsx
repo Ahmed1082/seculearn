@@ -1,82 +1,56 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { getQuizzesList } from "../../app/quizApi";
 import {
   FiBookOpen,
   FiCheckCircle,
   FiClock,
   FiFilter,
   FiHelpCircle,
+  FiRefreshCw,
   FiStar,
   FiTrendingUp,
   FiXCircle,
 } from "react-icons/fi";
 import "../../styles/AllQuizzes.css";
 
-const courses = [
-  { id: "c1", name: "Introduction to Cybersecurity" },
-  { id: "c2", name: "Introduction to Cryptography" },
-  { id: "c3", name: "Ethical Hacking" },
-];
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
 
-const lectures = [
-  { id: "l1", courseId: "c1", title: "Lecture 1: Cyber Fundamentals" },
-  { id: "l2", courseId: "c1", title: "Lecture 2: Firewall Rules" },
-  { id: "l3", courseId: "c2", title: "Lecture 1: Classical Ciphers" },
-  { id: "l4", courseId: "c2", title: "Lecture 2: AES and Modes" },
-  { id: "l5", courseId: "c3", title: "Lecture 1: Vulnerability Scanning" },
-  { id: "l6", courseId: "c3", title: "Lecture 2: Post Exploitation" },
-];
+const buildApiHeaders = (token) => ({
+  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  "ngrok-skip-browser-warning": "true",
+});
 
-const quizzes = [
-  { id: "q1", title: "Quiz 1: Threat Basics", lectureId: "l1", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 90 } },
-  { id: "q2", title: "Quiz 2: Attack Types", lectureId: "l1", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 95 } },
-  { id: "q3", title: "Quiz 3: Defense Strategies", lectureId: "l1", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 100 } },
-  { id: "q4", title: "Quiz 1: Network Protocols", lectureId: "l2", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 88 } },
-  { id: "q5", title: "Quiz 2: Firewall Analysis", lectureId: "l2", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 84 } },
-  { id: "q6", title: "Quiz 1: Caesar Cipher", lectureId: "l3", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 92 } },
-  { id: "q7", title: "Quiz 2: Vigenere Cipher", lectureId: "l3", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 86 } },
-  { id: "q8", title: "Quiz 1: AES Concepts", lectureId: "l4", doneStudentIds: [], missedStudentIds: [], results: {} },
-  { id: "q9", title: "Quiz 2: Block Modes", lectureId: "l4", doneStudentIds: [], missedStudentIds: [], results: {} },
-  { id: "q10", title: "Quiz 1: Recon Basics", lectureId: "l5", doneStudentIds: [], missedStudentIds: ["s1"], results: {} },
-  { id: "q11", title: "Quiz 2: Web Enumeration", lectureId: "l5", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 79 } },
-  { id: "q12", title: "Quiz 1: Incident Response", lectureId: "l6", doneStudentIds: ["s1"], missedStudentIds: [], results: { s1: 91 } },
-];
+const toNumberOrNull = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
 
-const mockStudentIds = new Set(
-  quizzes.flatMap((quiz) => [
-    ...quiz.doneStudentIds.map((id) => String(id)),
-    ...quiz.missedStudentIds.map((id) => String(id)),
-    ...Object.keys(quiz.results || {}).map((id) => String(id)),
-  ])
-);
+const normalizeQuizStatus = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
 
-const getCurrentStudentId = () => {
-  const fallbackId = "s1";
-  const stored = localStorage.getItem("user");
-
-  if (!stored) return fallbackId;
-
-  try {
-    const user = JSON.parse(stored);
-    const id = user.id || user.student_id || user.user_id || fallbackId;
-    return String(id);
-  } catch {
-    return fallbackId;
+  if (
+    normalized === "done" ||
+    normalized === "completed" ||
+    normalized === "complete" ||
+    normalized === "submitted"
+  ) {
+    return "done";
   }
-};
 
-const resolveStudentIdForMockData = (studentId) => {
-  if (mockStudentIds.has(studentId)) return studentId;
-  if (mockStudentIds.has("s1")) return "s1";
-  return studentId;
-};
+  if (
+    normalized === "missed" ||
+    normalized === "expired" ||
+    normalized === "closed"
+  ) {
+    return "missed";
+  }
 
-const getStatus = (quiz, studentId) => {
-  if (quiz.doneStudentIds.includes(studentId)) return "done";
-  if (quiz.missedStudentIds.includes(studentId)) return "missed";
   return "pending";
 };
-
-const getScore = (quiz, studentId) => quiz.results?.[studentId] ?? null;
 
 const scoreColor = (score) => {
   if (score >= 90) return "#54f4fc";
@@ -98,47 +72,193 @@ const statusConfig = {
   missed: { label: "Missed", icon: FiXCircle },
 };
 
+const normalizeApiQuiz = (apiQuiz, content, course) => ({
+  id: String(apiQuiz?.id || ""),
+  title: apiQuiz?.title || `Quiz ${apiQuiz?.id || ""}`,
+  duration_minutes:
+    toNumberOrNull(apiQuiz?.duration_minutes) ??
+    toNumberOrNull(apiQuiz?.time_limit) ??
+    30,
+  question_count:
+    toNumberOrNull(apiQuiz?.questions_count) ??
+    toNumberOrNull(apiQuiz?.question_count) ??
+    (Array.isArray(apiQuiz?.questions) ? apiQuiz.questions.length : 0),
+  passing_percentage:
+    toNumberOrNull(apiQuiz?.passing_percentage) ??
+    toNumberOrNull(apiQuiz?.passingScore) ??
+    60,
+  status: normalizeQuizStatus(apiQuiz?.status),
+  score:
+    toNumberOrNull(apiQuiz?.score) ??
+    toNumberOrNull(apiQuiz?.percentage) ??
+    null,
+  content,
+  course,
+});
+
 const StudentAllQuizzes = () => {
+  const navigate = useNavigate();
+  const token = localStorage.getItem("token");
+
+  const [loadState, setLoadState] = useState("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [quizzes, setQuizzes] = useState([]);
+  const [courses, setCourses] = useState([]);
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeCourse, setActiveCourse] = useState("all");
-  const currentStudentId = useMemo(() => resolveStudentIdForMockData(getCurrentStudentId()), []);
 
-  const enrichedQuizzes = useMemo(() => {
-    return quizzes
-      .map((quiz) => {
-        const lecture = lectures.find((item) => item.id === quiz.lectureId);
-        const course = courses.find((item) => item.id === lecture?.courseId);
+  const fetchAllQuizzes = useCallback(async () => {
+    if (!token) {
+      setCourses([]);
+      setQuizzes([]);
+      setLoadState("ready");
+      return;
+    }
 
-        return {
-          ...quiz,
-          lecture,
-          course,
-          status: getStatus(quiz, currentStudentId),
-          score: getScore(quiz, currentStudentId),
-        };
-      })
-      .sort((a, b) => a.title.localeCompare(b.title));
-  }, [currentStudentId]);
+    setLoadState("loading");
+    setErrorMsg("");
+
+    try {
+      const coursesResponse = await axios.get(`${API_BASE_URL}/api/get-courses`, {
+        headers: buildApiHeaders(token),
+      });
+
+      const rawCourses = Array.isArray(coursesResponse?.data?.courses)
+        ? coursesResponse.data.courses
+        : [];
+      setCourses(rawCourses);
+
+      const quizCollections = await Promise.all(
+        rawCourses.map(async (course) => {
+          const lectureEntries = Array.isArray(course?.lectures)
+            ? course.lectures
+            : [];
+          const sectionEntries = Array.isArray(course?.sections)
+            ? course.sections
+            : [];
+
+          const lectureQuizzes = await Promise.all(
+            lectureEntries.map(async (lecture) => {
+              try {
+                const quizList = await getQuizzesList(
+                  { lecture_id: lecture.id },
+                  token
+                );
+                const rawItems = Array.isArray(quizList?.quizzes)
+                  ? quizList.quizzes
+                  : Array.isArray(quizList)
+                    ? quizList
+                    : [];
+
+                return rawItems.map((quiz) =>
+                  normalizeApiQuiz(
+                    quiz,
+                    {
+                      id: String(lecture.id),
+                      title: lecture.title || `Lecture ${lecture.id}`,
+                      courseId: String(course.id),
+                      type: "lecture",
+                    },
+                    {
+                      id: String(course.id),
+                      name: course.title || course.name || `Course ${course.id}`,
+                    }
+                  )
+                );
+              } catch {
+                return [];
+              }
+            })
+          );
+
+          const sectionQuizzes = await Promise.all(
+            sectionEntries.map(async (section) => {
+              try {
+                const quizList = await getQuizzesList(
+                  { section_id: section.id },
+                  token
+                );
+                const rawItems = Array.isArray(quizList?.quizzes)
+                  ? quizList.quizzes
+                  : Array.isArray(quizList)
+                    ? quizList
+                    : [];
+
+                return rawItems.map((quiz) =>
+                  normalizeApiQuiz(
+                    quiz,
+                    {
+                      id: String(section.id),
+                      title: section.title || `Section ${section.id}`,
+                      courseId: String(course.id),
+                      type: "section",
+                    },
+                    {
+                      id: String(course.id),
+                      name: course.title || course.name || `Course ${course.id}`,
+                    }
+                  )
+                );
+              } catch {
+                return [];
+              }
+            })
+          );
+
+          return [...lectureQuizzes.flat(), ...sectionQuizzes.flat()];
+        })
+      );
+
+      setQuizzes(
+        quizCollections
+          .flat()
+          .filter((quiz) => quiz.id)
+          .sort((a, b) => {
+            const courseCompare = (a.course?.name || "").localeCompare(
+              b.course?.name || ""
+            );
+            if (courseCompare !== 0) return courseCompare;
+            return a.title.localeCompare(b.title);
+          })
+      );
+      setLoadState("ready");
+    } catch (error) {
+      setCourses([]);
+      setQuizzes([]);
+      setErrorMsg(error?.message || "Failed to load quizzes.");
+      setLoadState("error");
+    }
+  }, [token]);
+
+  useEffect(() => {
+    fetchAllQuizzes();
+  }, [fetchAllQuizzes]);
 
   const stats = useMemo(() => {
-    const total = enrichedQuizzes.length;
-    const done = enrichedQuizzes.filter((item) => item.status === "done").length;
-    const pending = enrichedQuizzes.filter((item) => item.status === "pending").length;
-    const missed = enrichedQuizzes.filter((item) => item.status === "missed").length;
-    const scores = enrichedQuizzes.filter((item) => item.score !== null).map((item) => item.score);
-    const avgScore = scores.length ? Math.round(scores.reduce((sum, item) => sum + item, 0) / scores.length) : null;
+    const total = quizzes.length;
+    const done = quizzes.filter((quiz) => quiz.status === "done").length;
+    const pending = quizzes.filter((quiz) => quiz.status === "pending").length;
+    const missed = quizzes.filter((quiz) => quiz.status === "missed").length;
+    const scores = quizzes
+      .filter((quiz) => quiz.score !== null)
+      .map((quiz) => quiz.score);
+    const avgScore = scores.length
+      ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+      : null;
     const bestScore = scores.length ? Math.max(...scores) : null;
 
     return { total, done, pending, missed, scores, avgScore, bestScore };
-  }, [enrichedQuizzes]);
+  }, [quizzes]);
 
   const filteredQuizzes = useMemo(() => {
-    return enrichedQuizzes.filter((item) => {
-      const statusMatch = activeFilter === "all" || item.status === activeFilter;
-      const courseMatch = activeCourse === "all" || item.course?.id === activeCourse;
+    return quizzes.filter((quiz) => {
+      const statusMatch =
+        activeFilter === "all" || quiz.status === activeFilter;
+      const courseMatch =
+        activeCourse === "all" || quiz.course?.id === activeCourse;
       return statusMatch && courseMatch;
     });
-  }, [activeCourse, activeFilter, enrichedQuizzes]);
+  }, [activeCourse, activeFilter, quizzes]);
 
   const filterItems = [
     { key: "all", label: "All", count: stats.total },
@@ -147,6 +267,77 @@ const StudentAllQuizzes = () => {
     { key: "missed", label: "Missed", count: stats.missed },
   ];
 
+  const openQuiz = (quiz) => {
+    const courseId = quiz.course?.id || quiz.content?.courseId;
+    const contentId = quiz.content?.id;
+
+    if (!courseId || !contentId || !quiz.id) return;
+
+    navigate(
+      quiz.content?.type === "section"
+        ? `/student/courses/${courseId}/section/${contentId}/exam/${quiz.id}`
+        : `/student/courses/${courseId}/lecture/${contentId}/exam/${quiz.id}`
+    );
+  };
+
+  if (loadState === "loading") {
+    return (
+      <section className="all-quizzes-page">
+        <div className="all-quizzes-shell">
+          <header className="all-quizzes-header">
+            <div className="all-quizzes-header-icon">
+              <FiHelpCircle size={16} />
+            </div>
+            <div>
+              <h1>Quizzes</h1>
+              <p>Loading your quizzes...</p>
+            </div>
+          </header>
+
+          <div className="all-quizzes-list">
+            <article className="all-quizzes-empty-state">
+              <FiHelpCircle size={24} />
+              <p>Loading...</p>
+            </article>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (loadState === "error") {
+    return (
+      <section className="all-quizzes-page">
+        <div className="all-quizzes-shell">
+          <header className="all-quizzes-header">
+            <div className="all-quizzes-header-icon">
+              <FiHelpCircle size={16} />
+            </div>
+            <div>
+              <h1>Quizzes</h1>
+              <p>{errorMsg}</p>
+            </div>
+          </header>
+
+          <div className="all-quizzes-list">
+            <article className="all-quizzes-empty-state">
+              <FiRefreshCw size={24} />
+              <p>{errorMsg}</p>
+              <button
+                type="button"
+                className="all-quizzes-start-btn"
+                style={{ marginTop: 12 }}
+                onClick={fetchAllQuizzes}
+              >
+                Retry
+              </button>
+            </article>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="all-quizzes-page">
       <div className="all-quizzes-shell">
@@ -154,7 +345,6 @@ const StudentAllQuizzes = () => {
           <div className="all-quizzes-header-icon">
             <FiHelpCircle size={16} />
           </div>
-
           <div>
             <h1>Quizzes</h1>
             <p>Your quiz history and upcoming tests</p>
@@ -173,35 +363,47 @@ const StudentAllQuizzes = () => {
           </article>
 
           <article className="all-quizzes-stat-card all-quizzes-stat-average">
-            <strong style={{ color: stats.avgScore !== null ? scoreColor(stats.avgScore) : "#9eb0c8" }}>
+            <strong
+              style={{
+                color:
+                  stats.avgScore !== null ? scoreColor(stats.avgScore) : "#9eb0c8",
+              }}
+            >
               {stats.avgScore !== null ? `${stats.avgScore}%` : "-"}
             </strong>
             <span>Avg Score</span>
           </article>
 
           <article className="all-quizzes-stat-card all-quizzes-stat-best">
-            <strong style={{ color: stats.bestScore !== null ? scoreColor(stats.bestScore) : "#9eb0c8" }}>
+            <strong
+              style={{
+                color:
+                  stats.bestScore !== null
+                    ? scoreColor(stats.bestScore)
+                    : "#9eb0c8",
+              }}
+            >
               {stats.bestScore !== null ? `${stats.bestScore}%` : "-"}
             </strong>
             <span>Best Score</span>
           </article>
         </section>
 
-        <section className="all-quizzes-trend-card">
-          <div className="all-quizzes-trend-icon">
-            <FiTrendingUp size={14} />
-          </div>
-
-          <div className="all-quizzes-trend-content">
-            <div className="all-quizzes-trend-top">
-              <h2>Score History</h2>
-              <span>{stats.scores.length} quizzes graded</span>
+        {stats.scores.length > 0 && (
+          <section className="all-quizzes-trend-card">
+            <div className="all-quizzes-trend-icon">
+              <FiTrendingUp size={14} />
             </div>
 
-            {stats.scores.length > 0 ? (
+            <div className="all-quizzes-trend-content">
+              <div className="all-quizzes-trend-top">
+                <h2>Score History</h2>
+                <span>{stats.scores.length} quizzes graded</span>
+              </div>
+
               <div className="all-quizzes-bars">
-                {enrichedQuizzes
-                  .filter((item) => item.score !== null)
+                {quizzes
+                  .filter((quiz) => quiz.score !== null)
                   .map((quiz) => (
                     <div
                       key={quiz.id}
@@ -210,32 +412,36 @@ const StudentAllQuizzes = () => {
                         height: `${Math.max(6, Math.round(quiz.score * 0.34))}px`,
                         background: scoreColor(quiz.score),
                       }}
-                      title={`${quiz.title}: ${quiz.score}/100`}
+                      title={`${quiz.title}: ${quiz.score}%`}
                     />
                   ))}
               </div>
-            ) : (
-              <p className="all-quizzes-trend-empty">No graded quizzes yet.</p>
-            )}
-          </div>
+            </div>
 
-          <div className="all-quizzes-trend-average">
-            <strong style={{ color: stats.avgScore !== null ? scoreColor(stats.avgScore) : "#9eb0c8" }}>
-              {stats.avgScore !== null ? `${stats.avgScore}%` : "-"}
-            </strong>
-            <span>average</span>
-          </div>
-        </section>
+            <div className="all-quizzes-trend-average">
+              <strong
+                style={{
+                  color:
+                    stats.avgScore !== null ? scoreColor(stats.avgScore) : "#9eb0c8",
+                }}
+              >
+                {stats.avgScore !== null ? `${stats.avgScore}%` : "-"}
+              </strong>
+              <span>average</span>
+            </div>
+          </section>
+        )}
 
         <section className="all-quizzes-filters-row">
           <div className="all-quizzes-filter-group">
             <FiFilter size={14} />
-
             {filterItems.map((filter) => (
               <button
                 key={filter.key}
                 type="button"
-                className={`all-quizzes-filter-chip ${activeFilter === filter.key ? "is-active" : ""}`}
+                className={`all-quizzes-filter-chip ${
+                  activeFilter === filter.key ? "is-active" : ""
+                }`}
                 onClick={() => setActiveFilter(filter.key)}
               >
                 <span>{filter.label}</span>
@@ -246,7 +452,6 @@ const StudentAllQuizzes = () => {
 
           <div className="all-quizzes-course-filter">
             <FiBookOpen size={14} />
-
             <select
               value={activeCourse}
               onChange={(event) => setActiveCourse(event.target.value)}
@@ -254,8 +459,8 @@ const StudentAllQuizzes = () => {
             >
               <option value="all">All Courses</option>
               {courses.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
+                <option key={course.id} value={String(course.id)}>
+                  {course.title || course.name || `Course ${course.id}`}
                 </option>
               ))}
             </select>
@@ -270,8 +475,8 @@ const StudentAllQuizzes = () => {
             </article>
           ) : (
             filteredQuizzes.map((quiz) => {
-              const status = statusConfig[quiz.status];
-              const StatusIcon = status.icon;
+              const config = statusConfig[quiz.status] || statusConfig.pending;
+              const StatusIcon = config.icon;
               const isDone = quiz.status === "done";
               const isPending = quiz.status === "pending";
               const isMissed = quiz.status === "missed";
@@ -286,11 +491,16 @@ const StudentAllQuizzes = () => {
                     <div className="all-quizzes-item-head">
                       <div>
                         <h3>{quiz.title}</h3>
-
                         <div className="all-quizzes-item-meta">
                           <span>{quiz.course?.name}</span>
+                          {quiz.content?.title && (
+                            <>
+                              <span className="all-quizzes-dot">&middot;</span>
+                              <span>{quiz.content.title.split(":")[0]}</span>
+                            </>
+                          )}
                           <span className="all-quizzes-dot">&middot;</span>
-                          <span>{quiz.lecture?.title?.split(":")[0]}</span>
+                          <span>{quiz.question_count} questions</span>
                         </div>
                       </div>
 
@@ -299,18 +509,25 @@ const StudentAllQuizzes = () => {
                           <div
                             className="all-quizzes-score-ring"
                             style={{
-                              background: `conic-gradient(${scoreColor(quiz.score)} ${Math.round(quiz.score * 3.6)}deg, #151515 0deg)`,
+                              background: `conic-gradient(${scoreColor(
+                                quiz.score
+                              )} ${Math.round(quiz.score * 3.6)}deg, #151515 0deg)`,
                             }}
                           >
-                            <div className="all-quizzes-score-ring-inner" style={{ color: scoreColor(quiz.score) }}>
+                            <div
+                              className="all-quizzes-score-ring-inner"
+                              style={{ color: scoreColor(quiz.score) }}
+                            >
                               {quiz.score}
                             </div>
                           </div>
                         )}
 
-                        <div className={`all-quizzes-status-pill status-${quiz.status}`}>
+                        <div
+                          className={`all-quizzes-status-pill status-${quiz.status}`}
+                        >
                           <StatusIcon size={11} />
-                          <span>{status.label}</span>
+                          <span>{config.label}</span>
                         </div>
                       </div>
                     </div>
@@ -318,20 +535,31 @@ const StudentAllQuizzes = () => {
                     <div className="all-quizzes-item-foot">
                       {isDone && quiz.score !== null && (
                         <div className="all-quizzes-score-note">
-                          <FiStar size={12} style={{ color: scoreColor(quiz.score) }} />
-                          <span style={{ color: scoreColor(quiz.score) }}>{scoreLabel(quiz.score)}</span>
-                          <small>{quiz.score}/100</small>
+                          <FiStar
+                            size={12}
+                            style={{ color: scoreColor(quiz.score) }}
+                          />
+                          <span style={{ color: scoreColor(quiz.score) }}>
+                            {scoreLabel(quiz.score)}
+                          </span>
+                          <small>{quiz.score}%</small>
                         </div>
                       )}
 
-                      {isPending && (
-                        <button type="button" className="all-quizzes-start-btn">
-                          Start Quiz
+                      {(isPending || isDone) && (
+                        <button
+                          type="button"
+                          className="all-quizzes-start-btn"
+                          onClick={() => openQuiz(quiz)}
+                        >
+                          {isDone ? "View Result" : "Start Quiz"}
                         </button>
                       )}
 
                       {isMissed && (
-                        <p className="all-quizzes-note-missed">Quiz window closed</p>
+                        <p className="all-quizzes-note-missed">
+                          Quiz window closed
+                        </p>
                       )}
                     </div>
                   </div>

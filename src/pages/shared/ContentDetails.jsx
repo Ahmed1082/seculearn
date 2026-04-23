@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
+import { getQuizzesList } from "../../app/quizApi";
 import {
   FiAlignLeft,
   FiArrowLeft,
@@ -290,6 +291,65 @@ const sanitizeQuizNumber = (value, min, max, fallback) => {
   return Math.min(max, Math.max(min, numericValue));
 };
 
+const toNumberOrNull = (value) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : null;
+};
+
+const normalizeQuizStatus = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+
+  if (
+    normalized === "done" ||
+    normalized === "completed" ||
+    normalized === "complete" ||
+    normalized === "submitted"
+  ) {
+    return "done";
+  }
+
+  if (
+    normalized === "missed" ||
+    normalized === "expired" ||
+    normalized === "closed"
+  ) {
+    return "missed";
+  }
+
+  return "pending";
+};
+
+const mapApiQuizToCard = (quiz) => ({
+  id: String(quiz?.id || ""),
+  apiId: quiz?.id || null,
+  title: quiz?.title || `Quiz ${quiz?.id || ""}`,
+  timeLimit:
+    toNumberOrNull(quiz?.duration_minutes) ??
+    toNumberOrNull(quiz?.time_limit) ??
+    30,
+  passingScore: toNumberOrNull(quiz?.passing_percentage) ?? 60,
+  questionCount:
+    toNumberOrNull(quiz?.questions_count) ??
+    toNumberOrNull(quiz?.question_count) ??
+    (Array.isArray(quiz?.questions) ? quiz.questions.length : 0),
+  shuffleQuestions:
+    Boolean(quiz?.shuffleQuestions) || Boolean(quiz?.shuffle_questions),
+  shuffleOptions:
+    Boolean(quiz?.shuffleOptions) || Boolean(quiz?.shuffle_options),
+  showResults:
+    typeof quiz?.showResults === "boolean"
+      ? quiz.showResults
+      : typeof quiz?.show_results === "boolean"
+        ? quiz.show_results
+        : true,
+  status: normalizeQuizStatus(quiz?.status),
+  score:
+    toNumberOrNull(quiz?.score) ??
+    toNumberOrNull(quiz?.percentage) ??
+    null,
+  questions: Array.isArray(quiz?.questions) ? quiz.questions : [],
+});
+
 const readFileAsDataUrl = (file) =>
   new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -507,6 +567,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const [quizForm, setQuizForm] = useState(getDefaultQuizForm());
   const [quizDialogMode, setQuizDialogMode] = useState("create");
   const [quizEditingId, setQuizEditingId] = useState(null);
+  const [isLoadingQuizzes, setIsLoadingQuizzes] = useState(false);
+  const [quizLoadError, setQuizLoadError] = useState("");
   const [isFetchingSectionAssignments, setIsFetchingSectionAssignments] =
     useState(false);
   const [sectionAssignmentsError, setSectionAssignmentsError] = useState("");
@@ -667,26 +729,42 @@ const ContentDetails = ({ role = "lecturer" }) => {
     }));
   }, [isSectionView, lectureId, lectureTitleFromState, stateSectionTitle]);
 
+  // Fetch quizzes from backend (API #40)
   useEffect(() => {
-    const applyStoredQuizzes = () => {
-      const storedQuizzes = readStoredQuizzes(quizStorageKey);
+    if (!contentApiId) return;
 
-      setLectureData((prev) => ({
-        ...prev,
-        quizzes: mergeStoredQuizzes(prev.quizzes, storedQuizzes),
-      }));
+    const fetchQuizzes = async () => {
+      setIsLoadingQuizzes(true);
+      setQuizLoadError("");
+
+      try {
+        const response = await getQuizzesList(
+          isSectionView
+            ? { section_id: contentApiId }
+            : { lecture_id: contentApiId },
+          token
+        );
+
+        const raw = Array.isArray(response?.quizzes)
+          ? response.quizzes
+          : Array.isArray(response)
+            ? response
+            : [];
+
+        const normalized = raw.map(mapApiQuizToCard);
+
+        setLectureData((prev) => ({ ...prev, quizzes: normalized }));
+        setIsLoadingQuizzes(false);
+      } catch (error) {
+        setLectureData((prev) => ({ ...prev, quizzes: [] }));
+        setQuizLoadError(error.message || "Failed to load quizzes.");
+        setIsLoadingQuizzes(false);
+        // silently ignore — quiz list section will just be empty
+      }
     };
 
-    applyStoredQuizzes();
-
-    const handleStorageUpdate = (event) => {
-      if (event.key !== quizStorageKey) return;
-      applyStoredQuizzes();
-    };
-
-    window.addEventListener("storage", handleStorageUpdate);
-    return () => window.removeEventListener("storage", handleStorageUpdate);
-  }, [quizStorageKey]);
+    fetchQuizzes();
+  }, [contentApiId, isSectionView, token]);
 
   useEffect(() => {
     if (shouldUseUploadsApi) {
@@ -970,8 +1048,15 @@ const ContentDetails = ({ role = "lecturer" }) => {
     return "pending";
   };
 
+  const getPersonalQuizStatus = (quiz) => {
+    if (quiz?.status) return normalizeQuizStatus(quiz.status);
+    if (quiz?.doneStudentIds?.includes(currentStudentId)) return "done";
+    if (quiz?.missedStudentIds?.includes(currentStudentId)) return "missed";
+    return "pending";
+  };
+
   const getPersonalQuizScore = (quiz) =>
-    quiz.results?.[currentStudentId] ?? null;
+    quiz?.score ?? quiz?.results?.[currentStudentId] ?? null;
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1131,6 +1216,12 @@ const ContentDetails = ({ role = "lecturer" }) => {
       }
 
       if (type === "quiz") {
+        // fire-and-forget API delete
+        axios
+          .delete(`${API_BASE_URL}/api/delete-quiz/${id}`, {
+            headers: buildApiHeaders(token),
+          })
+          .catch(() => {});
         return {
           ...prev,
           quizzes: prev.quizzes.filter((quiz) => quiz.id !== id),
@@ -1520,9 +1611,17 @@ const ContentDetails = ({ role = "lecturer" }) => {
     closeQuizDialog();
   };
 
-  const deleteQuizFromDialog = () => {
+  const deleteQuizFromDialog = async () => {
     if (!canManageLecture) return;
     if (quizDialogMode !== "edit" || !quizEditingId) return;
+
+    try {
+      await axios.delete(`${API_BASE_URL}/api/delete-quiz/${quizEditingId}`, {
+        headers: buildApiHeaders(token),
+      });
+    } catch {
+      // silently ignore — remove from UI regardless
+    }
 
     setLectureData((prev) => ({
       ...prev,
@@ -2055,6 +2154,14 @@ const ContentDetails = ({ role = "lecturer" }) => {
             open={openSections.quizzes}
             onToggle={toggleSection}
           >
+            {quizLoadError && (
+              <p className="lecture-content-hint">{quizLoadError}</p>
+            )}
+
+            {isLoadingQuizzes && (
+              <p className="lecture-content-hint">Loading quizzes...</p>
+            )}
+
             <div className="lecture-details-card-list">
               {lectureData.quizzes.map((quiz) => {
                 const contentBasePath = `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}`;
@@ -2069,13 +2176,13 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     onClick={role === "student" ? () => navigate(studentExamPath) : undefined}
                   >
                     {(() => {
-                      const personalStatus = getPersonalStatus(quiz);
+                      const personalStatus = getPersonalQuizStatus(quiz);
                       const personalStatusLabel =
                         personalStatus === "done"
-                          ? "Done"
+                          ? "Completed"
                           : personalStatus === "missed"
                             ? "Missed"
-                            : "Pending";
+                            : "Upcoming";
                       const personalScore = getPersonalQuizScore(quiz);
 
                       return (
@@ -2116,20 +2223,31 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     {canManageLecture ? (
                       <div className="lecture-details-status-row">
                         <p className="status done">
-                          <FiCheckCircle />
-                          <strong>Done:</strong>
-                          <span>{getNames(quiz.doneStudentIds)}</span>
+                          <FiHash />
+                          <strong>Questions:</strong>
+                          <span>{quiz.questionCount || 0}</span>
                         </p>
                         <p className="status missed">
-                          <FiMinusCircle />
-                          <strong>Missed:</strong>
-                          <span>{getNames(quiz.missedStudentIds)}</span>
+                          <FiClock />
+                          <strong>Time:</strong>
+                          <span>
+                            {quiz.timeLimit || 30} min
+                            {Number(quiz.passingScore) > 0
+                              ? ` • Pass ${quiz.passingScore}%`
+                              : ""}
+                          </span>
                         </p>
                       </div>
                     ) : (
                       <div className="lecture-details-student-status-row">
                         <span className={`lecture-details-student-pill ${personalStatus}`}>
-                          {personalStatus === "done" ? <FiCheckCircle /> : <FiClock />}
+                          {personalStatus === "done" ? (
+                            <FiCheckCircle />
+                          ) : personalStatus === "missed" ? (
+                            <FiMinusCircle />
+                          ) : (
+                            <FiClock />
+                          )}
                           {personalStatusLabel}
                         </span>
                       </div>
