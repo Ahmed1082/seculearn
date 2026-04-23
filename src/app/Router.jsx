@@ -8,6 +8,8 @@ import StudentLayout from "../layouts/StudentLayout";
 import AssignmentReview from "../pages/shared/AssignmentReview";
 import AddQuiz from "../pages/shared/AddQuiz";
 import QuizReview from "../pages/shared/QuizReview";
+import CTFCreate from "../pages/shared/CTFCreate";
+import CTFReview from "../pages/shared/CTFReview";
 
 import Welcome from "../pages/public/Welcome";
 import Login from "../pages/public/Login";
@@ -36,6 +38,7 @@ import StudentSubmitAssignment from "../pages/student/SubmitAssignment";
 import StudentAllAssignments from "../pages/student/AllAssignments";
 import StudentAllQuizzes from "../pages/student/AllQuizzes";
 import StudentMembers from "../pages/student/Members";
+import CTFPage from "../pages/student/CTFPage";
 
 const Router = () => (
   <Routes>
@@ -66,6 +69,8 @@ const Router = () => (
       <Route path="/lecturer/members" element={<LecturerMembers />} />
     
       <Route path="/lecturer/assignmentreview/:assignmentId" element={<AssignmentReview />} />
+      <Route path="/lecturer/courses/:courseId/ctf/create" element={<CTFCreate />} />
+      <Route path="/lecturer/courses/:courseId/ctf/:ctfId" element={<CTFReview />} />
     </Route>
 
     {/* ================= TA ================= */}
@@ -91,6 +96,8 @@ const Router = () => (
       <Route path="/ta/members" element={<TAMembers />} />
 
       <Route path="/ta/assignmentreview/:assignmentId" element={<AssignmentReview />} />
+      <Route path="/ta/courses/:courseId/ctf/create" element={<CTFCreate />} />
+      <Route path="/ta/courses/:courseId/ctf/:ctfId" element={<CTFReview />} />
     </Route>
 
     {/* ================= Student ================= */}   
@@ -104,12 +111,10 @@ const Router = () => (
       {/* Lecture Content */}
       <Route path="/student/courses/:courseId/lecture/:lectureId" element={<StudentContentDetails />} />
       <Route path="/student/courses/:courseId/lecture/:lectureId/exam/:quizId" element={<StudentExamPage />} />
-      {/* <Route path="/student/courses/:courseId/lecture/:lectureId/quizreview/:quizId" element={<QuizReview role="student" />} /> */}
 
       {/* Section Content */}
       <Route path="/student/courses/:courseId/section/:sectionId" element={<StudentContentDetails />} />
       <Route path="/student/courses/:courseId/section/:sectionId/exam/:quizId" element={<StudentExamPage />} />
-      {/* <Route path="/student/courses/:courseId/section/:sectionId/quizreview/:quizId" element={<QuizReview role="student" />} /> */}
 
       {/* Submit Assignment */}
       <Route
@@ -126,6 +131,7 @@ const Router = () => (
       <Route path="/student/allAssignments" element={<StudentAllAssignments />} />
       <Route path="/student/allQuizzes" element={<StudentAllQuizzes />} />
       <Route path="/student/members" element={<StudentMembers />} />
+      <Route path="/student/courses/:courseId/ctf/:ctfId" element={<CTFPage />} />
     </Route>
 
   </Routes>

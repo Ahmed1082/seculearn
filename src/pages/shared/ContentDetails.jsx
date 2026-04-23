@@ -105,7 +105,6 @@ const getDefaultAssignmentForm = () => ({
   maxScore: 100,
   files: [],
   closeSubmissionsAfterDueDate: false,
-  acceptingSubmissions: true,
 });
 
 const getDefaultQuizForm = () => ({
@@ -147,13 +146,6 @@ const normalizeAssignmentSettings = (settings = {}) => ({
       "close_submissions_after_due_date",
       "close_on_deadline"
     ) ?? false,
-  acceptingSubmissions:
-    readBooleanValue(
-      settings,
-      "acceptingSubmissions",
-      "accepting_submissions",
-      "is_accepting"
-    ) ?? true,
   dueDate:
     typeof settings?.dueDate === "string"
       ? settings.dueDate
@@ -970,12 +962,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
           "close_on_deadline",
           "close_submissions_after_due_date"
         ) ?? storedSettings.closeSubmissionsAfterDueDate,
-      acceptingSubmissions:
-        readBooleanValue(
-          assignment,
-          "is_accepting",
-          "accepting_submissions"
-        ) ?? storedSettings.acceptingSubmissions,
       attachments: attachmentPath
         ? [
             {
@@ -1432,10 +1418,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
           assignmentForm.closeSubmissionsAfterDueDate ? 1 : 0
         );
         formData.append(
-          "is_accepting",
-          assignmentForm.acceptingSubmissions ? 1 : 0
-        );
-        formData.append(
           "due_date",
           assignmentForm.dueDate ? toApiDateTime(assignmentForm.dueDate) : ""
         );
@@ -1468,10 +1450,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
             closeSubmissionsAfterDueDate:
               assignmentForm.closeSubmissionsAfterDueDate,
             dueDate: assignmentForm.dueDate,
-            acceptingSubmissions:
-              assignmentForm.acceptingSubmissions ??
-              currentStoredSettings.acceptingSubmissions ??
-              true,
           });
         } else {
           formData.append(assignmentOwnerField, String(contentApiId));
@@ -1492,8 +1470,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
               closeSubmissionsAfterDueDate:
                 assignmentForm.closeSubmissionsAfterDueDate,
               dueDate: assignmentForm.dueDate,
-              acceptingSubmissions:
-                assignmentForm.acceptingSubmissions ?? true,
             });
           }
         }
@@ -1513,8 +1489,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
               closeSubmissionsAfterDueDate:
                 assignmentForm.closeSubmissionsAfterDueDate,
               dueDate: assignmentForm.dueDate,
-              acceptingSubmissions:
-                createdAssignment.acceptingSubmissions ?? true,
             });
           }
         }
@@ -1535,7 +1509,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
       closeSubmissionsAfterDueDate:
         assignmentForm.closeSubmissionsAfterDueDate,
       dueDate: assignmentForm.dueDate,
-      acceptingSubmissions: assignmentForm.acceptingSubmissions ?? true,
     });
 
     setLectureData((prev) => ({
@@ -1550,7 +1523,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
           maxScore: Number(assignmentForm.maxScore) || 100,
           closeSubmissionsAfterDueDate:
             assignmentForm.closeSubmissionsAfterDueDate,
-          acceptingSubmissions: assignmentForm.acceptingSubmissions ?? true,
           attachments: assignmentForm.files.map((file) => ({
             name: file.name,
             url: file.url,
@@ -1960,8 +1932,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           dueDate: assignment.dueDate || "",
                           closeSubmissionsAfterDueDate:
                             !!assignment.closeSubmissionsAfterDueDate,
-                          acceptingSubmissions:
-                            assignment.acceptingSubmissions ?? true,
                         }
                       });
                     } else if (role === "ta") {
@@ -1977,8 +1947,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           dueDate: assignment.dueDate || "",
                           closeSubmissionsAfterDueDate:
                             !!assignment.closeSubmissionsAfterDueDate,
-                          acceptingSubmissions:
-                            assignment.acceptingSubmissions ?? true,
                         },
                       });
                     }

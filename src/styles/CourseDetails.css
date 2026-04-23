@@ -11,7 +11,7 @@
 }
 
 .course-header h1 {
-  font-size: 25px;
+  font-size: 30px;
   font-weight: 800;
   background: linear-gradient(180deg, #186EB4, #54F4FC);
   background-clip: text;
@@ -29,6 +29,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
+  margin-right: 10px;
   background: linear-gradient(90deg, #186EB4, #54F4FC);
   transition: 0.25s ease;
 }
@@ -279,4 +280,207 @@
 @keyframes scaleIn {
   from { transform: scale(0.9); opacity: 0 }
   to { transform: scale(1); opacity: 1 }
+}
+
+/* ================= CTF ================= */
+
+.ctf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(350px, 600px));
+  gap: 30px;
+  justify-content: center; /* 🔥 ده الحل */
+}
+
+.ctf-card {
+  background: linear-gradient(145deg, #0f1c2d, #142a44);
+  border: 1px solid #1e293b;
+  padding: 22px; /* 🔥 أكبر شوية */
+  border-radius: 16px;
+  transition: 0.3s ease;
+  cursor: pointer;
+}
+
+.ctf-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+}
+
+/* ✅ لما يتحل */
+.ctf-card.solved {
+  border: 1px solid #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+/* ================= HEADER ================= */
+
+.ctf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center; /* 🔥 مش flex-start */
+  margin-bottom: 8px;
+}
+
+.ctf-header h3 {
+  font-size: 18px;
+  color: white;
+}
+
+.points {
+  color: #38bdf8;
+  font-weight: bold;
+}
+
+/* ================= DESCRIPTION ================= */
+
+.ctf-desc {
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+/* ================= FOOTER ================= */
+
+.ctf-footer {
+  margin-top: 12px;
+}
+
+/* .difficulty {
+  font-size: 13px;
+  color: #facc15;
+} */
+
+/* ================= BUTTON ================= */
+
+.open-btn {
+  border: none;
+  background: transparent;
+  color: #38bdf8;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.open-btn:hover {
+  text-decoration: underline;
+}
+
+/* ================= SOLVED ================= */
+
+/* .solved-text {
+  color: #22c55e;
+  font-weight: bold;
+} */
+
+.instructor-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* ================= CTF HEADER ROW ================= */
+.ctf-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+/* ================= BIG CTF BOX ================= */
+
+.ctf-block-title {
+  width: 220px;      /* 🔥 كبر العرض */
+  height: 70px;      /* 🔥 كبر الارتفاع */
+}
+
+/* ===== CTF UPGRADE ===== */
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* BADGE */
+
+.badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.easy {
+  background: rgba(34,197,94,0.2);
+  color: #22c55e;
+}
+
+.badge.medium {
+  background: rgba(250,204,21,0.2);
+  color: #facc15;
+}
+
+.badge.hard {
+  background: rgba(239,68,68,0.2);
+  color: #ef4444;
+}
+
+/* CATEGORY */
+
+.ctf-category {
+  color: #64748b;
+  font-size: 13px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+}
+
+/* SOLVES */
+
+.solves {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+/* FLAG */
+
+.flag {
+  color: #22c55e;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+/* ===== STUDENT VIEW ===== */
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+/* hint لوحده */
+.hint-row {
+  margin-bottom: 6px;
+}
+
+/* الصف الأخير */
+.bottom-row {
+  margin-top: 4px;
+}
+
+/* hint */
+.hint {
+  color: #38bdf8;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hint:hover {
+  text-decoration: underline;
+}
+
+/* completed */
+.completed {
+  color: #22c55e;
+  font-size: 13px;
+  font-weight: 600;
 }
