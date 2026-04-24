@@ -1,0 +1,274 @@
+.ctfr-container {
+  min-height: 100vh;
+  background-color: #090e17;
+  color: #f8fafc;
+  padding: 2.5rem 4rem;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.ctfr-layout {
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.ctfr-back-btn {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 1.5rem;
+  padding: 0;
+  transition: color 0.2s;
+}
+.ctfr-back-btn:hover {
+  color: #f8fafc;
+}
+
+.ctfr-card {
+  background-color: #101726;
+  border: 1px solid #1e293b;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  margin-bottom: 1.5rem;
+}
+
+/* Header section */
+.ctfr-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.ctfr-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.ctfr-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ctfr-icon-box {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: rgba(0, 184, 217, 0.1);
+  border: 1px solid rgba(0, 184, 217, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ctfr-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  color: #f8fafc;
+}
+
+.ctfr-points-box {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.ctfr-points-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #00b8d9;
+}
+.ctfr-points-label {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+/* Badges */
+.ctfr-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.ctfr-badge-easy {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.ctfr-badge-medium {
+  background-color: rgba(234, 179, 8, 0.1);
+  color: #eab308;
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+.ctfr-badge-hard {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.ctfr-badge-outline {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  background: transparent;
+}
+
+/* Content */
+.ctfr-desc {
+  color: #94a3b8;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+}
+
+.ctfr-hint {
+  background-color: rgba(0, 184, 217, 0.05);
+  border: 1px solid rgba(0, 184, 217, 0.2);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+.ctfr-hint p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #00b8d9;
+  font-style: italic;
+}
+
+/* Flag Reveal */
+.ctfr-reveal-row {
+  display: flex;
+  align-items: center;
+}
+.ctfr-reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  color: #00b8d9;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.ctfr-reveal-btn:hover {
+  text-decoration: underline;
+}
+
+.ctfr-flag-code {
+  font-family: monospace;
+  background-color: rgba(0, 184, 217, 0.1);
+  color: #00b8d9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+  margin-left: 0.75rem;
+}
+
+/* Solved Grids */
+.ctfr-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 768px) {
+  .ctfr-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.ctfr-solved-card {
+  background-color: rgba(34, 197, 94, 0.03);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.ctfr-unsolved-card {
+  background-color: #101726;
+  border: 1px solid #1e293b;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.ctfr-box-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.ctfr-box-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.ctfr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ctfr-student-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: rgba(255, 255, 255, 0.02);
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+}
+
+.ctfr-student-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ctfr-avatar-solved {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background-color: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: #22c55e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ctfr-avatar-unsolved {
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background-color: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.ctfr-student-name {
+  font-size: 0.9rem;
+  color: #f8fafc;
+}
+.ctfr-student-id {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-family: monospace;
+}
