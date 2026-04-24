@@ -485,7 +485,20 @@ const CourseDetails = ({ role }) => {
                   </span>
                 </div>
 
-                <span className="points">🏆 {ctf.points} pts</span>
+                <div className="points-row">
+                  <span className="points">🏆 {ctf.points} pts</span>
+                  {permissions.canManageCTF && (
+                    <button
+                      className="ctf-edit-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/${role}/courses/${courseId}/ctf/edit/${ctf.id}`);
+                      }}
+                    >
+                      <FaEdit />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <p className="ctf-category">Network Security</p>

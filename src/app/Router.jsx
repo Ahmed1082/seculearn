@@ -70,6 +70,7 @@ const Router = () => (
     
       <Route path="/lecturer/assignmentreview/:assignmentId" element={<AssignmentReview />} />
       <Route path="/lecturer/courses/:courseId/ctf/create" element={<CTFCreate />} />
+      <Route path="/lecturer/courses/:courseId/ctf/edit/:ctfId" element={<CTFCreate />} />
       <Route path="/lecturer/courses/:courseId/ctf/:ctfId" element={<CTFReview />} />
     </Route>
 
@@ -97,6 +98,7 @@ const Router = () => (
 
       <Route path="/ta/assignmentreview/:assignmentId" element={<AssignmentReview />} />
       <Route path="/ta/courses/:courseId/ctf/create" element={<CTFCreate />} />
+      <Route path="/ta/courses/:courseId/ctf/edit/:ctfId" element={<CTFCreate />} />
       <Route path="/ta/courses/:courseId/ctf/:ctfId" element={<CTFReview />} />
     </Route>
 
