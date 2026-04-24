@@ -4,6 +4,7 @@ import { FaTrash, FaEdit } from "react-icons/fa";
 import "../../styles/CourseDetails.css";
 import AddItemModal from "../../components/AddItemModal";
 import axios from "axios";
+import { ctfChallenges } from "../../data/ctfChallenges";
 
 const CourseDetails = ({ role }) => {
   const { courseId } = useParams();
@@ -19,26 +20,7 @@ const CourseDetails = ({ role }) => {
   const [course, setCourse] = useState(null);
   const [lectures, setLectures] = useState([]);
   const [sections, setSections] = useState([]);
-  const [ctfs, setCtfs] = useState([
-    {
-      id: 1,
-      title: "Hidden in Plain Sight",
-      description: "Analyze PCAP file",
-      difficulty: "Easy",
-      points: 100,
-      solved: true,
-      flag: "pcap_master_2024"
-    },
-    {
-      id: 2,
-      title: "Firewall Bypass",
-      description: "Bypass firewall rules",
-      difficulty: "Medium",
-      points: 250,
-      solved: false,
-      flag: "firewall_bypass_2024"
-    },
-  ]);
+  const [ctfs, setCtfs] = useState(ctfChallenges);
 
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
@@ -472,6 +454,8 @@ const CourseDetails = ({ role }) => {
               onClick={() => {
                 if (permissions.canManageCTF) {
                   navigate(`/${role}/courses/${courseId}/ctf/${ctf.id}`);
+                } else {
+                  navigate(`/student/courses/${courseId}/ctf/${ctf.id}`);
                 }
               }}
               style={{ cursor: "pointer" }}
@@ -488,10 +472,10 @@ const CourseDetails = ({ role }) => {
                 <span className="points">🏆 {ctf.points} pts</span>
               </div>
 
-              <p className="ctf-category">Network Security</p>
+              <p className="ctf-category">{ctf.category || "Network Security"}</p>
 
               <p className="ctf-desc">
-                Find a way to bypass the misconfigured firewall rules and access the restricted endpoint.
+                {ctf.description || ctf.shortDescription}
               </p>
 
               <div className="ctf-footer">
