@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   createQuiz,
   getQuizzesList,
-  getQuizById,
+  getQuizForEdit,
   updateQuiz,
   deleteQuiz as apiDeleteQuiz,
 } from "../../app/quizApi";
@@ -285,50 +285,13 @@ const AddQuiz = ({ role = "lecturer" }) => {
       return;
     }
 
-    if (routeQuiz) {
-      applyQuizData(routeQuiz);
-    }
-
     const fetchQuizDetails = async () => {
       setIsLoadingQuiz(true);
-      if (!routeQuiz) {
-        setStatusMessage("Loading quiz details...");
-      }
+      setStatusMessage("Loading quiz details...");
 
       try {
-        const response = await getQuizzesList(
-          sectionId ? { section_id: sectionId } : { lecture_id: lectureId },
-          token
-        );
-
-        if (isCancelled) return;
-
-        const rawQuizzes =
-          (Array.isArray(response?.quizzes) && response.quizzes) ||
-          (Array.isArray(response?.data) && response.data) ||
-          (Array.isArray(response?.quizzes_list) && response.quizzes_list) ||
-          (Array.isArray(response?.quizzesList) && response.quizzesList) ||
-          (Array.isArray(response) ? response : []);
-        const matchedQuiz = rawQuizzes.find(
-          (quiz) => String(quiz?.id) === String(editingQuizId)
-        );
-
-        if (!matchedQuiz) {
-          setIsEditingQuizLoaded(false);
-          setStatusMessage("Could not find this quiz in the API response.");
-          return;
-        }
-
-        // `/get-quizzes-list` is often summary-only (no questions). If so, try loading full details.
-        const applied = applyQuizData(matchedQuiz);
-        if (!applied) {
-          try {
-            const detailed = unwrapApiData(await getQuizById(editingQuizId, token));
-            applyQuizData(detailed);
-          } catch {
-            // Keep the existing "editing disabled" message.
-          }
-        }
+        const detailed = unwrapApiData(await getQuizForEdit(editingQuizId, token));
+        applyQuizData(detailed);
       } catch (error) {
         if (isCancelled) return;
         setIsEditingQuizLoaded(false);

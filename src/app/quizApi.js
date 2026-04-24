@@ -124,6 +124,10 @@ export async function getQuizzesList({ lecture_id, section_id } = {}, token) {
   });
 }
 
+export async function getQuizForEdit(id, token) {
+  return requestQuizApi(`/get-quiz-for-edit/${id}`, { token });
+}
+
 // Attempts to load a single quiz with its questions/options for editing.
 // Backends differ in route naming, so we try a small set of common endpoints.
 export async function getQuizById(id, token) {
