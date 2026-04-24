@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   createQuiz,
   getQuizzesList,
+  getQuizById,
   updateQuiz,
   deleteQuiz as apiDeleteQuiz,
 } from "../../app/quizApi";
@@ -168,6 +169,7 @@ const AddQuiz = ({ role = "lecturer" }) => {
   const isEditingQuiz = Boolean(editingQuizId);
 
   const token = localStorage.getItem("token");
+  const unwrapApiData = (payload) => payload?.data ?? payload;
 
   const initialQuestions = useMemo(() => getInitialQuestions(), []);
   const [title, setTitle] = useState("");
@@ -317,7 +319,16 @@ const AddQuiz = ({ role = "lecturer" }) => {
           return;
         }
 
-        applyQuizData(matchedQuiz);
+        // `/get-quizzes-list` is often summary-only (no questions). If so, try loading full details.
+        const applied = applyQuizData(matchedQuiz);
+        if (!applied) {
+          try {
+            const detailed = unwrapApiData(await getQuizById(editingQuizId, token));
+            applyQuizData(detailed);
+          } catch {
+            // Keep the existing "editing disabled" message.
+          }
+        }
       } catch (error) {
         if (isCancelled) return;
         setIsEditingQuizLoaded(false);

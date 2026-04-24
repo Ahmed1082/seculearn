@@ -67,16 +67,18 @@ const ExamPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const timerRef = useRef(null);
 
+  const unwrapApiData = (payload) => payload?.data ?? payload;
+
   // ── start quiz (API #45) ────────────────────────────────
   const startQuiz = useCallback(async () => {
     setLoadState("loading");
     setErrorMsg("");
     try {
-      const data = await apiStartQuiz(quizId, token);
+      const data = unwrapApiData(await apiStartQuiz(quizId, token));
       const rawQuestions = data.questions || [];
       const normalized = rawQuestions.map(normalizeApiQuestion);
       setQuizMeta({
-        title: data.title || `Quiz ${quizId}`,
+        title: data.quiz_title || data.title || `Quiz ${quizId}`,
         duration_minutes: data.duration_minutes || 30,
         passing_percentage: data.passing_percentage || 60,
       });
@@ -100,7 +102,7 @@ const ExamPage = () => {
   const loadMyResult = useCallback(async () => {
     setLoadState("loading");
     try {
-      const data = await getMyQuizResult(quizId, token);
+      const data = unwrapApiData(await getMyQuizResult(quizId, token));
       setMyResult(data);
       setLoadState("result");
     } catch (err) {

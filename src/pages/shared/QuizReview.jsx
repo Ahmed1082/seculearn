@@ -47,6 +47,8 @@ const QuizReview = ({ role = "lecturer" }) => {
 
   const token = localStorage.getItem("token");
 
+  const unwrapApiData = (payload) => payload?.data ?? payload;
+
   // ── state ───────────────────────────────────────────────
   const [loadState, setLoadState] = useState("loading"); // loading | ready | error
   const [errorMsg, setErrorMsg] = useState("");
@@ -61,7 +63,7 @@ const QuizReview = ({ role = "lecturer" }) => {
     setLoadState("loading");
     setErrorMsg("");
     try {
-      const data = await getQuizResultsDashboard(quizId, token);
+      const data = unwrapApiData(await getQuizResultsDashboard(quizId, token));
       setDashboard(data);
       setLoadState("ready");
     } catch (err) {
@@ -81,7 +83,9 @@ const QuizReview = ({ role = "lecturer" }) => {
       setDetailError("");
       setStudentDetail(null);
       try {
-        const data = await getStudentQuizDetails(quizId, studentId, token);
+        const data = unwrapApiData(
+          await getStudentQuizDetails(quizId, studentId, token)
+        );
         setStudentDetail(data);
       } catch (err) {
         setDetailError(err.message || "Failed to load student details.");
@@ -100,13 +104,14 @@ const QuizReview = ({ role = "lecturer" }) => {
   // ── derived data from dashboard ────────────────────────
   const stats = useMemo(() => {
     if (!dashboard) return null;
+    const s = dashboard.stats || dashboard.statistics || null;
     return {
-      completed: dashboard.completed ?? dashboard.done ?? 0,
-      missed: dashboard.missed ?? 0,
-      pending: dashboard.pending ?? 0,
-      average: dashboard.average ?? dashboard.avg_score ?? null,
-      high: dashboard.high ?? dashboard.highest_score ?? null,
-      low: dashboard.low ?? dashboard.lowest_score ?? null,
+      completed: s?.completed ?? dashboard.completed ?? dashboard.done ?? 0,
+      missed: s?.missed ?? dashboard.missed ?? 0,
+      pending: s?.pending ?? dashboard.pending ?? 0,
+      average: s?.average ?? dashboard.average ?? dashboard.avg_score ?? null,
+      high: s?.high ?? dashboard.high ?? dashboard.highest_score ?? null,
+      low: s?.low ?? dashboard.low ?? dashboard.lowest_score ?? null,
     };
   }, [dashboard]);
 
@@ -135,7 +140,12 @@ const QuizReview = ({ role = "lecturer" }) => {
   // ── student detail derived ──────────────────────────────
   const detailQuestions = useMemo(() => {
     if (!studentDetail) return [];
-    return (studentDetail.questions || studentDetail.answers || []).map((item, i) => ({
+    const raw =
+      studentDetail.details ||
+      studentDetail.questions ||
+      studentDetail.answers ||
+      [];
+    return raw.map((item, i) => ({
       id: String(item.question_id || item.id || i),
       text: item.question_text || item.text || "",
       options: (item.options || []).map((opt) => ({

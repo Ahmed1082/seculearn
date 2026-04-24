@@ -124,6 +124,30 @@ export async function getQuizzesList({ lecture_id, section_id } = {}, token) {
   });
 }
 
+// Attempts to load a single quiz with its questions/options for editing.
+// Backends differ in route naming, so we try a small set of common endpoints.
+export async function getQuizById(id, token) {
+  const candidates = [
+    `/quiz/${id}`,
+    `/quizzes/${id}`,
+    `/get-quiz/${id}`,
+    `/get-quiz-details/${id}`,
+    `/quiz-details/${id}`,
+    `/quiz/${id}/details`,
+  ];
+
+  let lastError = null;
+  for (const path of candidates) {
+    try {
+      return await requestQuizApi(path, { token });
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Failed to load quiz details.");
+}
+
 export async function getQuizResultsDashboard(id, token) {
   return requestQuizApi(`/quiz-results-dashboard/${id}`, { token });
 }
