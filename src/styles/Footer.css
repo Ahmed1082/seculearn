@@ -27,10 +27,11 @@
 
 .footer-right {
   display: flex;
-  gap: 15px;
+  align-items: center;
+  gap: 14px;
 }
 
-.icon {
+.footer-right .icon {
   width: 32px;
   height: 32px;
   border: 1px solid #00e5ff;
@@ -42,9 +43,16 @@
   font-size: 15px;
   cursor: pointer;
   transition: 0.3s ease;
+  flex: 0 0 32px;
+  text-decoration: none;
 }
 
-.icon:hover {
+.footer-right .icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.footer-right .icon:hover {
   background-color: #00e5ff;
   color: #0A0A0A;
   transform: scale(1.1);

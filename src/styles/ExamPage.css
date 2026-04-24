@@ -705,8 +705,29 @@
 }
 
 .exam-option-text {
+  flex: 1;
+  min-width: 0;
   font-size: 0.88rem;
   line-height: 1.55;
+}
+
+.exam-option-review-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--exam-accent-end);
+  padding: 4px 9px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.exam-option-row.is-selected-wrong .exam-option-review-badge {
+  border-color: rgba(255, 142, 161, 0.34);
+  background: rgba(255, 142, 161, 0.1);
+  color: var(--exam-danger);
 }
 
 .exam-explanation {

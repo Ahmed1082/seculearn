@@ -6,9 +6,7 @@ import {
   FiAward,
   FiCheckCircle,
   FiClock,
-  FiHash,
   FiHelpCircle,
-  FiTarget,
   FiXCircle,
 } from "react-icons/fi";
 import "../../styles/ExamPage.css";
@@ -18,15 +16,6 @@ const scoreColor = (score) => {
   if (score >= 75) return "#7fe1ff";
   if (score >= 60) return "#c084fc";
   return "#ff8ea1";
-};
-
-const shuffleArray = (items = []) => {
-  const next = [...items];
-  for (let i = next.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [next[i], next[j]] = [next[j], next[i]];
-  }
-  return next;
 };
 
 // Normalize API question shape → internal shape
@@ -44,6 +33,27 @@ const normalizeApiQuestion = (apiQ) => {
     explanation: apiQ.explanation || "",
     points: Number(apiQ.points) || 1,
   };
+};
+
+const shouldLoadResultFromStartError = (err) => {
+  const msg = String(err?.message || "").toLowerCase();
+  const looksLikeAlreadySubmitted =
+    msg.includes("already submitted") ||
+    (msg.includes("already") && msg.includes("submit")) ||
+    msg.includes("submitted");
+  const looksLikeExpired =
+    msg.includes("expired") ||
+    msg.includes("time over") ||
+    msg.includes("time is over") ||
+    msg.includes("time ended");
+
+  return (
+    [409, 422].includes(err?.status) ||
+    ((err?.status === 403 || err?.status === 400) &&
+      (looksLikeAlreadySubmitted || looksLikeExpired)) ||
+    looksLikeAlreadySubmitted ||
+    looksLikeExpired
+  );
 };
 
 const ExamPage = () => {
@@ -69,6 +79,19 @@ const ExamPage = () => {
 
   const unwrapApiData = (payload) => payload?.data ?? payload;
 
+  // ── load my result (API #47) ────────────────────────────
+  const loadMyResult = useCallback(async () => {
+    setLoadState("loading");
+    try {
+      const data = unwrapApiData(await getMyQuizResult(quizId, token));
+      setMyResult(data);
+      setLoadState("result");
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to load quiz result.");
+      setLoadState("error");
+    }
+  }, [quizId, token]);
+
   // ── start quiz (API #45) ────────────────────────────────
   const startQuiz = useCallback(async () => {
     setLoadState("loading");
@@ -88,28 +111,15 @@ const ExamPage = () => {
       setCurrentIndex(0);
       setLoadState("ready");
     } catch (err) {
-      // 403/409/422 typically means already submitted — try to load result instead
-      if ([403, 409, 422].includes(err?.status)) {
+      if (shouldLoadResultFromStartError(err)) {
         loadMyResult();
-      } else {
-        setErrorMsg(err.message || "Failed to load quiz.");
-        setLoadState("error");
+        return;
       }
-    }
-  }, [quizId, token]);
 
-  // ── load my result (API #47) ────────────────────────────
-  const loadMyResult = useCallback(async () => {
-    setLoadState("loading");
-    try {
-      const data = unwrapApiData(await getMyQuizResult(quizId, token));
-      setMyResult(data);
-      setLoadState("result");
-    } catch (err) {
-      setErrorMsg(err.message || "Failed to load quiz result.");
+      setErrorMsg(err.message || "Failed to load quiz.");
       setLoadState("error");
     }
-  }, [quizId, token]);
+  }, [loadMyResult, quizId, token]);
 
   useEffect(() => {
     startQuiz();
@@ -117,6 +127,13 @@ const ExamPage = () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [startQuiz]);
+
+  const handleAutoSubmit = useCallback(() => {
+    if (loadState !== "ready" || isSubmitting) return;
+    clearInterval(timerRef.current);
+    setErrorMsg("");
+    startQuiz();
+  }, [isSubmitting, loadState, startQuiz]);
 
   // ── countdown timer ─────────────────────────────────────
   useEffect(() => {
@@ -134,7 +151,7 @@ const ExamPage = () => {
     }, 1000);
 
     return () => clearInterval(timerRef.current);
-  }, [loadState]);
+  }, [handleAutoSubmit, loadState]);
 
   // ── submit quiz (API #46) ───────────────────────────────
   const handleSubmitQuiz = async () => {
@@ -162,10 +179,6 @@ const ExamPage = () => {
     }
   };
 
-  const handleAutoSubmit = () => {
-    if (loadState === "ready") handleSubmitQuiz();
-  };
-
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
@@ -180,7 +193,8 @@ const ExamPage = () => {
   // ── result review data from API #47 ────────────────────
   const resultQuestions = useMemo(() => {
     if (!myResult) return [];
-    return (myResult.questions || myResult.answers || []).map((item) => ({
+    const raw = myResult.details || myResult.questions || myResult.answers || [];
+    return raw.map((item) => ({
       id: String(item.question_id || item.id),
       text: item.question_text || item.text || "",
       options: (item.options || []).map((opt) => ({
@@ -188,11 +202,16 @@ const ExamPage = () => {
         text: opt.option_text || opt.text || "",
         isCorrect: Boolean(opt.is_correct),
       })),
-      selectedOptionId: String(item.student_answer_id || item.selected_option_id || ""),
+      selectedOptionId: String(
+        item.student_answer_id ||
+          item.selected_option_id ||
+          selectedAnswers[String(item.question_id || item.id)] ||
+          ""
+      ),
       isCorrect: Boolean(item.is_correct),
       explanation: item.explanation || "",
     }));
-  }, [myResult]);
+  }, [myResult, selectedAnswers]);
 
   // ── loading ─────────────────────────────────────────────
   if (loadState === "idle" || loadState === "loading") {
@@ -250,6 +269,7 @@ const ExamPage = () => {
     const score =
       submitResult?.score ??
       myResult?.score ??
+      myResult?.student_score ??
       myResult?.percentage ??
       null;
     const passing = quizMeta?.passing_percentage || myResult?.passing_percentage || 60;
@@ -328,6 +348,15 @@ const ExamPage = () => {
                             {String.fromCharCode(65 + optIdx)}
                           </span>
                           <span className="exam-option-text">{opt.text}</span>
+                          {(isSelected || isCorrect) && (
+                            <span className="exam-option-review-badge">
+                              {isSelected && isCorrect
+                                ? "Your correct answer"
+                                : isSelected
+                                  ? "Your answer"
+                                  : "Correct answer"}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -383,33 +412,6 @@ const ExamPage = () => {
   }
 
   // ── active exam view ─────────────────────────────────────
-  const statCards = [
-    {
-      label: "Questions",
-      value: questions.length,
-      accent: "#c084fc",
-      icon: FiHash,
-    },
-    {
-      label: "Time Left",
-      value: formatTime(timeLeft),
-      accent: timeLeft < 60 ? "#ff8ea1" : "#54f4fc",
-      icon: FiClock,
-    },
-    {
-      label: "Passing Score",
-      value: `${quizMeta?.passing_percentage || 60}%`,
-      accent: "#7fe1ff",
-      icon: FiTarget,
-    },
-    {
-      label: "Progress",
-      value: `${answeredCount}/${questions.length}`,
-      accent: "#c084fc",
-      icon: FiCheckCircle,
-    },
-  ];
-
   return (
     <section className="exam-page">
       <div className="exam-shell">
