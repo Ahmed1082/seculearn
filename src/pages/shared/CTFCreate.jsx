@@ -1,10 +1,32 @@
-import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import {
-  ArrowLeft, Flag, Trophy, Shield, Zap, Skull, Eye, EyeOff,
-  Lightbulb, Paperclip, X, Plus, Tag, FileText, Sparkles,
-  CheckCircle2, AlertTriangle, Save, Trash2,
+  AlertTriangle,
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  FileText,
+  Flag,
+  Lightbulb,
+  Loader2,
+  Paperclip,
+  Plus,
+  Save,
+  Shield,
+  Skull,
+  Sparkles,
+  Trash2,
+  Trophy,
+  X,
+  Zap,
 } from "lucide-react";
+import {
+  buildCTFFormData,
+  createCTFChallenge,
+  deleteCTFChallenge,
+  getChallengeForEdit,
+  updateCTFChallenge,
+} from "../../app/ctfApi";
 import "../../styles/CTFCreate.css";
 
 const difficultyConfig = {
@@ -29,18 +51,36 @@ const categoryOptions = [
   "Pwn / Binary Exploitation",
 ];
 
+const createId = (prefix) =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const emptyHint = () => ({
+  id: createId("hint"),
+  hint_text: "",
+  cost_points: 10,
+});
+
 const formatBytes = (bytes) => {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const size = Number(bytes || 0);
+  if (!size) return "";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+const normalizeFlag = (value) => value.trim();
 
 const CTFCreate = () => {
   const { courseId, ctfId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const token = localStorage.getItem("token");
   const isEditMode = Boolean(ctfId);
+  const role = location.pathname.startsWith("/ta/") ? "ta" : "lecturer";
+  const coursePath = `/${role}/courses/${courseId}`;
 
-  // Core fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
@@ -49,112 +89,206 @@ const CTFCreate = () => {
   const [points, setPoints] = useState(100);
   const [flag, setFlag] = useState("flag{}");
   const [showFlag, setShowFlag] = useState(false);
-
-  // Hint
-  const [hintEnabled, setHintEnabled] = useState(false);
-  const [hint, setHint] = useState("");
-  const [hintCost, setHintCost] = useState(10);
-
-  // Lab / resources
+  const [isCaseSensitive, setIsCaseSensitive] = useState(true);
+  const [maxAttempts, setMaxAttempts] = useState(0);
+  const [labType, setLabType] = useState("docker");
   const [labUrl, setLabUrl] = useState("");
   const [files, setFiles] = useState([]);
-
-  // Tags
-  const [tags, setTags] = useState([]);
-  const [tagInput, setTagInput] = useState("");
-
-  // Settings
-  const [maxAttempts, setMaxAttempts] = useState(0); // 0 = unlimited
-  const [caseSensitive, setCaseSensitive] = useState(true);
+  const [hints, setHints] = useState([emptyHint()]);
+  const [loading, setLoading] = useState(isEditMode);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
   const [previewMode, setPreviewMode] = useState(false);
 
-  useEffect(() => {
-    if (isEditMode) {
-      // Simulate loading existing CTF data (since the backend endpoint might not be ready)
-      if (ctfId === "1") {
-        setTitle("Hidden in Plain Sight");
-        setDescription("Analyze PCAP file to find the hidden endpoint.");
-        setDifficulty("easy");
-        setPoints(100);
-        setFlag("flag{pcap_master_2024}");
-        setCategory("Network Security");
-      } else if (ctfId === "2") {
-        setTitle("Firewall Bypass");
-        setDescription("Find a way to bypass the misconfigured firewall rules and access the restricted endpoint.");
-        setDifficulty("medium");
-        setPoints(250);
-        setFlag("flag{firewall_bypass_2024}");
-        setCategory("Network Security");
-      } else {
-        setTitle("Existing CTF Challenge");
-      }
-    }
-  }, [isEditMode, ctfId]);
-
   const finalCategory = category === "__custom" ? customCategory.trim() : category;
-  const flagValid = flag.trim().startsWith("flag{") && flag.trim().endsWith("}") && flag.trim().length > 6;
+  const cleanHints = useMemo(
+    () =>
+      hints
+        .map((hint) => ({
+          hint_text: hint.hint_text.trim(),
+          cost_points: Number(hint.cost_points || 0),
+        }))
+        .filter((hint) => hint.hint_text),
+    [hints],
+  );
+  const flagValid =
+    normalizeFlag(flag).startsWith("flag{") &&
+    normalizeFlag(flag).endsWith("}") &&
+    normalizeFlag(flag).length > 6;
   const isValid =
     title.trim().length > 0 &&
     description.trim().length >= 10 &&
     finalCategory.length > 0 &&
     flagValid &&
-    points > 0 &&
-    (!hintEnabled || hint.trim().length > 0);
+    Number(points) > 0 &&
+    (labType !== "external" || labUrl.trim().length > 0) &&
+    hints.every((hint) => !hint.hint_text.trim() || Number(hint.cost_points) >= 0);
 
-  const handleDifficultyChange = (d) => {
-    setDifficulty(d);
-    setPoints(difficultyConfig[d].suggestedPoints);
-  };
+  const diff = difficultyConfig[difficulty] || difficultyConfig.easy;
+  const DiffIcon = diff.icon;
 
-  const handleAddFile = (e) => {
-    const fileList = e.target.files;
+  useEffect(() => {
+    if (!isEditMode || !token) return undefined;
+
+    let cancelled = false;
+
+    const loadChallenge = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const challenge = await getChallengeForEdit(ctfId, token);
+        if (cancelled) return;
+
+        const matchingCategory = categoryOptions.includes(challenge.category)
+          ? challenge.category
+          : "__custom";
+
+        setTitle(challenge.title);
+        setDescription(challenge.description);
+        setCategory(matchingCategory);
+        setCustomCategory(matchingCategory === "__custom" ? challenge.category : "");
+        setDifficulty(challenge.difficulty);
+        setPoints(challenge.points || 100);
+        setFlag(challenge.flag || "flag{}");
+        setIsCaseSensitive(challenge.isCaseSensitive);
+        setMaxAttempts(challenge.maxAttempts);
+        setFiles(
+          challenge.files.map((file) => ({
+            id: createId("file"),
+            name: file.name,
+            size: file.size,
+            url: file.url,
+          })),
+        );
+        setHints(
+          challenge.hints.length
+            ? challenge.hints.map((hint) => ({
+                id: hint.id,
+                hint_text: hint.text,
+                cost_points: hint.costPoints,
+              }))
+            : [emptyHint()],
+        );
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Could not load this CTF challenge.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    loadChallenge();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ctfId, isEditMode, token]);
+
+  const handleAddFile = (event) => {
+    const fileList = event.target.files;
     if (!fileList) return;
-    const newFiles = Array.from(fileList).map((f) => ({
-      id: crypto.randomUUID ? crypto.randomUUID() : `file-${Date.now()}`,
-      name: f.name,
-      size: f.size,
+
+    const newFiles = Array.from(fileList).map((file) => ({
+      id: createId("file"),
+      name: file.name,
+      size: file.size,
+      file,
     }));
+
     setFiles((prev) => [...prev, ...newFiles]);
-    e.target.value = "";
+    event.target.value = "";
   };
 
   const removeFile = (id) => {
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+    setFiles((prev) => prev.filter((file) => file.id !== id));
   };
 
-  const addTag = () => {
-    const t = tagInput.trim();
-    if (!t || tags.includes(t)) {
-      setTagInput("");
-      return;
-    }
-    setTags([...tags, t]);
-    setTagInput("");
+  const updateHint = (id, field, value) => {
+    setHints((prev) =>
+      prev.map((hint) =>
+        hint.id === id
+          ? { ...hint, [field]: field === "cost_points" ? Number(value) : value }
+          : hint,
+      ),
+    );
   };
 
-  const handleSubmit = () => {
-    if (!isValid) return;
-    console.log(isEditMode ? "CTF updated:" : "CTF created:", {
-      ctfId: isEditMode ? ctfId : undefined,
-      courseId, title: title.trim(), description: description.trim(),
-      category: finalCategory, difficulty, points, flag: flag.trim(),
-      hint: hintEnabled ? hint.trim() : undefined,
-      hintCost: hintEnabled ? hintCost : undefined,
-      labUrl: labUrl.trim() || undefined,
-      files, tags, maxAttempts, caseSensitive,
+  const removeHint = (id) => {
+    setHints((prev) => (prev.length === 1 ? [emptyHint()] : prev.filter((hint) => hint.id !== id)));
+  };
+
+  const buildPayload = () =>
+    buildCTFFormData({
+      title: title.trim(),
+      description: description.trim(),
+      category: finalCategory,
+      difficulty,
+      points: Number(points),
+      flag: normalizeFlag(flag),
+      dockerImage: null,
+      isCaseSensitive,
+      maxAttempts: Number(maxAttempts || 0),
+      labType,
+      labUrl: labUrl.trim(),
+      files,
+      hints: cleanHints,
     });
-    // toast.success("CTF challenge published!");
-    navigate(`/lecturer/courses/${courseId}`);
+
+  const handleSubmit = async () => {
+    if (!isValid || saving) return;
+
+    setSaving(true);
+    setError("");
+    try {
+      const payload = buildPayload();
+      if (isEditMode) {
+        await updateCTFChallenge(ctfId, payload, token);
+      } else {
+        await createCTFChallenge(payload, token);
+      }
+      navigate(coursePath);
+    } catch (err) {
+      setError(err.message || "Could not save the CTF challenge.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = () => {
-    console.log("CTF deleted:", ctfId);
-    // toast.success("CTF challenge deleted!");
-    navigate(`/lecturer/courses/${courseId}`);
+  const handleDelete = async () => {
+    if (!isEditMode || deleting) return;
+    const confirmed = window.confirm("Delete this CTF challenge permanently?");
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError("");
+
+    try {
+      await deleteCTFChallenge(ctfId, token);
+      navigate(coursePath);
+    } catch (err) {
+      setError(err.message || "Could not delete the CTF challenge.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
-  const diff = difficultyConfig[difficulty];
-  const DiffIcon = diff.icon;
+  if (loading) {
+    return (
+      <div className="ctf-container">
+        <div className="ctf-layout">
+          <div className="ctf-card ctf-border-glow">
+            <div className="ctf-card-header">
+              <Loader2 className="ctf-icon text-primary spin" />
+              <h1 className="ctf-h1">Loading challenge</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (previewMode) {
     return (
@@ -199,41 +333,33 @@ const CTFCreate = () => {
               {description || "Challenge description will appear here..."}
             </p>
 
-            {tags.length > 0 && (
-              <div className="ctf-tags-wrap mb-4">
-                {tags.map((t) => (
-                  <div key={t} className="ctf-badge ctf-badge-outline text-muted">
-                    #{t}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {labUrl && (
+            {labType === "external" && labUrl && (
               <a href={labUrl} target="_blank" rel="noreferrer" className="ctf-lab-link mb-4">
-                <Sparkles className="ctf-icon-sm" /> Open Lab Environment
+                <Sparkles className="ctf-icon-sm" /> Open External Lab
               </a>
             )}
 
             {files.length > 0 && (
               <div className="ctf-files-sec mb-4">
                 <p className="ctf-files-title">Challenge Files</p>
-                {files.map((f) => (
-                  <div key={f.id} className="ctf-file-item">
+                {files.map((file) => (
+                  <div key={file.id} className="ctf-file-item">
                     <Paperclip className="ctf-icon-sm text-muted" />
-                    <span className="flex-1 truncate">{f.name}</span>
-                    <span className="ctf-file-size">{formatBytes(f.size)}</span>
+                    <span className="flex-1 truncate">{file.name}</span>
+                    <span className="ctf-file-size">{formatBytes(file.size)}</span>
                   </div>
                 ))}
               </div>
             )}
 
-            {hintEnabled && (
+            {cleanHints.length > 0 && (
               <div className="ctf-hint-preview mb-4">
                 <Lightbulb className="ctf-icon-sm text-yellow shrink-0 mt-1" />
                 <div className="flex-1">
-                  <p className="ctf-hint-text">{hint || "(Hint hidden)"}</p>
-                  <p className="ctf-hint-cost">Costs {hintCost} pts to reveal</p>
+                  <p className="ctf-hint-text">{cleanHints.length} hint(s) configured.</p>
+                  <p className="ctf-hint-cost">
+                    Students reveal them one at a time for their configured point cost.
+                  </p>
                 </div>
               </div>
             )}
@@ -254,14 +380,19 @@ const CTFCreate = () => {
   return (
     <div className="ctf-container">
       <div className="ctf-layout">
-        <button className="ctf-btn ctf-btn-ghost mb-4 text-muted hover-text-foreground" onClick={() => navigate(`/lecturer/courses/${courseId}`)}>
+        <button className="ctf-btn ctf-btn-ghost mb-4 text-muted hover-text-foreground" onClick={() => navigate(coursePath)}>
           <ArrowLeft className="ctf-icon mr-2" /> Back to Course
         </button>
 
+        {error && (
+          <div className="ctf-form-message error">
+            <AlertTriangle className="ctf-icon-sm" />
+            <span>{error}</span>
+          </div>
+        )}
+
         <div className="ctf-grid">
-          {/* Main Column */}
           <div className="ctf-main-col">
-            
             <div className="ctf-card ctf-border-glow">
               <div className="ctf-card-header">
                 <div className="ctf-icon-sq bg-primary-15 border-primary-30">
@@ -273,37 +404,39 @@ const CTFCreate = () => {
               <div className="ctf-space-y-4">
                 <div className="ctf-field">
                   <label className="ctf-label">Challenge Title <span className="text-dest">*</span></label>
-                  <input className="ctf-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. SQL Injection 101" />
+                  <input className="ctf-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. SQL Injection 101" />
                 </div>
 
                 <div className="ctf-field">
                   <label className="ctf-label">Description <span className="text-dest">*</span></label>
-                  <textarea className="ctf-textarea min-h-140" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Describe the scenario, objective, and any constraints..." />
-                  <p className="ctf-helper">{description.length} chars · min 10</p>
+                  <textarea className="ctf-textarea min-h-140" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Describe the scenario, objective, and constraints..." />
+                  <p className="ctf-helper">{description.length} chars / min 10</p>
                 </div>
 
                 <div className="ctf-split-2">
                   <div className="ctf-field">
                     <label className="ctf-label">Category <span className="text-dest">*</span></label>
-                    <select className="ctf-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                    <select className="ctf-select" value={category} onChange={(event) => setCategory(event.target.value)}>
                       <option value="">Choose a category</option>
-                      {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-                      <option value="__custom">+ Custom category…</option>
+                      {categoryOptions.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                      <option value="__custom">Custom category</option>
                     </select>
                     {category === "__custom" && (
-                      <input className="ctf-input mt-2" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="Enter custom category" />
+                      <input className="ctf-input mt-2" value={customCategory} onChange={(event) => setCustomCategory(event.target.value)} placeholder="Enter custom category" />
                     )}
                   </div>
+
                   <div className="ctf-field">
                     <label className="ctf-label">Difficulty</label>
                     <div className="ctf-split-3">
-                      {Object.keys(difficultyConfig).map((d) => {
-                        const cfg = difficultyConfig[d];
-                        const Icon = cfg.icon;
-                        const active = difficulty === d;
+                      {Object.entries(difficultyConfig).map(([key, config]) => {
+                        const Icon = config.icon;
+                        const active = difficulty === key;
                         return (
-                          <button key={d} type="button" onClick={() => handleDifficultyChange(d)} className={`ctf-diff-btn ${active ? cfg.className + " active" : ""}`}>
-                            <Icon className="ctf-icon-sm" /> {cfg.label}
+                          <button key={key} type="button" onClick={() => setDifficulty(key)} className={`ctf-diff-btn ${active ? `${config.className} active` : ""}`}>
+                            <Icon className="ctf-icon-sm" /> {config.label}
                           </button>
                         );
                       })}
@@ -319,10 +452,10 @@ const CTFCreate = () => {
                 <h2 className="ctf-h2">Solution Flag</h2>
               </div>
               <div className="ctf-space-y-3 mt-4">
-                <label className="ctf-helper block">The flag students must submit to solve. Format: <code className="text-primary ctf-mono">flag{"{...}"}</code></label>
+                <label className="ctf-helper block">Students must submit this exact flag. Format: <code className="text-primary ctf-mono">flag{"{...}"}</code></label>
                 <div className="ctf-rel">
-                  <input type={showFlag ? "text" : "password"} value={flag} onChange={(e) => setFlag(e.target.value)} placeholder="flag{your_secret_here}" className="ctf-input ctf-mono pr-10" />
-                  <button type="button" onClick={() => setShowFlag(!showFlag)} className="ctf-eye-btn">
+                  <input type={showFlag ? "text" : "password"} value={flag} onChange={(event) => setFlag(event.target.value)} placeholder="flag{your_secret_here}" className="ctf-input ctf-mono pr-10" />
+                  <button type="button" onClick={() => setShowFlag((value) => !value)} className="ctf-eye-btn">
                     {showFlag ? <EyeOff className="ctf-icon-sm" /> : <Eye className="ctf-icon-sm" />}
                   </button>
                 </div>
@@ -332,10 +465,10 @@ const CTFCreate = () => {
                 <div className="ctf-switch-row mt-4">
                   <div>
                     <p className="ctf-switch-label">Case-sensitive matching</p>
-                    <p className="ctf-switch-helper">If off, FLAG{"{x}"} = flag{"{x}"}</p>
+                    <p className="ctf-switch-helper">If off, FLAG{"{x}"} equals flag{"{x}"}</p>
                   </div>
                   <label className="ctf-switch">
-                    <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} />
+                    <input type="checkbox" checked={isCaseSensitive} onChange={(event) => setIsCaseSensitive(event.target.checked)} />
                     <span className="ctf-slider"></span>
                   </label>
                 </div>
@@ -348,12 +481,26 @@ const CTFCreate = () => {
                 <h2 className="ctf-h2">Lab Environment & Files</h2>
               </div>
               <div className="ctf-space-y-4 mt-4">
-                <div className="ctf-field">
-                  <label className="ctf-label text-muted">Lab URL (optional)</label>
-                  <input className="ctf-input" value={labUrl} onChange={(e) => setLabUrl(e.target.value)} placeholder="https://lab.example.com/challenge-1" />
+                <div className="ctf-switch-row">
+                  <div>
+                    <p className="ctf-switch-label">External hosted lab</p>
+                    <p className="ctf-switch-helper">Use this only when the lab runs on another website.</p>
+                  </div>
+                  <label className="ctf-switch">
+                    <input type="checkbox" checked={labType === "external"} onChange={(event) => setLabType(event.target.checked ? "external" : "docker")} />
+                    <span className="ctf-slider"></span>
+                  </label>
                 </div>
+
+                {labType === "external" && (
+                  <div className="ctf-field">
+                    <label className="ctf-label text-muted">External Lab URL <span className="text-dest">*</span></label>
+                    <input className="ctf-input" value={labUrl} onChange={(event) => setLabUrl(event.target.value)} placeholder="https://lab.example.com/challenge-1" />
+                  </div>
+                )}
+
                 <div className="ctf-field">
-                  <label className="ctf-label text-muted">Challenge Files (optional)</label>
+                  <label className="ctf-label text-muted">Challenge File (optional)</label>
                   <label className="ctf-file-drop">
                     <Paperclip className="ctf-icon-sm text-muted" />
                     <span>Click to attach files</span>
@@ -361,12 +508,14 @@ const CTFCreate = () => {
                   </label>
                   {files.length > 0 && (
                     <div className="ctf-files-list pt-2">
-                      {files.map((f) => (
-                        <div key={f.id} className="ctf-file-item">
+                      {files.map((file) => (
+                        <div key={file.id} className="ctf-file-item">
                           <FileText className="ctf-icon-sm text-primary" />
-                          <span className="flex-1 truncate">{f.name}</span>
-                          <span className="ctf-file-size">{formatBytes(f.size)}</span>
-                          <button onClick={() => removeFile(f.id)} className="ctf-file-del"><X className="ctf-icon-sm" /></button>
+                          <span className="flex-1 truncate">{file.name}</span>
+                          <span className="ctf-file-size">{formatBytes(file.size)}</span>
+                          <button type="button" onClick={() => removeFile(file.id)} className="ctf-file-del">
+                            <X className="ctf-icon-sm" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -379,61 +528,46 @@ const CTFCreate = () => {
               <div className="ctf-card-header justify-between">
                 <div className="flex-row">
                   <Lightbulb className="ctf-icon text-yellow" />
-                  <h2 className="ctf-h2 ml-2">Hint</h2>
-                  <div className="ctf-badge ctf-badge-outline text-muted ml-2 font-normal text-xs">Optional</div>
+                  <h2 className="ctf-h2 ml-2">Hints</h2>
                 </div>
-                <label className="ctf-switch">
-                  <input type="checkbox" checked={hintEnabled} onChange={(e) => setHintEnabled(e.target.checked)} />
-                  <span className="ctf-slider"></span>
-                </label>
+                <button type="button" className="ctf-btn ctf-btn-outline px-3" onClick={() => setHints((prev) => [...prev, emptyHint()])}>
+                  <Plus className="ctf-icon-sm mr-1" /> Add
+                </button>
               </div>
-              {hintEnabled && (
-                <div className="ctf-space-y-3 mt-4">
-                  <div className="ctf-field">
-                    <label className="ctf-label text-muted">Hint Text</label>
-                    <textarea className="ctf-textarea min-h-60" value={hint} onChange={(e) => setHint(e.target.value)} placeholder="A nudge in the right direction..." />
+
+              <div className="ctf-space-y-3 mt-4">
+                {hints.map((hint, index) => (
+                  <div className="ctf-hint-editor" key={hint.id}>
+                    <div className="ctf-field">
+                      <label className="ctf-label text-muted">Hint {index + 1}</label>
+                      <textarea className="ctf-textarea min-h-60" value={hint.hint_text} onChange={(event) => updateHint(hint.id, "hint_text", event.target.value)} placeholder="A nudge in the right direction..." />
+                    </div>
+                    <div className="ctf-hint-editor-actions">
+                      <label className="ctf-field">
+                        <span className="ctf-label text-muted">Cost</span>
+                        <input type="number" min={0} max={points} value={hint.cost_points} onChange={(event) => updateHint(hint.id, "cost_points", event.target.value)} className="ctf-input w-32" />
+                      </label>
+                      <button type="button" className="ctf-file-del" onClick={() => removeHint(hint.id)}>
+                        <X className="ctf-icon-sm" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="ctf-field">
-                    <label className="ctf-label text-muted">Point Cost to Reveal Hint</label>
-                    <input type="number" min={0} max={points} value={hintCost} onChange={(e) => setHintCost(Number(e.target.value))} className="ctf-input w-32" />
-                  </div>
-                </div>
-              )}
+                ))}
+              </div>
             </div>
 
             <div className="ctf-card ctf-border-glow">
               <div className="ctf-card-header">
-                <Tag className="ctf-icon text-primary" />
-                <h2 className="ctf-h2">Tags & Limits</h2>
+                <AlertTriangle className="ctf-icon text-yellow" />
+                <h2 className="ctf-h2">Attempt Limit</h2>
               </div>
-              <div className="ctf-space-y-4 mt-4">
-                <div className="ctf-field">
-                  <label className="ctf-label text-muted">Tags (helps students filter)</label>
-                  <div className="flex-row gap-2">
-                    <input className="ctf-input" value={tagInput} onChange={(e) => setTagInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(); } }} placeholder="e.g. xss, beginner, owasp" />
-                    <button type="button" className="ctf-btn ctf-btn-outline px-3" onClick={addTag}><Plus className="ctf-icon-sm" /></button>
-                  </div>
-                  {tags.length > 0 && (
-                    <div className="ctf-tags-wrap pt-2">
-                      {tags.map((t) => (
-                        <div key={t} className="ctf-badge ctf-badge-outline text-primary gap-1">
-                          #{t}
-                          <button onClick={() => setTags(tags.filter((x) => x !== t))} className="ctf-tag-del"><X className="ctf-icon-xs" /></button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="ctf-field">
-                  <label className="ctf-label text-muted">Max Attempts (0 = unlimited)</label>
-                  <input type="number" min={0} value={maxAttempts} onChange={(e) => setMaxAttempts(Number(e.target.value))} className="ctf-input w-32" />
-                </div>
-              </div>
+              <label className="ctf-field mt-4">
+                <span className="ctf-label text-muted">Max Attempts (0 = unlimited)</span>
+                <input type="number" min={0} value={maxAttempts} onChange={(event) => setMaxAttempts(Number(event.target.value))} className="ctf-input w-32" />
+              </label>
             </div>
-
           </div>
 
-          {/* Sidebar */}
           <div className="ctf-sidebar-col">
             <div className="ctf-card border-primary-30 ctf-border-glow">
               <div className="ctf-card-header mb-3">
@@ -441,35 +575,41 @@ const CTFCreate = () => {
                 <h3 className="ctf-h3">Reward</h3>
               </div>
               <div className="ctf-reward-center">
-                <p className="ctf-reward-big">{points}</p>
+                <p className="ctf-reward-big">{Number(points) || 0}</p>
                 <p className="ctf-helper mt-1">points on solve</p>
               </div>
-              <input type="number" min={1} max={9999} value={points} onChange={(e) => setPoints(Number(e.target.value))} className="ctf-input text-center mt-4" />
+              <input type="number" min={1} max={9999} value={points} onChange={(event) => setPoints(Number(event.target.value))} className="ctf-input text-center mt-4" />
               <p className="ctf-helper text-center mt-2">
                 Suggested for {diff.label}: <span className="text-primary">{diff.suggestedPoints} pts</span>
               </p>
             </div>
 
-
+            <div className="ctf-card ctf-border-glow">
+              <h3 className="ctf-h3">Docker Image</h3>
+              <p className="ctf-helper mt-2">
+                The backend chooses the image automatically from difficulty and category.
+              </p>
+            </div>
 
             <div className="ctf-space-y-2 mt-2">
               <button className="ctf-btn ctf-btn-outline w-full" onClick={() => setPreviewMode(true)}>
                 <Eye className="ctf-icon-sm mr-2" /> Preview as Student
               </button>
-              <button disabled={!isValid} onClick={handleSubmit} className="ctf-btn ctf-btn-primary w-full">
-                <Save className="ctf-icon-sm mr-2" /> {isEditMode ? "Save Changes" : "Publish Challenge"}
+              <button disabled={!isValid || saving} onClick={handleSubmit} className="ctf-btn ctf-btn-primary w-full">
+                {saving ? <Loader2 className="ctf-icon-sm mr-2 spin" /> : <Save className="ctf-icon-sm mr-2" />}
+                {isEditMode ? "Save Changes" : "Publish Challenge"}
               </button>
-              <button className="ctf-btn ctf-btn-ghost w-full text-muted" onClick={() => navigate(`/lecturer/courses/${courseId}`)}>
+              <button className="ctf-btn ctf-btn-ghost w-full text-muted" onClick={() => navigate(coursePath)}>
                 Cancel
               </button>
               {isEditMode && (
-                <button className="ctf-btn ctf-btn-dest w-full" onClick={handleDelete}>
-                  <Trash2 className="ctf-icon-sm mr-2" /> Delete Challenge
+                <button className="ctf-btn ctf-btn-dest w-full" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? <Loader2 className="ctf-icon-sm mr-2 spin" /> : <Trash2 className="ctf-icon-sm mr-2" />}
+                  Delete Challenge
                 </button>
               )}
             </div>
           </div>
-
         </div>
       </div>
     </div>

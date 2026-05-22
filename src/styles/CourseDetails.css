@@ -513,3 +513,18 @@
   font-size: 13px;
   font-weight: 600;
 }
+
+.ctf-state-message {
+  grid-column: 1 / -1;
+  color: #94a3b8;
+  text-align: center;
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+}
+
+.ctf-state-message.error {
+  color: #fca5a5;
+  border-color: rgba(239, 68, 68, 0.35);
+}

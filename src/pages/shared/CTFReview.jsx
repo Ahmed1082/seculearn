@@ -1,6 +1,19 @@
-import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Flag, Trophy, Shield, Zap, Skull, Users, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Flag,
+  Loader2,
+  Shield,
+  Skull,
+  Trophy,
+  Users,
+  Zap,
+} from "lucide-react";
+import { getChallengeForEdit, getChallengeStats } from "../../app/ctfApi";
 import "../../styles/CTFReview.css";
 
 const difficultyConfig = {
@@ -9,65 +22,116 @@ const difficultyConfig = {
   hard: { label: "Hard", icon: Skull, className: "ctfr-badge-hard" },
 };
 
-const mockChallenge = {
-  id: "1",
-  title: "Hidden in Plain Sight",
-  difficulty: "easy",
-  category: "Network Analysis",
-  points: 100,
-  description: "A suspicious packet capture contains a secret message. Analyze the PCAP file and extract the hidden flag.",
-  hint: "Look at the HTTP headers carefully.",
-  flag: "flag{http_h3ad3rs_ar3_fun}",
-};
-
-const mockSolvers = [
-  { id: "s1", name: "Ahmed Ali", studentId: "STU001" },
-  { id: "s2", name: "Sara Hassan", studentId: "STU002" },
-  { id: "s3", name: "Omar Khalil", studentId: "STU003" },
-  { id: "s4", name: "Youssef Amin", studentId: "STU005" },
-];
-
-const mockNonSolvers = [
-  { id: "s5", name: "Fatima Nour", studentId: "STU004" },
-  { id: "s6", name: "Layla Ibrahim", studentId: "STU006" },
-  { id: "s7", name: "Kareem Fahmy", studentId: "STU007" },
-  { id: "s8", name: "Nadia Sayed", studentId: "STU008" },
-  { id: "s9", name: "Tarek Mostafa", studentId: "STU009" },
-  { id: "s10", name: "Hana Zaki", studentId: "STU010" },
-];
+const normalizeStudent = (student = {}, index = 0) => ({
+  id: student.student_id || student.id || `student-${index}`,
+  name: student.student_name || student.name || student.full_name || "Student",
+  customId: student.custom_id || student.studentId || student.student_id || "",
+  solvedAt: student.solved_at || null,
+  points: Number(student.points || student.final_points || 0),
+});
 
 const CTFReview = () => {
   const { courseId, ctfId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const token = localStorage.getItem("token");
+  const role = location.pathname.startsWith("/ta/") ? "ta" : "lecturer";
+  const [challenge, setChallenge] = useState(null);
+  const [solvedStudents, setSolvedStudents] = useState([]);
+  const [notSolvedStudents, setNotSolvedStudents] = useState([]);
   const [showFlag, setShowFlag] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // In a real app, you would fetch the challenge and student details using ctfId.
-  const challenge = mockChallenge;
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadReview = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [challengeData, statsData] = await Promise.all([
+          getChallengeForEdit(ctfId, token),
+          getChallengeStats(ctfId, token),
+        ]);
+
+        if (cancelled) return;
+
+        setChallenge(challengeData);
+        setSolvedStudents(
+          (statsData.solved_students || []).map(normalizeStudent),
+        );
+        setNotSolvedStudents(
+          (statsData.not_solved_students || []).map(normalizeStudent),
+        );
+      } catch (err) {
+        if (!cancelled) setError(err.message || "Could not load CTF statistics.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    if (token) loadReview();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ctfId, token]);
+
+  if (loading) {
+    return (
+      <div className="ctfr-container">
+        <div className="ctfr-layout">
+          <div className="ctfr-card">
+            <div className="ctfr-box-header">
+              <Loader2 className="ctf-icon-sm spin" />
+              <h1 className="ctfr-title">Loading CTF review</h1>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !challenge) {
+    return (
+      <div className="ctfr-container">
+        <div className="ctfr-layout">
+          <button className="ctfr-back-btn" onClick={() => navigate(`/${role}/courses/${courseId}`)}>
+            <ArrowLeft className="ctf-icon-sm mr-2" />
+            Back to Course
+          </button>
+          <div className="ctfr-card">
+            <h1 className="ctfr-title">Challenge unavailable</h1>
+            <p className="ctfr-desc">{error || "This CTF challenge could not be loaded."}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const diff = difficultyConfig[challenge.difficulty] || difficultyConfig.easy;
   const DiffIcon = diff.icon;
 
   return (
     <div className="ctfr-container">
       <div className="ctfr-layout">
-        <button
-          className="ctfr-back-btn"
-          onClick={() => navigate(-1)} // Or navigate(`/lecturer/courses/${courseId}`)
-        >
-          <ArrowLeft className="ctf-icon-sm mr-2" style={{ marginRight: '0.5rem', width: '1.25rem', height: '1.25rem' }} />
+        <button className="ctfr-back-btn" onClick={() => navigate(`/${role}/courses/${courseId}`)}>
+          <ArrowLeft className="ctf-icon-sm mr-2" />
           Back to Course
         </button>
 
-        {/* Challenge Header Card */}
         <div className="ctfr-card">
           <div className="ctfr-header-row">
             <div className="ctfr-title-group">
               <div className="ctfr-title-line">
                 <div className="ctfr-icon-box">
-                  <Flag style={{ width: '1rem', height: '1rem' }} className="text-primary" />
+                  <Flag className="text-primary" style={{ width: "1rem", height: "1rem" }} />
                 </div>
                 <h1 className="ctfr-title">{challenge.title}</h1>
                 <span className={`ctfr-badge ${diff.className}`}>
-                  <DiffIcon style={{ width: '0.75rem', height: '0.75rem', marginRight: '0.25rem' }} />
+                  <DiffIcon style={{ width: "0.75rem", height: "0.75rem", marginRight: "0.25rem" }} />
                   {diff.label}
                 </span>
               </div>
@@ -75,7 +139,7 @@ const CTFReview = () => {
             </div>
 
             <div className="ctfr-points-box">
-              <Trophy style={{ width: '1rem', height: '1rem', color: '#00b8d9' }} />
+              <Trophy style={{ width: "1rem", height: "1rem", color: "#00b8d9" }} />
               <span className="ctfr-points-val">{challenge.points}</span>
               <span className="ctfr-points-label">pts</span>
             </div>
@@ -83,58 +147,66 @@ const CTFReview = () => {
 
           <p className="ctfr-desc">{challenge.description}</p>
 
-          {challenge.hint && (
+          {challenge.hints.length > 0 && (
             <div className="ctfr-hint">
-              <p>
-                <strong>Hint:</strong> {challenge.hint}
-              </p>
+              {challenge.hints.map((hint, index) => (
+                <p key={hint.id}>
+                  <strong>Hint {index + 1}:</strong> {hint.text} ({hint.costPoints} pts)
+                </p>
+              ))}
             </div>
           )}
 
           <div className="ctfr-reveal-row">
-            <button className="ctfr-reveal-btn" onClick={() => setShowFlag(!showFlag)}>
-              {showFlag ? <EyeOff style={{ width: '1rem', height: '1rem' }} /> : <Eye style={{ width: '1rem', height: '1rem' }} />}
+            <button className="ctfr-reveal-btn" onClick={() => setShowFlag((value) => !value)}>
+              {showFlag ? <EyeOff style={{ width: "1rem", height: "1rem" }} /> : <Eye style={{ width: "1rem", height: "1rem" }} />}
               {showFlag ? "Hide Flag" : "Show Flag"}
             </button>
             {showFlag && <code className="ctfr-flag-code">{challenge.flag}</code>}
           </div>
         </div>
 
-        {/* Solved / Unsolved Grid */}
         <div className="ctfr-grid">
-          {/* Solved Box */}
           <div className="ctfr-solved-card">
             <div className="ctfr-box-header">
-              <CheckCircle2 style={{ width: '1.25rem', height: '1.25rem', color: '#22c55e' }} />
-              <h2 className="ctfr-box-title">Solved ({mockSolvers.length})</h2>
+              <CheckCircle2 style={{ width: "1.25rem", height: "1.25rem", color: "#22c55e" }} />
+              <h2 className="ctfr-box-title">Solved ({solvedStudents.length})</h2>
             </div>
             <div className="ctfr-list">
-              {mockSolvers.map((student) => (
+              {solvedStudents.length === 0 && (
+                <p className="ctfr-empty-text">No students solved this challenge yet.</p>
+              )}
+              {solvedStudents.map((student) => (
                 <div key={student.id} className="ctfr-student-item">
                   <div className="ctfr-student-info">
                     <div className="ctfr-avatar-solved">{student.name.charAt(0)}</div>
-                    <span className="ctfr-student-name">{student.name}</span>
+                    <div>
+                      <span className="ctfr-student-name">{student.name}</span>
+                      {student.solvedAt && <small className="ctfr-student-meta">{student.solvedAt}</small>}
+                    </div>
                   </div>
-                  <span className="ctfr-student-id">{student.studentId}</span>
+                  <span className="ctfr-student-id">{student.customId || `${student.points} pts`}</span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Unsolved Box */}
           <div className="ctfr-unsolved-card">
             <div className="ctfr-box-header">
-              <Users style={{ width: '1.25rem', height: '1.25rem', color: '#94a3b8' }} />
-              <h2 className="ctfr-box-title">Not Solved ({mockNonSolvers.length})</h2>
+              <Users style={{ width: "1.25rem", height: "1.25rem", color: "#94a3b8" }} />
+              <h2 className="ctfr-box-title">Not Solved ({notSolvedStudents.length})</h2>
             </div>
             <div className="ctfr-list">
-              {mockNonSolvers.map((student) => (
+              {notSolvedStudents.length === 0 && (
+                <p className="ctfr-empty-text">Everyone has solved this challenge.</p>
+              )}
+              {notSolvedStudents.map((student) => (
                 <div key={student.id} className="ctfr-student-item">
                   <div className="ctfr-student-info">
                     <div className="ctfr-avatar-unsolved">{student.name.charAt(0)}</div>
                     <span className="ctfr-student-name">{student.name}</span>
                   </div>
-                  <span className="ctfr-student-id">{student.studentId}</span>
+                  <span className="ctfr-student-id">{student.customId}</span>
                 </div>
               ))}
             </div>

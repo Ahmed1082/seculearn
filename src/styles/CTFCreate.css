@@ -349,3 +349,58 @@
 .ctf-space-y-2 > * + * { margin-top: 0.5rem; }
 .ctf-space-y-3 > * + * { margin-top: 0.75rem; }
 .ctf-space-y-4 > * + * { margin-top: 1rem; }
+
+.ctf-form-message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(0, 184, 217, 0.25);
+  border-radius: 0.5rem;
+  background: rgba(0, 184, 217, 0.08);
+  color: var(--ctf-text);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.ctf-form-message.error {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fecaca;
+}
+
+.ctf-hint-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+  border: 1px solid var(--ctf-input-border);
+  border-radius: 0.5rem;
+  background: var(--ctf-input-bg);
+  padding: 0.75rem;
+}
+
+.ctf-hint-editor-actions {
+  display: flex;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.spin {
+  animation: ctf-spin 0.85s linear infinite;
+}
+
+@keyframes ctf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 700px) {
+  .ctf-layout {
+    padding: 1.5rem 1rem;
+  }
+
+  .ctf-hint-editor {
+    grid-template-columns: 1fr;
+  }
+}

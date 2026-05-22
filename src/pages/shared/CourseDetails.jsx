@@ -4,7 +4,7 @@ import { FaTrash, FaEdit } from "react-icons/fa";
 import "../../styles/CourseDetails.css";
 import AddItemModal from "../../components/AddItemModal";
 import axios from "axios";
-import { ctfChallenges } from "../../data/ctfChallenges";
+import { getInstructorChallenges, getStudentChallenges } from "../../app/ctfApi";
 
 const CourseDetails = ({ role }) => {
   const { courseId } = useParams();
@@ -20,7 +20,9 @@ const CourseDetails = ({ role }) => {
   const [course, setCourse] = useState(null);
   const [lectures, setLectures] = useState([]);
   const [sections, setSections] = useState([]);
-  const [ctfs, setCtfs] = useState(ctfChallenges);
+  const [ctfs, setCtfs] = useState([]);
+  const [ctfLoading, setCtfLoading] = useState(false);
+  const [ctfError, setCtfError] = useState("");
 
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState("");
@@ -51,6 +53,27 @@ const CourseDetails = ({ role }) => {
 
     if (token) fetchCourses();
   }, [courseId, token]);
+
+  useEffect(() => {
+    const fetchCTFs = async () => {
+      setCtfLoading(true);
+      setCtfError("");
+
+      try {
+        const challenges = permissions.canManageCTF
+          ? await getInstructorChallenges(token)
+          : await getStudentChallenges(token);
+        setCtfs(challenges);
+      } catch (err) {
+        console.error("Error fetching CTF challenges:", err);
+        setCtfError(err.message || "Could not load CTF challenges.");
+      } finally {
+        setCtfLoading(false);
+      }
+    };
+
+    if (token) fetchCTFs();
+  }, [permissions.canManageCTF, token]);
 
   /* ================= AUTO NUMBERING ================= */
   const getNextLectureNumber = () => {
@@ -139,16 +162,7 @@ const CourseDetails = ({ role }) => {
       
       // ===== CTF =====
       if (modalType === "ctf" && permissions.canManageCTF) {
-        const newCTF = {
-          id: Date.now(),
-          title: title,
-          description: "New Challenge",
-          difficulty: "Easy",
-          points: 100,
-          solved: false,
-        };
-
-        setCtfs((prev) => [...prev, newCTF]);
+        navigate(`/${role}/courses/${courseId}/ctf/create`);
       }
 
       setShowModal(false);
@@ -445,11 +459,23 @@ const CourseDetails = ({ role }) => {
         </div>
 
         <div className="ctf-grid">
+          {ctfLoading && (
+            <p className="ctf-state-message">Loading CTF challenges...</p>
+          )}
+
+          {!ctfLoading && ctfError && (
+            <p className="ctf-state-message error">{ctfError}</p>
+          )}
+
+          {!ctfLoading && !ctfError && ctfs.length === 0 && (
+            <p className="ctf-state-message">No CTF challenges yet.</p>
+          )}
+
           {ctfs.map((ctf) => (
             <div
               key={ctf.id}
               className={`ctf-card ${
-                !permissions.canManageCTF && ctf.solved ? "solved" : ""
+                !permissions.canManageCTF && ctf.isSolved ? "solved" : ""
               }`}
               onClick={() => {
                 if (permissions.canManageCTF) {
@@ -464,13 +490,13 @@ const CourseDetails = ({ role }) => {
                 <div className="title-row">
                   <h3>{ctf.title}</h3>
 
-                  <span className={`badge ${ctf.difficulty.toLowerCase()}`}>
+                  <span className={`badge ${ctf.difficulty}`}>
                     {ctf.difficulty}
                   </span>
                 </div>
 
                 <div className="points-row">
-                  <span className="points">🏆 {ctf.points} pts</span>
+                  <span className="points">{ctf.points} pts</span>
                   {permissions.canManageCTF && (
                     <button
                       className="ctf-edit-btn"
@@ -494,30 +520,28 @@ const CourseDetails = ({ role }) => {
               <div className="ctf-footer">
                 {!permissions.canManageCTF && (
                   <>
-                    {ctf.solved ? (
-                      /* 🟢 SOLVED */
+                    {ctf.isSolved ? (
                       <>
                         <div className="row hint-row">
-                          <span className="hint">💡 Show Hint (-50% points)</span>
+                          <span className="hint">{ctf.hints.length} hints available</span>
                         </div>
 
                         <div className="row bottom-row">
-                          <span className="solves">🏳 1 solve</span>
+                          <span className="solves">{ctf.solvesCount} solves</span>
 
                           <span className="completed">
-                            ✔ Challenge completed — {ctf.points} points earned
+                            Challenge completed
                           </span>
                         </div>
                       </>
                     ) : (
-                      /* 🔵 NOT SOLVED */
                       <>
                         <div className="row hint-row">
-                          <span className="hint">💡 Show Hint (-50% points)</span>
+                          <span className="hint">{ctf.hints.length} hints available</span>
                         </div>
 
                         <div className="row bottom-row">
-                          <span className="solves">🏳 1 solve</span>
+                          <span className="solves">{ctf.solvesCount} solves</span>
 
                           <button
                             className="open-btn"
@@ -526,7 +550,7 @@ const CourseDetails = ({ role }) => {
                               navigate(`/student/courses/${courseId}/ctf/${ctf.id}`);
                             }}
                           >
-                            Open challenge →
+                            Open challenge
                           </button>
                         </div>
                       </>
@@ -534,11 +558,10 @@ const CourseDetails = ({ role }) => {
                   </>
                 )}
 
-                {/* 👨‍🏫 Doctor */}
                 {permissions.canManageCTF && (
                   <div className="row instructor-row">
-                    <span className="solves">🏳 1 solve</span>
-                    <span className="flag">flag{`{${ctf.flag}}`}</span>
+                    <span className="solves">{ctf.solvesCount} solves</span>
+                    <span className="flag">{ctf.determinedImage || "auto docker image"}</span>
                   </div>
                 )}
 
