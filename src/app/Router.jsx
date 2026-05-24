@@ -10,6 +10,7 @@ import AddQuiz from "../pages/shared/AddQuiz";
 import QuizReview from "../pages/shared/QuizReview";
 import CTFCreate from "../pages/shared/CTFCreate";
 import CTFReview from "../pages/shared/CTFReview";
+import AIAssistant from "../pages/shared/AIAssistant";
 
 import Welcome from "../pages/public/Welcome";
 import Login from "../pages/public/Login";
@@ -72,6 +73,7 @@ const Router = () => (
       <Route path="/lecturer/courses/:courseId/ctf/create" element={<CTFCreate />} />
       <Route path="/lecturer/courses/:courseId/ctf/edit/:ctfId" element={<CTFCreate />} />
       <Route path="/lecturer/courses/:courseId/ctf/:ctfId" element={<CTFReview />} />
+      <Route path="/lecturer/ai-assistant" element={<AIAssistant role="lecturer" />} />
     </Route>
 
     {/* ================= TA ================= */}
@@ -100,6 +102,7 @@ const Router = () => (
       <Route path="/ta/courses/:courseId/ctf/create" element={<CTFCreate />} />
       <Route path="/ta/courses/:courseId/ctf/edit/:ctfId" element={<CTFCreate />} />
       <Route path="/ta/courses/:courseId/ctf/:ctfId" element={<CTFReview />} />
+      <Route path="/ta/ai-assistant" element={<AIAssistant role="ta" />} />
     </Route>
 
     {/* ================= Student ================= */}   
@@ -134,6 +137,7 @@ const Router = () => (
       <Route path="/student/allQuizzes" element={<StudentAllQuizzes />} />
       <Route path="/student/members" element={<StudentMembers />} />
       <Route path="/student/courses/:courseId/ctf/:ctfId" element={<CTFPage />} />
+      <Route path="/student/ai-assistant" element={<AIAssistant role="student" />} />
     </Route>
 
   </Routes>

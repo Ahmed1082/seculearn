@@ -109,6 +109,19 @@ const CTFPage = () => {
         setChallenge(selected);
         setSolved(selected.isSolved);
 
+        const initialRevealedHints = {};
+        if (Array.isArray(selected.hints)) {
+          selected.hints.forEach((hint) => {
+            if (hint.revealed) {
+              initialRevealedHints[hint.id] = {
+                text: hint.text,
+                deductedPoints: hint.costPoints,
+              };
+            }
+          });
+        }
+        setRevealedHints(initialRevealedHints);
+
         if (!selected.isSolved) {
           try {
             const statusResponse = await checkCTFLabStatus(selected.id, token);

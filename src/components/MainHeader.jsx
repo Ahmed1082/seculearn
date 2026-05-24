@@ -62,6 +62,7 @@ const MainHeader = ({ role }) => {
               <Link to="/lecturer">Overview</Link>
               <Link to="/lecturer/courses">Courses</Link>
               <Link to="/lecturer/members">Members</Link>
+              <Link to="/lecturer/ai-assistant">AI Assistant</Link>
             </>
           )}
 
@@ -70,6 +71,7 @@ const MainHeader = ({ role }) => {
               <Link to="/ta">Overview</Link>
               <Link to="/ta/courses">Courses</Link>
               <Link to="/ta/members">Members</Link>
+              <Link to="/ta/ai-assistant">AI Assistant</Link>
             </>
           )}
 
@@ -79,6 +81,7 @@ const MainHeader = ({ role }) => {
               <Link to="/student/courses">Courses</Link>
               <Link to="/student/allQuizzes">Quizzes</Link>
               <Link to="/student/members">Members</Link>
+              <Link to="/student/ai-assistant">AI Assistant</Link>
             </>
           )}
 
