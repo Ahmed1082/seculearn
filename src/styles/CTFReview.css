@@ -130,6 +130,25 @@
   margin-bottom: 1.5rem;
 }
 
+.ctfr-lab-details {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 1px solid rgba(0, 184, 217, 0.2);
+  border-radius: 0.5rem;
+  background-color: rgba(0, 184, 217, 0.05);
+  color: #94a3b8;
+  font-size: 0.85rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.ctfr-lab-details a,
+.ctfr-lab-details code {
+  color: #00b8d9;
+  overflow-wrap: anywhere;
+}
+
 .ctfr-hint {
   background-color: rgba(0, 184, 217, 0.05);
   border: 1px solid rgba(0, 184, 217, 0.2);

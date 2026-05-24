@@ -60,6 +60,7 @@ const calculateRemaining = (expiresAt) => {
 
 const normalizeLab = (payload = {}) => ({
   id: payload.id,
+  status: payload.status || "",
   url: payload.connection_url || payload.url || payload.lab_url || "",
   expiresAt: payload.expires_at || payload.expiresAt || "",
   description: payload.description || "",
@@ -67,6 +68,11 @@ const normalizeLab = (payload = {}) => ({
   fileUrl: payload.file_url || payload.challenge_file || "",
   fileName: payload.file_name || payload.file_original_name || "",
 });
+
+const isActiveLabResponse = (payload = {}) =>
+  payload.status === "running" ||
+  payload.status === "external" ||
+  Boolean(payload.connection_url && payload.expires_at);
 
 const CTFPage = () => {
   const { courseId, ctfId } = useParams();
@@ -125,7 +131,7 @@ const CTFPage = () => {
         if (!selected.isSolved) {
           try {
             const statusResponse = await checkCTFLabStatus(selected.id, token);
-            if (!cancelled && statusResponse?.status === "running") {
+            if (!cancelled && isActiveLabResponse(statusResponse)) {
               const session = normalizeLab(statusResponse);
               setLabStatus("running");
               setLabSession(session);
@@ -169,6 +175,7 @@ const CTFPage = () => {
   const difficultyKey = challenge?.difficulty || "easy";
   const difficulty = difficultyConfig[difficultyKey] || difficultyConfig.easy;
   const DifficultyIcon = difficulty.icon;
+  const isExternalLab = challenge?.labType === "external";
   const deductedPoints = useMemo(
     () =>
       Object.values(revealedHints).reduce(
@@ -384,7 +391,7 @@ const CTFPage = () => {
 
                 {labStatus === "idle" && !solved && (
                   <button className="ctf-primary-button" onClick={launchLab}>
-                    <Play className="ctf-icon" /> Launch Lab
+                    <Play className="ctf-icon" /> {isExternalLab ? "Open External Lab" : "Launch Lab"}
                   </button>
                 )}
                 {labStatus === "starting" && (
@@ -407,7 +414,11 @@ const CTFPage = () => {
               {labStatus === "idle" && !solved && (
                 <div className="ctf-lab-placeholder">
                   <Sparkles className="ctf-empty-icon" />
-                  <p>Launch the isolated challenge environment to receive the lab URL and files.</p>
+                  <p>
+                    {isExternalLab
+                      ? "Open the hosted challenge to receive the external lab URL."
+                      : "Launch the isolated challenge environment to receive the lab URL and files."}
+                  </p>
                 </div>
               )}
 
@@ -421,7 +432,7 @@ const CTFPage = () => {
               {labStatus === "starting" && (
                 <div className="ctf-lab-placeholder active">
                   <Loader2 className="ctf-empty-icon spin" />
-                  <p>Starting the container or loading the external lab URL.</p>
+                  <p>{isExternalLab ? "Loading the external lab URL." : "Starting the container."}</p>
                 </div>
               )}
 
@@ -429,7 +440,7 @@ const CTFPage = () => {
                 <div className="ctf-lab-shell">
                   <div className="ctf-lab-link-card">
                     <div>
-                      <h3>Lab URL</h3>
+                      <h3>{isExternalLab ? "External Lab URL" : "Lab URL"}</h3>
                       <code>{labSession.url || "Files-only challenge"}</code>
                       {labSession.expiresAt && <p>Expires at {labSession.expiresAt}</p>}
                     </div>

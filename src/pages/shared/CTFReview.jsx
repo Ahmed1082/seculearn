@@ -147,6 +147,17 @@ const CTFReview = () => {
 
           <p className="ctfr-desc">{challenge.description}</p>
 
+          <div className="ctfr-lab-details">
+            <strong>Lab environment</strong>
+            {challenge.labType === "external" ? (
+              <a href={challenge.externalUrl} target="_blank" rel="noreferrer">
+                {challenge.externalUrl || "External hosted lab"}
+              </a>
+            ) : (
+              <code>{challenge.dockerImage || challenge.determinedImage || "Docker lab"}</code>
+            )}
+          </div>
+
           {challenge.hints.length > 0 && (
             <div className="ctfr-hint">
               {challenge.hints.map((hint, index) => (

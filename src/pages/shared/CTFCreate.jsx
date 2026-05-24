@@ -112,10 +112,7 @@ const CTFCreate = () => {
         .filter((hint) => hint.hint_text),
     [hints],
   );
-  const flagValid =
-    normalizeFlag(flag).startsWith("flag{") &&
-    normalizeFlag(flag).endsWith("}") &&
-    normalizeFlag(flag).length > 6;
+  const flagValid = /^flag\{.+\}$/i.test(normalizeFlag(flag));
   const isValid =
     title.trim().length > 0 &&
     description.trim().length >= 10 &&
@@ -127,6 +124,12 @@ const CTFCreate = () => {
 
   const diff = difficultyConfig[difficulty] || difficultyConfig.easy;
   const DiffIcon = diff.icon;
+
+  const selectDifficulty = (key) => {
+    const selectedDifficulty = difficultyConfig[key] || difficultyConfig.easy;
+    setDifficulty(key);
+    setPoints(selectedDifficulty.suggestedPoints);
+  };
 
   useEffect(() => {
     if (!isEditMode || !token) return undefined;
@@ -154,6 +157,8 @@ const CTFCreate = () => {
         setFlag(challenge.flag || "flag{}");
         setIsCaseSensitive(challenge.isCaseSensitive);
         setMaxAttempts(challenge.maxAttempts);
+        setLabType(challenge.labType);
+        setLabUrl(challenge.externalUrl || "");
         setFiles(
           challenge.files.map((file) => ({
             id: createId("file"),
@@ -435,7 +440,7 @@ const CTFCreate = () => {
                         const Icon = config.icon;
                         const active = difficulty === key;
                         return (
-                          <button key={key} type="button" onClick={() => setDifficulty(key)} className={`ctf-diff-btn ${active ? `${config.className} active` : ""}`}>
+                          <button key={key} type="button" onClick={() => selectDifficulty(key)} className={`ctf-diff-btn ${active ? `${config.className} active` : ""}`}>
                             <Icon className="ctf-icon-sm" /> {config.label}
                           </button>
                         );
@@ -449,10 +454,10 @@ const CTFCreate = () => {
             <div className="ctf-card ctf-border-glow">
               <div className="ctf-card-header">
                 <Flag className="ctf-icon text-primary" />
-                <h2 className="ctf-h2">Solution Flag</h2>
+                <h2 className="ctf-h2">Solution Flag <span className="text-dest">*</span></h2>
               </div>
               <div className="ctf-space-y-3 mt-4">
-                <label className="ctf-helper block">Students must submit this exact flag. Format: <code className="text-primary ctf-mono">flag{"{...}"}</code></label>
+                <label className="ctf-helper block">Students must submit this exact flag. Format: <code className="text-primary ctf-mono">flag{"{...}"}</code> or <code className="text-primary ctf-mono">FLAG{"{...}"}</code></label>
                 <div className="ctf-rel">
                   <input type={showFlag ? "text" : "password"} value={flag} onChange={(event) => setFlag(event.target.value)} placeholder="flag{your_secret_here}" className="ctf-input ctf-mono pr-10" />
                   <button type="button" onClick={() => setShowFlag((value) => !value)} className="ctf-eye-btn">
@@ -460,7 +465,7 @@ const CTFCreate = () => {
                   </button>
                 </div>
                 {!flagValid && flag.length > 0 && (
-                  <p className="ctf-warn-text"><AlertTriangle className="ctf-icon-xs" /> Flag must follow the format flag{"{...}"}</p>
+                  <p className="ctf-warn-text"><AlertTriangle className="ctf-icon-xs" /> Flag must follow the format flag{"{...}"} or FLAG{"{...}"}</p>
                 )}
                 <div className="ctf-switch-row mt-4">
                   <div>
@@ -585,9 +590,11 @@ const CTFCreate = () => {
             </div>
 
             <div className="ctf-card ctf-border-glow">
-              <h3 className="ctf-h3">Docker Image</h3>
+              <h3 className="ctf-h3">Lab Type</h3>
               <p className="ctf-helper mt-2">
-                The backend chooses the image automatically from difficulty and category.
+                {labType === "external"
+                  ? "External hosted URL. Students receive it when they launch the lab."
+                  : "Docker image is selected automatically when the challenge is published."}
               </p>
             </div>
 

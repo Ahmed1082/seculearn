@@ -561,7 +561,11 @@ const CourseDetails = ({ role }) => {
                 {permissions.canManageCTF && (
                   <div className="row instructor-row">
                     <span className="solves">{ctf.solvesCount} solves</span>
-                    <span className="flag">{ctf.determinedImage || "auto docker image"}</span>
+                    <span className="flag">
+                      {ctf.labType === "external"
+                        ? "external URL"
+                        : ctf.determinedImage || ctf.dockerImage || "Docker lab"}
+                    </span>
                   </div>
                 )}
 

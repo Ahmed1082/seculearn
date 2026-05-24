@@ -106,6 +106,8 @@ export const normalizeCTFHint = (hint = {}, index = 0) => ({
 });
 
 export const normalizeCTFChallenge = (challenge = {}) => {
+  const externalUrl = challenge.external_url || challenge.lab_url || "";
+  const labType = challenge.lab_type === "external" || externalUrl ? "external" : "docker";
   const fileFromFields = normalizeFile({
     file_original_name: challenge.file_original_name,
     file_url: challenge.file_url,
@@ -129,6 +131,8 @@ export const normalizeCTFChallenge = (challenge = {}) => {
     isCaseSensitive: Boolean(challenge.is_case_sensitive ?? challenge.case_sensitive ?? true),
     maxAttempts: Number(challenge.max_attempts || 0),
     dockerImage: challenge.docker_image || null,
+    externalUrl,
+    labType,
     determinedImage: challenge.determined_image || challenge.docker_image || "",
     // NOTE: Backend bug — revealing a hint may incorrectly set is_solved to true.
     // We accept is_solved only when it's strictly boolean true (not "1", 1, or "true").
@@ -234,6 +238,8 @@ export function buildCTFFormData(values) {
   const hasFile = values.files?.some(
     (file) => typeof File !== "undefined" && file.file instanceof File
   );
+  const dockerImage = values.labType === "docker" ? values.dockerImage?.trim() || null : null;
+  const externalUrl = values.labType === "external" ? values.labUrl?.trim() || null : null;
 
   if (!hasFile) {
     return {
@@ -243,11 +249,10 @@ export function buildCTFFormData(values) {
       difficulty: values.difficulty,
       points: values.points,
       flag: values.flag,
-      docker_image: values.dockerImage || null,
+      docker_image: dockerImage,
+      external_url: externalUrl,
       is_case_sensitive: values.isCaseSensitive,
       max_attempts: values.maxAttempts,
-      lab_type: values.labType,
-      lab_url: values.labUrl || null,
       hints: values.hints,
     };
   }
@@ -259,11 +264,10 @@ export function buildCTFFormData(values) {
   formData.append("difficulty", values.difficulty);
   formData.append("points", String(values.points));
   formData.append("flag", values.flag);
-  formData.append("docker_image", values.dockerImage || "");
+  formData.append("docker_image", dockerImage || "");
+  formData.append("external_url", externalUrl || "");
   formData.append("is_case_sensitive", values.isCaseSensitive ? "1" : "0");
   formData.append("max_attempts", String(values.maxAttempts || 0));
-  formData.append("lab_type", values.labType || "docker");
-  if (values.labUrl) formData.append("lab_url", values.labUrl);
 
   values.files.forEach((file) => {
     if (typeof File !== "undefined" && file.file instanceof File) {
