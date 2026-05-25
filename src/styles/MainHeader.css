@@ -15,6 +15,12 @@
   color: #00e5ff;
 }
 
+.header-nav a.active {
+  color: #00e5ff;
+  font-weight: 600;
+  text-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+}
+
 .profile {
   display: flex;
   align-items: center;

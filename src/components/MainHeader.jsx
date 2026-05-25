@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useState, useEffect } from "react";
 import "../styles/MainHeader.css";
 import logo from "../images/logo.png";
@@ -59,29 +59,29 @@ const MainHeader = ({ role }) => {
 
           {role === "lecturer" && (
             <>
-              <Link to="/lecturer">Overview</Link>
-              <Link to="/lecturer/courses">Courses</Link>
-              <Link to="/lecturer/members">Members</Link>
-              <Link to="/lecturer/ai-assistant">AI Assistant</Link>
+              <NavLink to="/lecturer" end>Overview</NavLink>
+              <NavLink to="/lecturer/courses">Courses</NavLink>
+              <NavLink to="/lecturer/members">Members</NavLink>
+              <NavLink to="/lecturer/ai-assistant">AI Assistant</NavLink>
             </>
           )}
 
           {role === "ta" && (
             <>
-              <Link to="/ta">Overview</Link>
-              <Link to="/ta/courses">Courses</Link>
-              <Link to="/ta/members">Members</Link>
-              <Link to="/ta/ai-assistant">AI Assistant</Link>
+              <NavLink to="/ta" end>Overview</NavLink>
+              <NavLink to="/ta/courses">Courses</NavLink>
+              <NavLink to="/ta/members">Members</NavLink>
+              <NavLink to="/ta/ai-assistant">AI Assistant</NavLink>
             </>
           )}
 
           {role === "student" && (
             <>
-              <Link to="/student/allAssignments">Assignments</Link>
-              <Link to="/student/courses">Courses</Link>
-              <Link to="/student/allQuizzes">Quizzes</Link>
-              <Link to="/student/members">Members</Link>
-              <Link to="/student/ai-assistant">AI Assistant</Link>
+              <NavLink to="/student/allAssignments">Assignments</NavLink>
+              <NavLink to="/student/courses">Courses</NavLink>
+              <NavLink to="/student/allQuizzes">Quizzes</NavLink>
+              <NavLink to="/student/members">Members</NavLink>
+              <NavLink to="/student/ai-assistant">AI Assistant</NavLink>
             </>
           )}
 
