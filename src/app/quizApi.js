@@ -1,8 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
-
-const QUIZ_API_BASE_URL = `${API_BASE_URL}/api`;
+const QUIZ_API_BASE_URL = "/api";
 
 const getStoredToken = () => {
   if (typeof window === "undefined") return "";
@@ -73,7 +69,10 @@ async function requestQuizApi(path, options = {}) {
     headers,
   } = options;
 
-  const url = new URL(`${QUIZ_API_BASE_URL}${path}`);
+  const url = new URL(
+    `${QUIZ_API_BASE_URL}${path}`,
+    typeof window !== "undefined" ? window.location.origin : undefined
+  );
   appendQueryParams(url, params);
 
   const response = await fetch(url.toString(), {

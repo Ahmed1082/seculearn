@@ -59,6 +59,7 @@ const AIAssistant = ({ role = "student" }) => {
   const [focus, setFocus] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
 
   // Stats States
   const [statsLoading, setStatsLoading] = useState(true);
@@ -99,7 +100,7 @@ const AIAssistant = ({ role = "student" }) => {
       setStatsLoading(true);
       try {
         // 1. Fetch courses
-        const coursesRes = await axios.get(`${API_BASE_URL}/api/get-courses`, {
+        const coursesRes = await axios.get("/api/get-courses", {
           headers: buildApiHeaders(token),
         });
         const coursesList = coursesRes.data?.courses || [];
@@ -121,7 +122,7 @@ const AIAssistant = ({ role = "student" }) => {
           let missedAssignments = 0;
           try {
             const assignmentsRes = await axios.get(
-              `${API_BASE_URL}/api/student/assignments-tracker`,
+              "/api/student/assignments-tracker",
               { headers: buildApiHeaders(token) }
             );
             const assignmentsList = assignmentsRes.data?.assignments || assignmentsRes.data?.data || [];
@@ -147,7 +148,13 @@ const AIAssistant = ({ role = "student" }) => {
                   lectureEntries.map(async (lecture) => {
                     try {
                       const quizList = await getQuizzesList({ lecture_id: lecture.id }, token);
-                      return quizList?.quizzes || quizList?.data || quizList || [];
+                      const rawItems =
+                        (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
+                        (Array.isArray(quizList?.data) && quizList.data) ||
+                        (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
+                        (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
+                        (Array.isArray(quizList) ? quizList : []);
+                      return rawItems;
                     } catch { return []; }
                   })
                 );
@@ -156,7 +163,13 @@ const AIAssistant = ({ role = "student" }) => {
                   sectionEntries.map(async (section) => {
                     try {
                       const quizList = await getQuizzesList({ section_id: section.id }, token);
-                      return quizList?.quizzes || quizList?.data || quizList || [];
+                      const rawItems =
+                        (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
+                        (Array.isArray(quizList?.data) && quizList.data) ||
+                        (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
+                        (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
+                        (Array.isArray(quizList) ? quizList : []);
+                      return rawItems;
                     } catch { return []; }
                   })
                 );
@@ -167,8 +180,10 @@ const AIAssistant = ({ role = "student" }) => {
 
             const allQuizzes = quizCollections.flat().filter((q) => q && q.id);
             allQuizzes.forEach((q) => {
-              const score = q.score !== undefined ? Number(q.score) : (q.percentage !== undefined ? Number(q.percentage) : null);
-              if (score !== null) {
+              const rawScore = q.score ?? q.percentage;
+              const score = (rawScore !== null && rawScore !== undefined && rawScore !== "") ? Number(rawScore) : null;
+              
+              if (score !== null && !isNaN(score)) {
                 quizScoresSum += score;
                 gradedQuizzesCount++;
               }
@@ -431,39 +446,66 @@ const AIAssistant = ({ role = "student" }) => {
 
   const generate = async () => {
     setLoading(true);
-    // Simulate premium visual analysis duration
-    setTimeout(async () => {
-      try {
-        let responseData = null;
-        try {
-          // Attempt hitting backend endpoint
-          const res = await axios.post(
-            `${API_BASE_URL}/api/student/ai-recommendations`,
-            {
-              role,
-              userName,
-              focus: focus.trim() || undefined,
-              stats: role === "student" ? studentStats : instructorStats,
-            },
-            { headers: buildApiHeaders(token) }
-          );
-          responseData = res.data;
-        } catch {
-          // Falls back to smart client-side analysis
-          responseData = generateLocalRecommendations(focus);
-        }
+    setError(null);
+    try {
+      // Simulate premium visual analysis duration
+      await new Promise((resolve) => setTimeout(resolve, 1200));
 
-        setResult(responseData);
+      const endpoint = (role === "lecturer" || role === "ta")
+        ? "/api/dr-ta/ai-recommendations"
+        : "/api/student/ai-recommendations";
+
+      const res = await axios.post(
+        endpoint,
+        {
+          focus_area: focus.trim() || undefined,
+        },
+        { headers: buildApiHeaders(token) }
+      );
+
+      let responseData = null;
+      if (res.data && res.data.status === "success" && res.data.data) {
+        responseData = res.data.data;
+      } else {
+        responseData = res.data;
+      }
+
+      // Normalize recommendations keys from backend format to frontend format
+      if (responseData && Array.isArray(responseData.recommendations)) {
+        responseData.recommendations = responseData.recommendations.map((r) => ({
+          ...r,
+          category: r.category || r.type || "General",
+          detail: r.detail || r.description || "",
+        }));
+      }
+
+      setResult(responseData);
+      localStorage.setItem(
+        `ai_assistant_result_${role}_${user?.id || "default"}`,
+        JSON.stringify(responseData)
+      );
+    } catch (err) {
+      console.error("AI Generation Error: falling back to client-side model.", err);
+      setError(
+        err.response?.data?.message ||
+        err.message ||
+        "Could not connect to AI server"
+      );
+
+      // Attempt local fallback
+      try {
+        const localData = generateLocalRecommendations(focus);
+        setResult(localData);
         localStorage.setItem(
           `ai_assistant_result_${role}_${user?.id || "default"}`,
-          JSON.stringify(responseData)
+          JSON.stringify(localData)
         );
-      } catch (err) {
-        console.error("AI Generation Error:", err);
-      } finally {
-        setLoading(false);
+      } catch (fallbackErr) {
+        console.error("Local fallback failed:", fallbackErr);
       }
-    }, 1500);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Stats Card data
@@ -562,6 +604,17 @@ const AIAssistant = ({ role = "student" }) => {
           </div>
         </div>
 
+        {/* Error Alert */}
+        {error && !loading && (
+          <div className="ai-stat-card ai-text-destructive" style={{ padding: "16px", display: "flex", gap: "12px", alignItems: "center", justifyContent: "flex-start" }}>
+            <AlertTriangle size={20} style={{ flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: "2px", textAlign: "left" }}>
+              <span style={{ fontWeight: 600, fontSize: "14px" }}>API Server Connection Failed</span>
+              <span style={{ fontSize: "13px", opacity: 0.9 }}>{error}. Loaded fallback recommendations.</span>
+            </div>
+          </div>
+        )}
+
         {/* Analysis Loading */}
         {loading && (
           <div className="ai-loader-container">
@@ -637,19 +690,21 @@ const AIAssistant = ({ role = "student" }) => {
             </div>
 
             {/* Next Steps */}
-            <div className="ai-next-steps-card">
-              <h3>
-                <ArrowRight size={16} /> Next Steps
-              </h3>
-              <div className="ai-steps-list">
-                {result.next_steps?.map((step, idx) => (
-                  <div key={idx} className="ai-step-item">
-                    <div className="ai-step-number">{idx + 1}</div>
-                    <p>{step}</p>
-                  </div>
-                ))}
+            {result.next_steps && result.next_steps.length > 0 && (
+              <div className="ai-next-steps-card">
+                <h3>
+                  <ArrowRight size={16} /> Next Steps
+                </h3>
+                <div className="ai-steps-list">
+                  {result.next_steps.map((step, idx) => (
+                    <div key={idx} className="ai-step-item">
+                      <div className="ai-step-number">{idx + 1}</div>
+                      <p>{step}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
