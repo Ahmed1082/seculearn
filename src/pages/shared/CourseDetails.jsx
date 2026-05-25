@@ -331,11 +331,6 @@ const CourseDetails = ({ role }) => {
               className="circle-card"
               key={section.id}
               onClick={() => {
-                if (permissions.canManageSections) {
-                  localStorage.setItem("ta_active_section_id", String(section.id));
-                  localStorage.setItem("ta_active_section_title", section.title || "");
-                }
-
                 navigate(`/${role}/courses/${courseId}/section/${section.id}`, {
                   state: {
                     sectionTitle: section.title,

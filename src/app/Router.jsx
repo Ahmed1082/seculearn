@@ -131,7 +131,6 @@ const Router = () => (
         path="/student/courses/:courseId/section/:sectionId/assignment/:assignmentId"
         element={<StudentSubmitAssignment unitType="section" />}
       />
-
       
       <Route path="/student/allAssignments" element={<StudentAllAssignments />} />
       <Route path="/student/allQuizzes" element={<StudentAllQuizzes />} />

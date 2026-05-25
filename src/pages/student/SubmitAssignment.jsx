@@ -479,50 +479,19 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   }, [assignmentId, currentUserRole, displayName, token]);
 
   const readCachedSubmission = useCallback(() => {
-    if (!submissionCacheKey) return null;
-
-    try {
-      const raw = localStorage.getItem(submissionCacheKey);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== "object") return null;
-
-      if (!parsed.url && !parsed.name && !parsed.id) {
-        localStorage.removeItem(submissionCacheKey);
-        return null;
-      }
-
-      return {
-        id: parsed.id || null,
-        name: parsed.name || "Submitted file",
-        url: parsed.url || "",
-      };
-    } catch {
-      localStorage.removeItem(submissionCacheKey);
-      return null;
-    }
-  }, [submissionCacheKey]);
+    return null;
+  }, []);
 
   const cacheSubmittedFile = useCallback(
     (entry, id = null) => {
-      if (!submissionCacheKey || !entry) return;
-
-      const payload = {
-        id: id || null,
-        name: entry.name || "Submitted file",
-        url: entry.url || "",
-      };
-
-      if (!payload.id && !payload.name && !payload.url) return;
-      localStorage.setItem(submissionCacheKey, JSON.stringify(payload));
+      // No-op - removed localStorage caching
     },
-    [submissionCacheKey]
+    []
   );
 
   const clearCachedSubmission = useCallback(() => {
-    if (!submissionCacheKey) return;
-    localStorage.removeItem(submissionCacheKey);
-  }, [submissionCacheKey]);
+    // No-op - removed localStorage caching
+  }, []);
 
   useEffect(() => {
     const fetchAssignment = async () => {

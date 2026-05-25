@@ -115,15 +115,7 @@ const getPrivateThreadMapStorageKey = (assignmentId) =>
   `assignment-review:private-thread-map:${String(assignmentId || "")}`;
 
 const readPrivateThreadMap = (assignmentId) => {
-  if (!assignmentId) return {};
-  try {
-    const raw = localStorage.getItem(getPrivateThreadMapStorageKey(assignmentId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  return {};
 };
 
 const getAssignmentSettingsStorageKey = (assignmentId) =>
@@ -169,15 +161,7 @@ const normalizeAssignmentSettings = (settings = {}) => ({
 });
 
 const readStoredAssignmentSettings = (assignmentId) => {
-  if (!assignmentId) return normalizeAssignmentSettings();
-
-  try {
-    const raw = localStorage.getItem(getAssignmentSettingsStorageKey(assignmentId));
-    if (!raw) return normalizeAssignmentSettings();
-    return normalizeAssignmentSettings(JSON.parse(raw));
-  } catch {
-    return normalizeAssignmentSettings();
-  }
+  return normalizeAssignmentSettings();
 };
 
 const parseAssignmentDate = (value) => {
@@ -341,12 +325,8 @@ const AssignmentReview = () => {
   }, [assignmentId]);
 
   const persistPrivateThreadMap = useCallback(() => {
-    if (!assignmentId) return;
-    localStorage.setItem(
-      getPrivateThreadMapStorageKey(assignmentId),
-      JSON.stringify(privateThreadMapRef.current || {})
-    );
-  }, [assignmentId]);
+    // No-op - removed localStorage persistence
+  }, []);
 
   const bindCommentToStudent = useCallback(
     (commentId, studentId) => {

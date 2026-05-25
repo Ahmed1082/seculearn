@@ -26,70 +26,12 @@ import {
 import { FaRegEdit } from "react-icons/fa";
 import "../../styles/LectureDetails.css";
 
-const students = [
-  { id: "s1", name: "Ahmed Ali" },
-  { id: "s2", name: "Sara Hassan" },
-  { id: "s3", name: "Omar Khalil" },
-  { id: "s4", name: "Fatima Nour" },
-  { id: "s5", name: "Youssef Amin" },
-  { id: "s6", name: "Layla Ibrahim" },
-  { id: "s7", name: "Kareem Fahmy" },
-  { id: "s8", name: "Nadia Sayed" },
-  { id: "s9", name: "Tarek Mostafa" },
-  { id: "s10", name: "Hana Zaki" },
-];
-
 const lectureSeed = {
-  id: "l1",
-  title: "Lecture 1: Threat Landscape Overview",
-  course: "Introduction to Cybersecurity",
-  sections: [
-    { id: "ls1", title: "Section A: Introduction to Threats" },
-    { id: "ls2", title: "Section B: Common Attack Vectors" },
-  ],
-  assignments: [
-    {
-      id: "a1",
-      title: "Assignment 1: Threat Report",
-      doneStudentIds: ["s1", "s2", "s3", "s4", "s5"],
-      missedStudentIds: ["s6", "s7"],
-    },
-    {
-      id: "a2",
-      title: "Assignment 2: Vulnerability Scan",
-      doneStudentIds: ["s1", "s2", "s3"],
-      missedStudentIds: ["s8", "s9"],
-    },
-    {
-      id: "a3",
-      title: "Assignment 3: Risk Assessment",
-      doneStudentIds: ["s1", "s4", "s5", "s6", "s7", "s8"],
-      missedStudentIds: ["s10"],
-    },
-  ],
-  quizzes: [
-    {
-      id: "q1",
-      title: "Quiz 1: Threat Basics",
-      doneStudentIds: ["s1", "s2", "s3", "s4", "s5", "s6"],
-      missedStudentIds: ["s7", "s8"],
-      results: { s1: 90, s2: 85, s3: 78 },
-    },
-    {
-      id: "q2",
-      title: "Quiz 2: Attack Types",
-      doneStudentIds: ["s1", "s2", "s3"],
-      missedStudentIds: ["s9", "s10"],
-      results: { s1: 88, s2: 82, s3: 75 },
-    },
-    {
-      id: "q3",
-      title: "Quiz 3: Defense Strategies",
-      doneStudentIds: ["s1", "s4", "s5"],
-      missedStudentIds: [],
-      results: { s1: 95, s4: 91, s5: 84 },
-    },
-  ],
+  id: "",
+  title: "",
+  course: "Course",
+  assignments: [],
+  quizzes: [],
 };
 
 const roleCopy = {
@@ -114,15 +56,6 @@ const getDefaultQuizForm = () => ({
   shuffleQuestions: false,
 });
 
-const getQuizStorageKey = ({ courseId, lectureId, sectionId }) => {
-  const unitType = sectionId ? "section" : "lecture";
-  const unitId = sectionId || lectureId || "unknown";
-  return `seculearn-quizzes:${courseId || "unknown"}:${unitType}:${unitId}`;
-};
-
-const getAssignmentSettingsStorageKey = (assignmentId) =>
-  `seculearn-assignment-settings:${String(assignmentId || "unknown")}`;
-
 const toBooleanOrNull = (value) => {
   if (typeof value === "boolean") return value;
   if (value === 1 || value === "1") return true;
@@ -138,143 +71,18 @@ const readBooleanValue = (source, ...keys) => {
   return null;
 };
 
-const normalizeAssignmentSettings = (settings = {}) => ({
-  closeSubmissionsAfterDueDate:
-    readBooleanValue(
-      settings,
-      "closeSubmissionsAfterDueDate",
-      "close_submissions_after_due_date",
-      "close_on_deadline"
-    ) ?? false,
-  dueDate:
-    typeof settings?.dueDate === "string"
-      ? settings.dueDate
-      : typeof settings?.due_date === "string"
-        ? String(settings.due_date).trim().replace(" ", "T").slice(0, 16)
-        : "",
-});
-
-const readStoredAssignmentSettings = (assignmentId) => {
-  if (!assignmentId) return normalizeAssignmentSettings();
-
-  try {
-    const rawValue = localStorage.getItem(
-      getAssignmentSettingsStorageKey(assignmentId)
-    );
-    if (!rawValue) return normalizeAssignmentSettings();
-
-    return normalizeAssignmentSettings(JSON.parse(rawValue));
-  } catch {
-    return normalizeAssignmentSettings();
-  }
-};
-
-const writeStoredAssignmentSettings = (assignmentId, partialSettings = {}) => {
-  if (!assignmentId) return normalizeAssignmentSettings(partialSettings);
-
-  const nextSettings = normalizeAssignmentSettings({
-    ...readStoredAssignmentSettings(assignmentId),
-    ...partialSettings,
-  });
-
-  localStorage.setItem(
-    getAssignmentSettingsStorageKey(assignmentId),
-    JSON.stringify(nextSettings)
-  );
-
-  return nextSettings;
-};
-
-const removeStoredAssignmentSettings = (assignmentId) => {
-  if (!assignmentId) return;
-  localStorage.removeItem(getAssignmentSettingsStorageKey(assignmentId));
-};
-
-const readStoredQuizzes = (storageKey) => {
-  if (!storageKey) return [];
-
-  try {
-    const rawValue = localStorage.getItem(storageKey);
-    if (!rawValue) return [];
-
-    const parsedValue = JSON.parse(rawValue);
-    return Array.isArray(parsedValue) ? parsedValue : [];
-  } catch {
-    return [];
-  }
-};
-
-const mergeStoredQuizzes = (baseQuizzes = [], storedQuizzes = []) => {
-  const mergedQuizzes = new Map();
-  const deletedQuizIds = new Set(
-    storedQuizzes
-      .filter((quiz) => quiz?.deleted && quiz?.id)
-      .map((quiz) => String(quiz.id))
-  );
-
-  baseQuizzes.forEach((quiz) => {
-    if (deletedQuizIds.has(String(quiz.id))) return;
-    mergedQuizzes.set(String(quiz.id), quiz);
-  });
-
-  storedQuizzes.forEach((quiz) => {
-    if (!quiz?.id) return;
-    if (quiz.deleted) {
-      mergedQuizzes.delete(String(quiz.id));
-      return;
-    }
-    const existingQuiz = mergedQuizzes.get(String(quiz.id)) || {};
-    mergedQuizzes.set(String(quiz.id), {
-      ...existingQuiz,
-      ...quiz,
-      id: quiz.id,
-      doneStudentIds: Array.isArray(quiz.doneStudentIds)
-        ? quiz.doneStudentIds
-        : existingQuiz.doneStudentIds || [],
-      missedStudentIds: Array.isArray(quiz.missedStudentIds)
-        ? quiz.missedStudentIds
-        : existingQuiz.missedStudentIds || [],
-      results:
-        quiz.results && typeof quiz.results === "object"
-          ? quiz.results
-          : existingQuiz.results || {},
-    });
-  });
-
-  return Array.from(mergedQuizzes.values());
-};
-
-const mockStudentIds = new Set([
-  ...lectureSeed.assignments.flatMap((assignment) => [
-    ...assignment.doneStudentIds.map((id) => String(id)),
-    ...assignment.missedStudentIds.map((id) => String(id)),
-  ]),
-  ...lectureSeed.quizzes.flatMap((quiz) => [
-    ...quiz.doneStudentIds.map((id) => String(id)),
-    ...quiz.missedStudentIds.map((id) => String(id)),
-    ...Object.keys(quiz.results || {}).map((id) => String(id)),
-  ]),
-]);
-
 const getCurrentStudentId = () => {
-  const fallbackId = "s1";
   const stored = localStorage.getItem("user");
 
-  if (!stored) return fallbackId;
+  if (!stored) return "";
 
   try {
     const user = JSON.parse(stored);
-    const id = user.id || user.student_id || user.user_id || fallbackId;
-    return String(id);
+    const id = user.id || user.student_id || user.user_id;
+    return id ? String(id) : "";
   } catch {
-    return fallbackId;
+    return "";
   }
-};
-
-const resolveStudentIdForMockData = (studentId) => {
-  if (mockStudentIds.has(studentId)) return studentId;
-  if (mockStudentIds.has("s1")) return "s1";
-  return studentId;
 };
 
 const sanitizeQuizNumber = (value, min, max, fallback) => {
@@ -341,14 +149,6 @@ const mapApiQuizToCard = (quiz) => ({
     null,
   questions: Array.isArray(quiz?.questions) ? quiz.questions : [],
 });
-
-const readFileAsDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
 
 const createClientId = (prefix) =>
   `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -524,18 +324,13 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const [courseTitle, setCourseTitle] = useState("");
 
   const [lectureData, setLectureData] = useState(() => {
-    const sectionView = !!sectionId;
-    const base = {
+    return {
       ...lectureSeed,
-      id: lectureId || lectureSeed.id,
-      title: sectionView
+      id: lectureId || "",
+      title: sectionId
       ? stateSectionTitle || `Section ${sectionId}`
       : lectureTitleFromState || `Lecture ${lectureId}`,
     };
-    if (role === "student" && sectionView) {
-      return { ...base, assignments: [] };
-    }
-    return base;
   });
   const [openSections, setOpenSections] = useState({
     lecture: true,
@@ -544,7 +339,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
   });
 
   const [uploadedLectureFiles, setUploadedLectureFiles] = useState([]);
-  const [hasLoadedLectureFiles, setHasLoadedLectureFiles] = useState(false);
   const [isUploadingLectureFiles, setIsUploadingLectureFiles] = useState(false);
   const [isFetchingSectionUploads, setIsFetchingSectionUploads] =
     useState(false);
@@ -564,51 +358,34 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const [isFetchingSectionAssignments, setIsFetchingSectionAssignments] =
     useState(false);
   const [sectionAssignmentsError, setSectionAssignmentsError] = useState("");
-  const [activeSectionId, setActiveSectionId] = useState(() =>
-    role === "ta" ? localStorage.getItem("ta_active_section_id") || "" : ""
-  );
-  const [activeSectionTitle, setActiveSectionTitle] = useState(() =>
-    role === "ta" ? localStorage.getItem("ta_active_section_title") || "" : ""
-  );
-
   const [editingId, setEditingId] = useState(null);
   const [editingType, setEditingType] = useState("");
   const [editedTitle, setEditedTitle] = useState("");
-  const lectureFilesStorageKey = `lecture-files:${lectureData.id}`;
-
-
-  const studentNameById = useMemo(() => {
-    const map = {};
-
-    students.forEach((student) => {
-      map[student.id] = student.name;
-    });
-
-    return map;
-  }, []);
 
   const getNames = (ids) => {
     if (!Array.isArray(ids) || !ids.length) return "None";
-    return ids.map((id) => studentNameById[id] || id).join(", ");
+    return ids
+      .map((student) =>
+        typeof student === "object"
+          ? student.name || student.student_name || student.id || ""
+          : student
+      )
+      .filter(Boolean)
+      .join(", ") || "None";
   };
 
-  const currentStudentId = useMemo(
-    () => resolveStudentIdForMockData(getCurrentStudentId()),
-    []
-  );
+  const currentStudentId = useMemo(() => getCurrentStudentId(), []);
   const canManageAssignmentsViaApi = isSectionView ? isTA : isLecturer;
   const canManageUploadsViaApi = isSectionView ? isTA : isLecturer;
-  const shouldFetchAssignmentsFromApi = true;
-  const shouldUseUploadsApi = true;
   const contentApiId = useMemo(() => {
     if (isSectionView) {
-      const sectionTargetId = stateSectionId || activeSectionId;
+      const sectionTargetId = stateSectionId;
       return sectionTargetId ? String(sectionTargetId) : "";
     }
 
     const lectureTargetId = lectureId || lectureData.id;
     return lectureTargetId ? String(lectureTargetId) : "";
-  }, [activeSectionId, isSectionView, stateSectionId, lectureId, lectureData.id]);
+  }, [isSectionView, stateSectionId, lectureId, lectureData.id]);
   const assignmentApiScope = isSectionView ? "section" : "lecture";
   const assignmentOwnerField =
     assignmentApiScope === "section" ? "section_id" : "lecture_id";
@@ -631,15 +408,11 @@ const ContentDetails = ({ role = "lecturer" }) => {
   const assignmentFileAccept = isSectionView
     ? SECTION_ASSIGNMENT_FILE_ACCEPT
     : LECTURE_ASSIGNMENT_FILE_ACCEPT;
-  const quizStorageKey = useMemo(
-    () => getQuizStorageKey({ courseId, lectureId, sectionId }),
-    [courseId, lectureId, sectionId]
-  );
   const unitLabel = isSectionView ? "Section" : "Lecture";
   const unitLabelLower = unitLabel.toLowerCase();
   const addQuizPath = `/${role}/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}/add-quiz`;
   const resolvedTitle = isSectionView
-    ? activeSectionTitle || stateSectionTitle || lectureData.title
+    ? stateSectionTitle || lectureData.title
     : lectureTitleFromState || lectureData.title;
   const pageTitle = resolvedTitle;
   const contentBlockTitle = `${unitLabel} Content`;
@@ -692,34 +465,14 @@ const ContentDetails = ({ role = "lecturer" }) => {
   );
 
   useEffect(() => {
-    if (!isSectionView && !isTA) return;
-
-    if (stateSectionId !== undefined && stateSectionId !== null) {
-      const normalizedSectionId = String(stateSectionId);
-      setActiveSectionId(normalizedSectionId);
-      if (isTA) {
-        localStorage.setItem("ta_active_section_id", normalizedSectionId);
-      }
-    }
-
-    if (stateSectionTitle) {
-      const normalizedSectionTitle = String(stateSectionTitle);
-      setActiveSectionTitle(normalizedSectionTitle);
-      if (isTA) {
-        localStorage.setItem("ta_active_section_title", normalizedSectionTitle);
-      }
-    }
-  }, [isTA, isSectionView, stateSectionId, stateSectionTitle]);
-
-  useEffect(() => {
     setLectureData((prev) => ({
       ...prev,
-      id: lectureId || prev.id || lectureSeed.id,
+      id: lectureId || prev.id || "",
       title: isSectionView
-        ? stateSectionTitle || prev.title || lectureSeed.title
-        : lectureTitleFromState || prev.title || lectureSeed.title,
+        ? stateSectionTitle || `Section ${sectionId}`
+        : lectureTitleFromState || `Lecture ${lectureId}`,
     }));
-  }, [isSectionView, lectureId, lectureTitleFromState, stateSectionTitle]);
+  }, [isSectionView, lectureId, lectureTitleFromState, sectionId, stateSectionTitle]);
 
   // Fetch quizzes from backend (API #40)
   useEffect(() => {
@@ -759,76 +512,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
     fetchQuizzes();
   }, [contentApiId, isSectionView, token]);
 
-  useEffect(() => {
-    if (shouldUseUploadsApi) {
-      setHasLoadedLectureFiles(false);
-      return;
-    }
-
-    try {
-      const rawStoredFiles = localStorage.getItem(lectureFilesStorageKey);
-      if (!rawStoredFiles) {
-        setUploadedLectureFiles([]);
-        setHasLoadedLectureFiles(true);
-        return;
-      }
-
-      const parsedFiles = JSON.parse(rawStoredFiles);
-      setUploadedLectureFiles(normalizeLectureFileEntries(parsedFiles));
-    } catch {
-      setUploadedLectureFiles([]);
-    } finally {
-      setHasLoadedLectureFiles(true);
-    }
-  }, [lectureFilesStorageKey, shouldUseUploadsApi]);
-
-  useEffect(() => {
-    if (shouldUseUploadsApi) return;
-    if (!hasLoadedLectureFiles) return;
-
-    const serializableFiles = uploadedLectureFiles.map((file) => ({
-      id: file.id,
-      name: file.name,
-      size: file.size,
-      lastModified: file.lastModified,
-      mimeType: file.mimeType,
-      dataUrl: file.dataUrl || "",
-      url: file.url || "",
-    }));
-
-    localStorage.setItem(
-      lectureFilesStorageKey,
-      JSON.stringify(serializableFiles)
-    );
-  }, [
-    hasLoadedLectureFiles,
-    lectureFilesStorageKey,
-    shouldUseUploadsApi,
-    uploadedLectureFiles,
-  ]);
-
-  useEffect(() => {
-    if (shouldUseUploadsApi) return;
-
-    const handleStorageSync = (event) => {
-      if (event.key !== lectureFilesStorageKey) return;
-      if (!event.newValue) {
-        setUploadedLectureFiles([]);
-        return;
-      }
-
-      try {
-        const parsedFiles = JSON.parse(event.newValue);
-        setUploadedLectureFiles(normalizeLectureFileEntries(parsedFiles));
-      } catch {
-        setUploadedLectureFiles([]);
-      }
-    };
-
-    window.addEventListener("storage", handleStorageSync);
-    return () => window.removeEventListener("storage", handleStorageSync);
-  }, [lectureFilesStorageKey, shouldUseUploadsApi]);
-
   const formatDueDate = (dateValue) => {
     if (!dateValue) return "";
     const normalizedDate = String(dateValue).replace(" ", "T");
@@ -858,22 +541,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
     return parts[parts.length - 1].slice(0, 4).toUpperCase();
   };
 
-  const normalizeLectureFileEntries = (entries) => {
-    if (!Array.isArray(entries)) return [];
-
-    return entries
-      .filter((entry) => entry && entry.name && (entry.dataUrl || entry.url))
-      .map((entry) => ({
-        id: entry.id || createClientId("lecture-file"),
-        name: entry.name,
-        size: Number(entry.size) || 0,
-        lastModified: entry.lastModified || Date.now(),
-        mimeType: entry.mimeType || "",
-        dataUrl: entry.dataUrl || "",
-        url: resolveFileHref({ url: entry.url }),
-      }));
-  };
-
   const mapSectionUploadToLectureFile = useCallback((upload) => {
     const name =
       getApiFileDisplayName(upload, upload?.file_path || upload?.path || upload?.url) ||
@@ -900,8 +567,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
   }, []);
 
   const fetchSectionUploads = useCallback(async () => {
-    if (!shouldUseUploadsApi) return;
-
     if (!contentApiId) {
       setUploadedLectureFiles([]);
       if (canManageLecture) {
@@ -935,7 +600,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
     canManageLecture,
     contentApiId,
     mapSectionUploadToLectureFile,
-    shouldUseUploadsApi,
     token,
     uploadCollectionEndpoint,
   ]);
@@ -948,7 +612,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
     const attachmentPath = assignment?.file_path || "";
     const attachmentName =
       getApiFileDisplayName(assignment, attachmentPath) || "assignment.pdf";
-    const storedSettings = readStoredAssignmentSettings(assignment?.id);
 
     return {
       id: `assignment-${assignment.id}`,
@@ -962,7 +625,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
           assignment,
           "close_on_deadline",
           "close_submissions_after_due_date"
-        ) ?? storedSettings.closeSubmissionsAfterDueDate,
+        ) ?? false,
       attachments: attachmentPath
         ? [
             {
@@ -972,13 +635,18 @@ const ContentDetails = ({ role = "lecturer" }) => {
             },
           ]
         : [],
-      doneStudentIds: [],
-      missedStudentIds: [],
+      doneStudentIds:
+        assignment?.done_students ||
+        assignment?.completed_students ||
+        assignment?.doneStudentIds ||
+        [],
+      missedStudentIds:
+        assignment?.missed_students || assignment?.missedStudentIds || [],
     };
   }, []);
 
   const fetchSectionAssignments = useCallback(async () => {
-    const canFetch = shouldFetchAssignmentsFromApi && contentApiId;
+    const canFetch = Boolean(contentApiId);
     if (!canFetch) {
       if (canManageAssignmentsViaApi && !contentApiId) {
         setSectionAssignmentsError(
@@ -1021,7 +689,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
     canManageAssignmentsViaApi,
     contentApiId,
     mapSectionAssignmentToCard,
-    shouldFetchAssignmentsFromApi,
     token,
   ]);
 
@@ -1162,7 +829,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
             headers: buildApiHeaders(token),
           }
         );
-        removeStoredAssignmentSettings(assignmentToDelete.apiId);
         await fetchSectionAssignments();
         cancelEdit();
       } catch (error) {
@@ -1192,8 +858,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
             revokeEntryUrl(attachment);
           }
         });
-        removeStoredAssignmentSettings(id);
-
         return {
           ...prev,
           assignments: prev.assignments.filter(
@@ -1273,27 +937,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
       ...prev,
       [field]: value,
     }));
-  };
-
-  const openQuizDialog = () => {
-    if (!canManageLecture) return;
-    setQuizDialogMode("create");
-    setQuizEditingId(null);
-    setQuizForm(getDefaultQuizForm());
-    setQuizDialogOpen(true);
-  };
-
-  const openQuizEditDialog = (quiz) => {
-    if (!canManageLecture) return;
-    setQuizDialogMode("edit");
-    setQuizEditingId(quiz.id);
-    setQuizForm({
-      title: quiz.title || "",
-      timeLimit: sanitizeQuizNumber(quiz.timeLimit, 1, 180, 30),
-      questionCount: sanitizeQuizNumber(quiz.questionCount, 1, 200, 10),
-      shuffleQuestions: !!quiz.shuffleQuestions,
-    });
-    setQuizDialogOpen(true);
   };
 
   const openQuizBuilderPage = (quiz = null) => {
@@ -1444,55 +1087,14 @@ const ContentDetails = ({ role = "lecturer" }) => {
               headers: buildApiHeaders(token),
             }
           );
-          const currentStoredSettings = readStoredAssignmentSettings(
-            assignmentToUpdate.apiId
-          );
-          writeStoredAssignmentSettings(assignmentToUpdate.apiId, {
-            closeSubmissionsAfterDueDate:
-              assignmentForm.closeSubmissionsAfterDueDate,
-            dueDate: assignmentForm.dueDate,
-          });
         } else {
           formData.append(assignmentOwnerField, String(contentApiId));
-          const createResponse = await axios.post(createAssignmentEndpoint, formData, {
+          await axios.post(createAssignmentEndpoint, formData, {
             headers: buildApiHeaders(token),
           });
-
-          const createdAssignmentId =
-            createResponse?.data?.data?.id ??
-            createResponse?.data?.data?.assignment_id ??
-            createResponse?.data?.assignment?.id ??
-            createResponse?.data?.assignment_id ??
-            createResponse?.data?.id ??
-            null;
-
-          if (createdAssignmentId) {
-            writeStoredAssignmentSettings(createdAssignmentId, {
-              closeSubmissionsAfterDueDate:
-                assignmentForm.closeSubmissionsAfterDueDate,
-              dueDate: assignmentForm.dueDate,
-            });
-          }
         }
 
-        const nextAssignments = await fetchSectionAssignments();
-        if (!isEditMode) {
-          const createdAssignment = nextAssignments.find(
-            (assignment) =>
-              assignment.title === trimmed &&
-              assignment.dueDate === assignmentForm.dueDate &&
-              Number(assignment.maxScore) ===
-                (Number(assignmentForm.maxScore) || 100)
-          );
-
-          if (createdAssignment?.apiId) {
-            writeStoredAssignmentSettings(createdAssignment.apiId, {
-              closeSubmissionsAfterDueDate:
-                assignmentForm.closeSubmissionsAfterDueDate,
-              dueDate: assignmentForm.dueDate,
-            });
-          }
-        }
+        await fetchSectionAssignments();
         closeAssignmentDialog();
       } catch (error) {
         setSectionAssignmentsError(
@@ -1504,37 +1106,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
       }
       return;
     }
-
-    const nextAssignmentId = `a-${Date.now()}`;
-    writeStoredAssignmentSettings(nextAssignmentId, {
-      closeSubmissionsAfterDueDate:
-        assignmentForm.closeSubmissionsAfterDueDate,
-      dueDate: assignmentForm.dueDate,
-    });
-
-    setLectureData((prev) => ({
-      ...prev,
-      assignments: [
-        ...prev.assignments,
-        {
-          id: nextAssignmentId,
-          title: trimmed,
-          description: assignmentForm.description.trim(),
-          dueDate: assignmentForm.dueDate,
-          maxScore: Number(assignmentForm.maxScore) || 100,
-          closeSubmissionsAfterDueDate:
-            assignmentForm.closeSubmissionsAfterDueDate,
-          attachments: assignmentForm.files.map((file) => ({
-            name: file.name,
-            url: file.url,
-          })),
-          doneStudentIds: [],
-          missedStudentIds: [],
-        },
-      ],
-    }));
-
-    closeAssignmentDialog({ keepUploadedFiles: true });
   };
 
   const addQuizFromDialog = (event) => {
@@ -1624,7 +1195,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
           headers: buildApiHeaders(token),
         }
       );
-      removeStoredAssignmentSettings(assignmentToDelete.apiId);
       await fetchSectionAssignments();
       closeAssignmentDialog();
     } catch (error) {
@@ -1642,49 +1212,23 @@ const ContentDetails = ({ role = "lecturer" }) => {
     setLectureUploadError("");
 
     try {
-      if (shouldUseUploadsApi) {
-        if (!contentApiId) {
-          setLectureUploadError(
-            "No active lecture or section selected. Open content details from the course page."
-          );
-          return;
-        }
-
-        const selectedFile = files[0];
-        const formData = new FormData();
-        formData.append(uploadOwnerField, String(contentApiId));
-        formData.append("upload_file", selectedFile);
-
-        await axios.post(createUploadEndpoint, formData, {
-          headers: buildApiHeaders(token),
-        });
-
-        await fetchSectionUploads();
+      if (!contentApiId) {
+        setLectureUploadError(
+          "No active lecture or section selected. Open content details from the course page."
+        );
         return;
       }
 
-      const fileEntries = await Promise.all(
-        files.map(async (file) => ({
-          id: createClientId("lecture-file"),
-          name: file.name,
-          size: file.size,
-          lastModified: file.lastModified,
-          mimeType: file.type || "",
-          dataUrl: await readFileAsDataUrl(file),
-          url: "",
-        }))
-      );
+      const selectedFile = files[0];
+      const formData = new FormData();
+      formData.append(uploadOwnerField, String(contentApiId));
+      formData.append("upload_file", selectedFile);
 
-      setUploadedLectureFiles((prev) => {
-        const existingFiles = new Set(
-          prev.map((file) => `${file.name}-${file.size}-${file.lastModified}`)
-        );
-        const uniqueEntries = fileEntries.filter(
-          (file) =>
-            !existingFiles.has(`${file.name}-${file.size}-${file.lastModified}`)
-        );
-        return [...prev, ...uniqueEntries];
+      await axios.post(createUploadEndpoint, formData, {
+        headers: buildApiHeaders(token),
       });
+
+      await fetchSectionUploads();
     } catch (error) {
       setLectureUploadError(
         error?.response?.data?.message || "Upload failed. Please try again."
@@ -1696,35 +1240,23 @@ const ContentDetails = ({ role = "lecturer" }) => {
   };
 
   const removeLectureFile = async (fileId) => {
-    if (shouldUseUploadsApi && canManageUploadsViaApi) {
-      const target = uploadedLectureFiles.find((file) => file.id === fileId);
-      if (!target?.apiId) return;
+    if (!canManageUploadsViaApi) return;
+    const target = uploadedLectureFiles.find((file) => file.id === fileId);
+    if (!target?.apiId) return;
 
-      try {
-        setLectureUploadError("");
-        await axios.delete(getUploadDeleteEndpoint(target.apiId), {
-          headers: buildApiHeaders(token),
-        });
-        setUploadedLectureFiles((prev) =>
-          prev.filter((file) => file.id !== fileId)
-        );
-      } catch (error) {
-        setLectureUploadError(
-          error?.response?.data?.message || "Failed to delete file."
-        );
-      }
-      return;
+    try {
+      setLectureUploadError("");
+      await axios.delete(getUploadDeleteEndpoint(target.apiId), {
+        headers: buildApiHeaders(token),
+      });
+      setUploadedLectureFiles((prev) =>
+        prev.filter((file) => file.id !== fileId)
+      );
+    } catch (error) {
+      setLectureUploadError(
+        error?.response?.data?.message || "Failed to delete file."
+      );
     }
-
-    setUploadedLectureFiles((prev) => {
-      const target = prev.find((file) => file.id === fileId);
-
-      if (target?.url?.startsWith("blob:")) {
-        revokeEntryUrl(target);
-      }
-
-      return prev.filter((file) => file.id !== fileId);
-    });
   };
 
   const isAssignmentFormValid = assignmentForm.title.trim().length > 0;
@@ -1774,11 +1306,9 @@ const ContentDetails = ({ role = "lecturer" }) => {
                   ref={lectureFileInputRef}
                   className="lecture-details-hidden-file"
                   accept={
-                    shouldUseUploadsApi
-                      ? isSectionView
-                        ? ".pdf,.ppt,.pptx,.doc,.docx"
-                        : ".pdf,.ppt,.pptx"
-                      : undefined
+                    isSectionView
+                      ? ".pdf,.ppt,.pptx,.doc,.docx"
+                      : ".pdf,.ppt,.pptx"
                   }
                   onChange={onUploadLectureFile}
                 />
@@ -1796,7 +1326,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
             {isUploadingLectureFiles && (
               <p className="lecture-content-hint">Uploading file(s)...</p>
             )}
-            {shouldUseUploadsApi && isFetchingSectionUploads && (
+            {isFetchingSectionUploads && (
               <p className="lecture-content-hint">Loading uploaded files...</p>
             )}
 
