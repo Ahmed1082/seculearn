@@ -102,11 +102,9 @@ const getContentId = (assignment, source) => {
 };
 
 const getTrackerEndpoint = (courseId) =>
-  toAbsoluteApiUrl(
-    courseId
-      ? `/api/student/assignments-tracker/${courseId}`
-      : "/api/student/assignments-tracker"
-  );
+  courseId
+    ? `/api/student/assignments-tracker/${courseId}`
+    : "/api/student/assignments-tracker";
 
 const extractAssignments = (payload) => {
   if (Array.isArray(payload?.assignments)) return payload.assignments;

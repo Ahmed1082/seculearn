@@ -296,7 +296,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
   useEffect(() => {
     const fetchCourse = async () => {
       try {
-        const res = await axios.get(`${API_BASE_URL}/api/get-courses`, {
+        const res = await axios.get("/api/get-courses", {
           headers: buildApiHeaders(token),
         });
 

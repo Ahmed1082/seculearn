@@ -357,7 +357,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${API_BASE_URL}/api/dr-ta/assignment/${assignmentId}/get-assignment-submissions`,
+        `/api/dr-ta/assignment/${assignmentId}/get-assignment-submissions`,
         { headers: buildApiHeaders(token) }
       );
       const data = unwrapApiObject(res.data);
@@ -418,7 +418,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `${API_BASE_URL}/api/dr-ta/submission/${submissionId}/save-grade`,
+        `/api/dr-ta/submission/${submissionId}/save-grade`,
         { grade },
         { headers: buildApiHeaders(token) }
       );
@@ -432,7 +432,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${API_BASE_URL}/api/dr-ta/assignment/${assignmentId}/student/${studentId}`,
+        `/api/dr-ta/assignment/${assignmentId}/student/${studentId}`,
         { headers: buildApiHeaders(token) }
       );
       return res.data || null;
@@ -447,7 +447,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.delete(
-        `${API_BASE_URL}/api/dr-ta/submission/${submissionId}/return`,
+        `/api/dr-ta/submission/${submissionId}/return`,
         { headers: buildApiHeaders(token) }
       );
       return unwrapApiObject(res.data);
@@ -474,7 +474,7 @@ const AssignmentReview = () => {
       }
 
       const res = await axios.post(
-        `${API_BASE_URL}/api/add-comment`,
+        "/api/add-comment",
         formData,
         { headers: buildApiHeaders(token) }
       );
@@ -492,7 +492,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${API_BASE_URL}/api/get-class-comments/${assignmentId}`,
+        `/api/get-class-comments/${assignmentId}`,
         { headers: buildApiHeaders(token) }
       );
       // Handle both array and object with data property
@@ -509,7 +509,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `${API_BASE_URL}/api/get-private-comments/${assignmentId}`,
+        `/api/get-private-comments/${assignmentId}`,
         { headers: buildApiHeaders(token) }
       );
       // Handle both array and object with data property
@@ -526,7 +526,7 @@ const AssignmentReview = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `${API_BASE_URL}/api/delete-comment/${commentId}`,
+        `/api/delete-comment/${commentId}`,
         { headers: buildApiHeaders(token) }
       );
       return true;
@@ -544,7 +544,7 @@ const AssignmentReview = () => {
       formData.append("message", text);
       formData.append("is_private", String(isPrivate));
       await axios.post(
-        `${API_BASE_URL}/api/update-comment/${commentId}`,
+        `/api/update-comment/${commentId}`,
         formData,
         { headers: buildApiHeaders(token) }
       );

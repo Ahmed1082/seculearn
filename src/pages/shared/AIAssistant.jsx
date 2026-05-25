@@ -182,14 +182,21 @@ const AIAssistant = ({ role = "student" }) => {
 
             const allQuizzes = quizCollections.flat().filter((q) => q && q.id);
             allQuizzes.forEach((q) => {
-              const rawScore = q.score ?? q.percentage;
+              const attempts = q.attempts || [];
+              const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
+              const firstAttemptScore = hasAttempts ? attempts[0]?.score : null;
+              
+              const rawScore = q.score ?? q.percentage ?? firstAttemptScore;
               const score = (rawScore !== null && rawScore !== undefined && rawScore !== "") ? Number(rawScore) : null;
               
+              const rawStatus = String(q.status || "").trim().toLowerCase();
+              const isDone = hasAttempts || ["done", "completed", "complete", "submitted"].includes(rawStatus);
+
               if (score !== null && !isNaN(score)) {
                 quizScoresSum += score;
                 gradedQuizzesCount++;
               }
-              if (q.status === "missed" || q.status === "expired" || q.status === "closed") {
+              if (!isDone && (rawStatus === "missed" || rawStatus === "expired" || rawStatus === "closed")) {
                 missedQuizzesCount++;
               }
             });

@@ -72,29 +72,40 @@ const statusConfig = {
   missed: { label: "Missed", icon: FiXCircle },
 };
 
-const normalizeApiQuiz = (apiQuiz, content, course) => ({
-  id: String(apiQuiz?.id || ""),
-  title: apiQuiz?.title || `Quiz ${apiQuiz?.id || ""}`,
-  duration_minutes:
-    toNumberOrNull(apiQuiz?.duration_minutes) ??
-    toNumberOrNull(apiQuiz?.time_limit) ??
-    30,
-  question_count:
-    toNumberOrNull(apiQuiz?.questions_count) ??
-    toNumberOrNull(apiQuiz?.question_count) ??
-    (Array.isArray(apiQuiz?.questions) ? apiQuiz.questions.length : 0),
-  passing_percentage:
-    toNumberOrNull(apiQuiz?.passing_percentage) ??
-    toNumberOrNull(apiQuiz?.passingScore) ??
-    60,
-  status: normalizeQuizStatus(apiQuiz?.status),
-  score:
-    toNumberOrNull(apiQuiz?.score) ??
-    toNumberOrNull(apiQuiz?.percentage) ??
-    null,
-  content,
-  course,
-});
+const normalizeApiQuiz = (apiQuiz, content, course) => {
+  const attempts = apiQuiz?.attempts || [];
+  const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
+  const firstAttemptScore = hasAttempts ? attempts[0]?.score : null;
+  const rawStatus = apiQuiz?.status;
+  const isDone = hasAttempts || [
+    "done", "completed", "complete", "submitted"
+  ].includes(String(rawStatus || "").trim().toLowerCase());
+
+  return {
+    id: String(apiQuiz?.id || ""),
+    title: apiQuiz?.title || `Quiz ${apiQuiz?.id || ""}`,
+    duration_minutes:
+      toNumberOrNull(apiQuiz?.duration_minutes) ??
+      toNumberOrNull(apiQuiz?.time_limit) ??
+      30,
+    question_count:
+      toNumberOrNull(apiQuiz?.questions_count) ??
+      toNumberOrNull(apiQuiz?.question_count) ??
+      (Array.isArray(apiQuiz?.questions) ? apiQuiz.questions.length : 0),
+    passing_percentage:
+      toNumberOrNull(apiQuiz?.passing_percentage) ??
+      toNumberOrNull(apiQuiz?.passingScore) ??
+      60,
+    status: isDone ? "done" : normalizeQuizStatus(rawStatus),
+    score:
+      toNumberOrNull(apiQuiz?.score) ??
+      toNumberOrNull(apiQuiz?.percentage) ??
+      toNumberOrNull(firstAttemptScore) ??
+      null,
+    content,
+    course,
+  };
+};
 
 const StudentAllQuizzes = () => {
   const navigate = useNavigate();
@@ -119,7 +130,7 @@ const StudentAllQuizzes = () => {
     setErrorMsg("");
 
     try {
-      const coursesResponse = await axios.get(`${API_BASE_URL}/api/get-courses`, {
+      const coursesResponse = await axios.get("/api/get-courses", {
         headers: buildApiHeaders(token),
       });
 

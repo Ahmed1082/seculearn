@@ -36,7 +36,7 @@ const OverviewDashboard = ({ coursesPath, userFallbackName }) => {
     setError(null);
     
     try {
-      const res = await axios.get(`${API_BASE_URL}/api/dr-ta/dashboard`, {
+      const res = await axios.get("/api/dr-ta/dashboard", {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
