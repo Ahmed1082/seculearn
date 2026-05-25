@@ -64,30 +64,18 @@ const AIAssistant = ({ role = "student" }) => {
   // Stats States
   const [statsLoading, setStatsLoading] = useState(true);
   const [studentStats, setStudentStats] = useState({
-    avgQuizScore: 92,
-    assignmentsDone: 12,
+    avgQuizScore: 0,
+    assignmentsDone: 0,
     missedItems: 0,
-    ctfPoints: 2150,
+    ctfPoints: 0,
   });
 
   const [instructorStats, setInstructorStats] = useState({
-    coursesCount: 3,
-    avgSubmission: 78,
-    avgQuizScore: 87,
-    studentsCount: 10,
+    coursesCount: 0,
+    avgSubmission: 0,
+    avgQuizScore: 0,
+    studentsCount: 0,
   });
-
-  // Load cached result from localStorage on mount
-  useEffect(() => {
-    const cached = localStorage.getItem(`ai_assistant_result_${role}_${user?.id || "default"}`);
-    if (cached) {
-      try {
-        setResult(JSON.parse(cached));
-      } catch (e) {
-        console.error("Failed to parse cached recommendations:", e);
-      }
-    }
-  }, [role, user?.id]);
 
   // Fetch actual data to compute metrics
   useEffect(() => {
@@ -125,11 +113,25 @@ const AIAssistant = ({ role = "student" }) => {
               "/api/student/assignments-tracker",
               { headers: buildApiHeaders(token) }
             );
-            const assignmentsList = assignmentsRes.data?.assignments || assignmentsRes.data?.data || [];
-            completedAssignments = assignmentsList.filter(
-              (a) => a.status === "submitted" || a.status === "done"
-            ).length;
-            missedAssignments = assignmentsList.filter((a) => a.status === "missed").length;
+            const payload = assignmentsRes.data;
+            const stats = payload?.stats || payload?.data?.stats || {};
+            
+            if (stats.submitted !== undefined) {
+              completedAssignments = Number(stats.submitted ?? 0);
+              missedAssignments = Number(stats.missed ?? 0);
+            } else {
+              const assignmentsList = Array.isArray(payload?.assignments) ? payload.assignments : 
+                                      Array.isArray(payload?.data?.assignments) ? payload.data.assignments : 
+                                      Array.isArray(payload?.data) ? payload.data : [];
+                                      
+              completedAssignments = assignmentsList.filter(
+                (a) => {
+                  const status = String(a.status || "").toLowerCase();
+                  return status === "submitted" || status === "done";
+                }
+              ).length;
+              missedAssignments = assignmentsList.filter((a) => String(a.status || "").toLowerCase() === "missed").length;
+            }
           } catch (err) {
             console.error("Failed to fetch assignments for metrics:", err);
           }
@@ -195,24 +197,24 @@ const AIAssistant = ({ role = "student" }) => {
             console.error("Failed to fetch quizzes for metrics:", err);
           }
 
-          const calculatedAvg = gradedQuizzesCount > 0 ? Math.round(quizScoresSum / gradedQuizzesCount) : 92;
+          const calculatedAvg = gradedQuizzesCount > 0 ? Math.round(quizScoresSum / gradedQuizzesCount) : 0;
 
           setStudentStats({
-            avgQuizScore: calculatedAvg,
-            assignmentsDone: completedAssignments || 12,
-            missedItems: (missedQuizzesCount + missedAssignments) || 0,
-            ctfPoints: ctfPointsCount || 2150,
+            avgQuizScore: gradedQuizzesCount > 0 ? calculatedAvg : 0,
+            assignmentsDone: completedAssignments,
+            missedItems: missedQuizzesCount + missedAssignments,
+            ctfPoints: ctfPointsCount,
           });
         } else {
           // Lecturer or TA
           const totalCourses = coursesList.length;
-          const totalStudents = coursesList.reduce((sum, c) => sum + (c.memberCount || c.member_count || 10), 0);
+          const totalStudents = coursesList.reduce((sum, c) => sum + (c.memberCount || c.member_count || 0), 0);
 
           setInstructorStats({
-            coursesCount: totalCourses || 3,
-            avgSubmission: 78,
-            avgQuizScore: 87,
-            studentsCount: totalStudents || 10,
+            coursesCount: totalCourses,
+            avgSubmission: 0,
+            avgQuizScore: 0,
+            studentsCount: totalStudents,
           });
         }
       } catch (err) {
@@ -242,207 +244,6 @@ const AIAssistant = ({ role = "student" }) => {
       placeholder: "Optional: focus area (e.g. 'How should I give better written feedback on assignments?').",
     },
   }[role];
-
-  // Client-side AI Recommendations Engine
-  const generateLocalRecommendations = (focusText) => {
-    const cleaned = focusText.toLowerCase().trim();
-
-    if (role === "student") {
-      const { avgQuizScore, assignmentsDone, ctfPoints } = studentStats;
-
-      if (cleaned.includes("vpn") || cleaned.includes("network") || cleaned.includes("protocol")) {
-        return {
-          summary: `${userName}, based on your query about networking, we've analyzed your progress in Network Security modules. You have a solid foundation in firewall rules, but transitioning to secure tunneling protocols needs a quick review.`,
-          strengths: [
-            "Strong score in Firewall Configuration quizzes.",
-            "Completed the introductory Network Reconnaissance CTF challenges.",
-            "Consistent engagement with Lecture 2 materials."
-          ],
-          focus_areas: [
-            "VPN protocols comparison (IPsec vs SSL/TLS tunnels).",
-            "Intrusion Detection Systems (IDS) alert analysis.",
-            "Advanced packet filtering techniques."
-          ],
-          recommendations: [
-            {
-              title: "Review VPN Protocols",
-              detail: "Revisit 'Lecture 2: Network Security Basics' focusing on VPN Protocols to solidify your understanding, as indicated by a lower quiz score in this area.",
-              priority: "high",
-              category: "Study"
-            },
-            {
-              title: "Tackle Network Security CTFs",
-              detail: "Attempt the 'Firewall Bypass' CTF challenge to apply and enhance your practical skills in network security.",
-              priority: "medium",
-              category: "CTF"
-            }
-          ],
-          next_steps: [
-            "Re-watch the lecture on VPN Protocols in 'Network Security Basics'.",
-            "Complete the 'Firewall Bypass' CTF to apply network security knowledge."
-          ]
-        };
-      }
-
-      if (cleaned.includes("cryptography") || cleaned.includes("crypto") || cleaned.includes("key")) {
-        return {
-          summary: `${userName}, your cryptography progress is outstanding. You have achieved high scores in Symmetric Encryption, but asymmetric key management concepts require closer review to prevent security gaps.`,
-          strengths: [
-            "Excellent score on Symmetric Encryption quizzes.",
-            "Decoupled key management concepts understood.",
-            "Solved the 'Vigenère Cipher' challenge on first attempt."
-          ],
-          focus_areas: [
-            "Asymmetric key exchange algorithms (Diffie-Hellman).",
-            "RSA padding schemes (OAEP) and mathematical security foundations.",
-            "Secure storage of private keys in Docker containers."
-          ],
-          recommendations: [
-            {
-              title: "Deep Dive into Key Management",
-              detail: "Spend additional time on 'Lecture 1: Symmetric Encryption' and the 'Key Management' topic to reinforce this crucial aspect of cryptography.",
-              priority: "high",
-              category: "Study"
-            },
-            {
-              title: "Advanced Cryptography Concepts",
-              detail: "Given your strong foundation, consider exploring more advanced topics in cryptography beyond the current curriculum, perhaps through external resources.",
-              priority: "low",
-              category: "Study"
-            }
-          ],
-          next_steps: [
-            "Review RSA and Diffie-Hellman implementation details.",
-            "Attempt the advanced cryptography CTF challenge."
-          ]
-        };
-      }
-
-      if (cleaned.includes("reverse") || cleaned.includes("malware") || cleaned.includes("assembly") || cleaned.includes("binary")) {
-        return {
-          summary: `${userName}, binary analysis is one of the most challenging topics, but your x86 knowledge is developing. Focusing on compiler optimization and assembly reading will help you progress further.`,
-          strengths: [
-            "Good understanding of x86 calling conventions.",
-            "Basic stack buffer overflow defense knowledge.",
-            "Strong local debugger usage skills."
-          ],
-          focus_areas: [
-            "GDB debugging and assembly analysis.",
-            "Malware obfuscation techniques.",
-            "Reverse engineering compiled C binaries."
-          ],
-          recommendations: [
-            {
-              title: "Explore Reverse Engineering",
-              detail: "Consider exploring the 'Malware Reverse' CTF to challenge yourself in a new, advanced area, expanding your practical skillset.",
-              priority: "low",
-              category: "CTF"
-            }
-          ],
-          next_steps: [
-            "Practice tracing execution in GDB.",
-            "Solve assembly instruction quizzes."
-          ]
-        };
-      }
-
-      // Default Student Response
-      return {
-        summary: `${userName}, your performance is strong across the board, demonstrating a solid grasp of core cybersecurity concepts. While excelling in many areas, there are specific topics where a bit more focus can elevate your understanding further.`,
-        strengths: [
-          `Excellent overall quiz performance with an average score of ${avgQuizScore}%.`,
-          `Perfect record with ${assignmentsDone} assignments submitted.`,
-          `High engagement and proficiency in CTFs, earning ${ctfPoints} points.`,
-          "Strong understanding of Threat Landscape Overview and Ethical Hacking Reconnaissance."
-        ],
-        focus_areas: [
-          "Network Security Basics, specifically VPN Protocols.",
-          "Cryptography, particularly Key Management.",
-          "Certain advanced CTF categories like Reverse Engineering and Network Security (Firewall Bypass)."
-        ],
-        recommendations: [
-          {
-            title: "Review VPN Protocols",
-            detail: "Revisit 'Lecture 2: Network Security Basics' focusing on VPN Protocols to solidify your understanding, as indicated by a lower quiz score in this area.",
-            priority: "high",
-            category: "Study"
-          },
-          {
-            title: "Deep Dive into Key Management",
-            detail: "Spend additional time on 'Lecture 1: Symmetric Encryption' and the 'Key Management' topic to reinforce this crucial aspect of cryptography.",
-            priority: "high",
-            category: "Study"
-          },
-          {
-            title: "Tackle Network Security CTFs",
-            detail: "Attempt the 'Firewall Bypass' CTF challenge to apply and enhance your practical skills in network security.",
-            priority: "medium",
-            category: "CTF"
-          },
-          {
-            title: "Explore Reverse Engineering",
-            detail: "Consider exploring the 'Malware Reverse' CTF to challenge yourself in a new, advanced area, expanding your practical skillset.",
-            priority: "low",
-            category: "CTF"
-          },
-          {
-            title: "Advanced Cryptography Concepts",
-            detail: "Given your strong foundation, consider exploring more advanced topics in cryptography beyond the current curriculum, perhaps through external resources.",
-            priority: "low",
-            category: "Study"
-          }
-        ],
-        next_steps: [
-          "Re-watch the lecture on VPN Protocols in 'Network Security Basics'.",
-          "Complete the 'Firewall Bypass' CTF to apply network security knowledge.",
-          "Review external resources or SecuLearn advanced modules on key management best practices and considerations."
-        ]
-      };
-    } else {
-      // Instructor / Lecturer / TA Response
-      const isTa = role === "ta";
-      const { coursesCount, avgSubmission, avgQuizScore, studentsCount } = instructorStats;
-
-      return {
-        summary: `Class-wide performance across your ${coursesCount} courses is generally strong, with an average assignment submission rate of ${avgSubmission}%. However, there are noticeable drop-offs in quiz performance on specific challenging lectures.`,
-        strengths: [
-          `Excellent submission rate (${avgSubmission}%) on assignments across ${studentsCount} students.`,
-          "Strong active participation in containerized CTF labs.",
-          `High class average (${avgQuizScore}%) in introductory threat assessment modules.`
-        ],
-        focus_areas: [
-          "Improve student participation rates in late-term assignments.",
-          "Reinforce advanced topics like Public Key Infrastructure and Buffer Overflows.",
-          isTa ? "Provide targeted assistance to student groups struggling with debugging." : "Optimize lecture content delivery for hybrid sections."
-        ],
-        recommendations: [
-          {
-            title: "Review Sessions for Cryptography",
-            detail: "Plan a dedicated Q&A session on Public Key Infrastructure before the next major quiz, as students struggled with key exchange concepts.",
-            priority: "high",
-            category: "Lecture"
-          },
-          {
-            title: "Optimize CTF Clues",
-            detail: "Provide additional hints or resources for the 'Buffer Overflow' challenge to boost completion rates among struggling student groups.",
-            priority: "medium",
-            category: "CTF"
-          },
-          {
-            title: "Active Grading Policy",
-            detail: "Implement automated grading checks or reminders to assist students in submitting overdue assignments.",
-            priority: "low",
-            category: "Assignment"
-          }
-        ],
-        next_steps: [
-          "Schedule a Q&A session on Asymmetric Cryptography.",
-          "Update the instructions for the SQL Injection lab to clarify connection issues.",
-          "Monitor submission rates for the upcoming threat modeling assignment."
-        ]
-      };
-    }
-  };
 
   const generate = async () => {
     setLoading(true);
@@ -480,29 +281,14 @@ const AIAssistant = ({ role = "student" }) => {
       }
 
       setResult(responseData);
-      localStorage.setItem(
-        `ai_assistant_result_${role}_${user?.id || "default"}`,
-        JSON.stringify(responseData)
-      );
     } catch (err) {
-      console.error("AI Generation Error: falling back to client-side model.", err);
+      console.error("AI Generation Error:", err);
       setError(
         err.response?.data?.message ||
         err.message ||
         "Could not connect to AI server"
       );
-
-      // Attempt local fallback
-      try {
-        const localData = generateLocalRecommendations(focus);
-        setResult(localData);
-        localStorage.setItem(
-          `ai_assistant_result_${role}_${user?.id || "default"}`,
-          JSON.stringify(localData)
-        );
-      } catch (fallbackErr) {
-        console.error("Local fallback failed:", fallbackErr);
-      }
+      setResult(null);
     } finally {
       setLoading(false);
     }

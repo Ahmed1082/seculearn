@@ -180,7 +180,7 @@ const Login = () => {
       <div className="login-container">
         
         {/* LEFT SIDE */}
-        <div className="login-left">
+        <form className="login-left" onSubmit={handleLogin}>
           <h1 className="login-title">LOG IN</h1>
 
           {/* Custom Dropdown */}
@@ -238,13 +238,13 @@ const Login = () => {
           <p className="forgot">Forgot Password ?</p>
 
           <button 
+            type="submit"
             className="login-submit-btn" 
-            onClick={handleLogin}
             disabled={loading}
           >
             {loading ? "Logging In..." : "Log In"}
           </button>
-        </div>
+        </form>
 
         {/* RIGHT SIDE */}
         <div className="login-right">
