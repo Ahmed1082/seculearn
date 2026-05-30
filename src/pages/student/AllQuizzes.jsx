@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../app/apiClient";
 import { getQuizzesList } from "../../app/quizApi";
@@ -65,6 +65,15 @@ const statusConfig = {
   missed: { label: "Missed", icon: FiXCircle },
 };
 
+const sortQuizzes = (items) =>
+  [...items].sort((a, b) => {
+    const courseCompare = (a.course?.name || "").localeCompare(
+      b.course?.name || ""
+    );
+    if (courseCompare !== 0) return courseCompare;
+    return a.title.localeCompare(b.title);
+  });
+
 const mapWithConcurrency = async (
   items,
   mapper,
@@ -124,6 +133,7 @@ const normalizeApiQuiz = (apiQuiz, content, course) => {
 const StudentAllQuizzes = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  const activeLoadRef = useRef(0);
 
   const [loadState, setLoadState] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
@@ -133,6 +143,9 @@ const StudentAllQuizzes = () => {
   const [activeCourse, setActiveCourse] = useState("all");
 
   const fetchAllQuizzes = useCallback(async () => {
+    const loadId = activeLoadRef.current + 1;
+    activeLoadRef.current = loadId;
+
     if (!token) {
       setCourses([]);
       setQuizzes([]);
@@ -142,9 +155,11 @@ const StudentAllQuizzes = () => {
 
     setLoadState("loading");
     setErrorMsg("");
+    setQuizzes([]);
 
     try {
       const coursesResponse = await apiRequest("/api/get-courses", { token });
+      if (activeLoadRef.current !== loadId) return;
 
       const rawCourses = Array.isArray(coursesResponse?.data?.courses)
         ? coursesResponse.data.courses
@@ -183,11 +198,18 @@ const StudentAllQuizzes = () => {
         ];
       });
 
+      if (quizTargets.length === 0) {
+        setLoadState("ready");
+        return;
+      }
+
       const quizCollections = await mapWithConcurrency(
         quizTargets,
         async ({ params, content, course }) => {
           try {
             const quizList = await getQuizzesList(params, token);
+            if (activeLoadRef.current !== loadId) return [];
+
             const rawItems =
               (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
               (Array.isArray(quizList?.data) && quizList.data) ||
@@ -195,27 +217,23 @@ const StudentAllQuizzes = () => {
               (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
               (Array.isArray(quizList) ? quizList : []);
 
-            return rawItems.map((quiz) => normalizeApiQuiz(quiz, content, course));
+            const normalized = rawItems
+              .map((quiz) => normalizeApiQuiz(quiz, content, course))
+              .filter((quiz) => quiz.id);
+
+            return normalized;
           } catch {
             return [];
           }
         }
       );
 
-      setQuizzes(
-        quizCollections
-          .flat()
-          .filter((quiz) => quiz.id)
-          .sort((a, b) => {
-            const courseCompare = (a.course?.name || "").localeCompare(
-              b.course?.name || ""
-            );
-            if (courseCompare !== 0) return courseCompare;
-            return a.title.localeCompare(b.title);
-          })
-      );
-      setLoadState("ready");
+      if (activeLoadRef.current === loadId) {
+        setQuizzes(sortQuizzes(quizCollections.flat()));
+        setLoadState("ready");
+      }
     } catch (error) {
+      if (activeLoadRef.current !== loadId) return;
       setCourses([]);
       setQuizzes([]);
       setErrorMsg(error?.message || "Failed to load quizzes.");
@@ -228,7 +246,10 @@ const StudentAllQuizzes = () => {
       fetchAllQuizzes();
     }, 0);
 
-    return () => window.clearTimeout(loadTimer);
+    return () => {
+      activeLoadRef.current += 1;
+      window.clearTimeout(loadTimer);
+    };
   }, [fetchAllQuizzes]);
 
   const stats = useMemo(() => {
@@ -453,6 +474,7 @@ const StudentAllQuizzes = () => {
               value={activeCourse}
               onChange={(event) => setActiveCourse(event.target.value)}
               aria-label="Filter quizzes by course"
+              disabled={loadState === "loading"}
             >
               <option value="all">All Courses</option>
               {courses.map((course) => (
@@ -471,7 +493,8 @@ const StudentAllQuizzes = () => {
               <p>No quizzes match the selected filter.</p>
             </article>
           ) : (
-            filteredQuizzes.map((quiz) => {
+            <>
+              {filteredQuizzes.map((quiz) => {
               const config = statusConfig[quiz.status] || statusConfig.pending;
               const StatusIcon = config.icon;
               const isDone = quiz.status === "done";
@@ -562,7 +585,9 @@ const StudentAllQuizzes = () => {
                   </div>
                 </article>
               );
-            })
+              })}
+
+            </>
           )}
         </section>
       </div>

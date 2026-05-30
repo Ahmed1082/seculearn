@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
 import {
   Sparkles,
   Brain,
@@ -12,18 +11,10 @@ import {
   RefreshCw,
   BookOpen,
 } from "lucide-react";
-import { getStudentChallenges, getInstructorChallenges } from "../../app/ctfApi";
+import { apiRequest } from "../../app/apiClient";
+import { getStudentChallenges } from "../../app/ctfApi";
 import { getQuizzesList } from "../../app/quizApi";
 import "../../styles/AIAssistant.css";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
-
-const buildApiHeaders = (token) => ({
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  "ngrok-skip-browser-warning": "true",
-});
 
 const priorityStyles = {
   high: "ai-priority-high",
@@ -31,30 +22,171 @@ const priorityStyles = {
   low: "ai-priority-low",
 };
 
+const QUIZ_REQUEST_CONCURRENCY = 4;
+const METRICS_TIMEOUT_MS = 12000;
+
+const toNumber = (value, fallback = 0) => {
+  if (value === null || value === undefined || value === "") return fallback;
+
+  const parsed = Number(String(value ?? "").replace("%", ""));
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const extractAssignments = (payload) => {
+  if (Array.isArray(payload?.assignments)) return payload.assignments;
+  if (Array.isArray(payload?.data?.assignments)) return payload.data.assignments;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
+};
+
+const getQuizItems = (payload) =>
+  (Array.isArray(payload?.quizzes) && payload.quizzes) ||
+  (Array.isArray(payload?.data) && payload.data) ||
+  (Array.isArray(payload?.quizzes_list) && payload.quizzes_list) ||
+  (Array.isArray(payload?.quizzesList) && payload.quizzesList) ||
+  (Array.isArray(payload) ? payload : []);
+
+const mapWithConcurrency = async (
+  items,
+  mapper,
+  concurrency = QUIZ_REQUEST_CONCURRENCY
+) => {
+  const results = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+};
+
+const getCourseQuizTargets = (coursesList) =>
+  coursesList.flatMap((course) => {
+    const lectureEntries = Array.isArray(course?.lectures) ? course.lectures : [];
+    const sectionEntries = Array.isArray(course?.sections) ? course.sections : [];
+
+    return [
+      ...lectureEntries.map((lecture) => ({ lecture_id: lecture.id })),
+      ...sectionEntries.map((section) => ({ section_id: section.id })),
+    ];
+  });
+
+const getQuizScore = (quiz) => {
+  const attempts = Array.isArray(quiz?.attempts) ? quiz.attempts : [];
+  const firstAttemptScore = attempts.length > 0 ? attempts[0]?.score : null;
+  const rawScore = quiz?.score ?? quiz?.percentage ?? firstAttemptScore;
+
+  if (rawScore === null || rawScore === undefined || rawScore === "") return null;
+
+  const score = Number(rawScore);
+  return Number.isFinite(score) ? score : null;
+};
+
+const isMissedQuiz = (quiz) => {
+  const status = String(quiz?.status || "").trim().toLowerCase();
+  return status === "missed" || status === "expired" || status === "closed";
+};
+
+const getStudentQuizMetrics = async (coursesList, token) => {
+  const quizTargets = getCourseQuizTargets(coursesList);
+
+  const quizCollections = await mapWithConcurrency(
+    quizTargets,
+    async (params) => {
+      try {
+        return getQuizItems(await getQuizzesList(params, token));
+      } catch (error) {
+        console.error("Failed to fetch quiz metrics for content:", error);
+        return [];
+      }
+    }
+  );
+
+  const quizzes = quizCollections.flat();
+  const scores = quizzes
+    .map(getQuizScore)
+    .filter((score) => score !== null);
+  const avgQuizScore = scores.length
+    ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+    : 0;
+
+  return {
+    avgQuizScore,
+    missedQuizzes: quizzes.filter(isMissedQuiz).length,
+  };
+};
+
+const withTimeout = (promise, fallback, label) =>
+  new Promise((resolve) => {
+    const timeoutId = window.setTimeout(() => {
+      console.warn(`${label} metrics timed out.`);
+      resolve(fallback);
+    }, METRICS_TIMEOUT_MS);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timeoutId);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timeoutId);
+        console.error(`Failed to load ${label.toLowerCase()} metrics.`, error);
+        resolve(fallback);
+      });
+  });
+
+const getStudentAssignmentMetrics = (payload) => {
+  const stats = payload?.stats || payload?.data?.stats || {};
+
+  if (
+    stats.submitted !== undefined ||
+    stats.done !== undefined ||
+    stats.completed !== undefined ||
+    stats.missed !== undefined
+  ) {
+    return {
+      assignmentsDone: toNumber(
+        stats.submitted ?? stats.done ?? stats.completed
+      ),
+      missedAssignments: toNumber(stats.missed),
+    };
+  }
+
+  const assignmentsList = extractAssignments(payload);
+  return {
+    assignmentsDone: assignmentsList.filter((assignment) => {
+      const status = String(assignment?.status || "").toLowerCase();
+      return status === "submitted" || status === "done";
+    }).length,
+    missedAssignments: assignmentsList.filter(
+      (assignment) => String(assignment?.status || "").toLowerCase() === "missed"
+    ).length,
+  };
+};
+
+const getInstructorDashboardMetrics = (dashboardPayload, coursesList) => {
+  const payload =
+    dashboardPayload?.status === "success" ? dashboardPayload : dashboardPayload?.data || dashboardPayload;
+  const cards = payload?.cards || {};
+  const progress = payload?.progress_bars || {};
+
+  return {
+    coursesCount: toNumber(cards.total_courses, coursesList.length),
+    avgSubmission: toNumber(progress.overall_submission_rate),
+    avgQuizScore: toNumber(cards.avg_quiz_score ?? progress.average_quiz_score),
+    studentsCount: toNumber(cards.enrolled_students),
+  };
+};
+
 const AIAssistant = ({ role = "student" }) => {
   const token = localStorage.getItem("token");
-  const storedUser = localStorage.getItem("user");
-  
-  const user = useMemo(() => {
-    if (!storedUser) return null;
-    try {
-      return JSON.parse(storedUser);
-    } catch {
-      return null;
-    }
-  }, [storedUser]);
-
-  const userName = useMemo(() => {
-    if (!user) return role === "student" ? "Student" : role === "ta" ? "TA" : "Lecturer";
-    return (
-      user.name ||
-      user.full_name ||
-      user.username ||
-      (user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : "") ||
-      user.first_name ||
-      "User"
-    );
-  }, [user, role]);
 
   const [focus, setFocus] = useState("");
   const [loading, setLoading] = useState(false);
@@ -62,7 +194,6 @@ const AIAssistant = ({ role = "student" }) => {
   const [error, setError] = useState(null);
 
   // Stats States
-  const [statsLoading, setStatsLoading] = useState(true);
   const [studentStats, setStudentStats] = useState({
     avgQuizScore: 0,
     assignmentsDone: 0,
@@ -80,136 +211,88 @@ const AIAssistant = ({ role = "student" }) => {
   // Fetch actual data to compute metrics
   useEffect(() => {
     if (!token) {
-      setStatsLoading(false);
       return;
     }
 
+    let isMounted = true;
+
     const fetchMetrics = async () => {
-      setStatsLoading(true);
       try {
-        // 1. Fetch courses
-        const coursesRes = await axios.get("/api/get-courses", {
-          headers: buildApiHeaders(token),
-        });
-        const coursesList = coursesRes.data?.courses || [];
+        const coursesRes = await apiRequest("/api/get-courses", { token });
+        const coursesList = Array.isArray(coursesRes.data?.courses)
+          ? coursesRes.data.courses
+          : [];
 
         if (role === "student") {
-          // Fetch CTFs
-          let ctfPointsCount = 0;
-          try {
-            const challenges = await getStudentChallenges(token);
-            ctfPointsCount = challenges
-              .filter((c) => c.isSolved)
-              .reduce((sum, c) => sum + (c.points || 0), 0);
-          } catch (err) {
-            console.error("Failed to fetch CTF challenges for metrics:", err);
-          }
+          const [assignmentsResult, quizzesResult, ctfResult] = await Promise.allSettled([
+            withTimeout(
+              apiRequest("/api/student/assignments-tracker", { token }),
+              null,
+              "Assignments"
+            ),
+            withTimeout(
+              getStudentQuizMetrics(coursesList, token),
+              { avgQuizScore: 0, missedQuizzes: 0 },
+              "Quiz"
+            ),
+            withTimeout(getStudentChallenges(token), [], "CTF"),
+          ]);
 
-          // Fetch Assignments
-          let completedAssignments = 0;
-          let missedAssignments = 0;
-          try {
-            const assignmentsRes = await axios.get(
-              "/api/student/assignments-tracker",
-              { headers: buildApiHeaders(token) }
-            );
-            const payload = assignmentsRes.data;
-            const stats = payload?.stats || payload?.data?.stats || {};
-            
-            if (stats.submitted !== undefined) {
-              completedAssignments = Number(stats.submitted ?? 0);
-              missedAssignments = Number(stats.missed ?? 0);
-            } else {
-              const assignmentsList = Array.isArray(payload?.assignments) ? payload.assignments : 
-                                      Array.isArray(payload?.data?.assignments) ? payload.data.assignments : 
-                                      Array.isArray(payload?.data) ? payload.data : [];
-                                      
-              completedAssignments = assignmentsList.filter(
-                (a) => {
-                  const status = String(a.status || "").toLowerCase();
-                  return status === "submitted" || status === "done";
-                }
-              ).length;
-              missedAssignments = assignmentsList.filter((a) => String(a.status || "").toLowerCase() === "missed").length;
-            }
-          } catch (err) {
-            console.error("Failed to fetch assignments for metrics:", err);
-          }
+          const assignmentMetrics =
+            assignmentsResult.status === "fulfilled" && assignmentsResult.value
+              ? getStudentAssignmentMetrics(assignmentsResult.value.data)
+              : { assignmentsDone: 0, missedAssignments: 0 };
+          const quizMetrics =
+            quizzesResult.status === "fulfilled"
+              ? quizzesResult.value
+              : { avgQuizScore: 0, missedQuizzes: 0 };
+          const challenges =
+            ctfResult.status === "fulfilled" && Array.isArray(ctfResult.value)
+              ? ctfResult.value
+              : [];
+          const ctfPointsCount = challenges
+            .filter((challenge) => challenge.isSolved)
+            .reduce((sum, challenge) => sum + toNumber(challenge.points), 0);
 
-          let quizScoresSum = 0;
-          let gradedQuizzesCount = 0;
-          let missedQuizzesCount = 0;
-          try {
-            const studentLectureIds = new Set();
-            const studentSectionIds = new Set();
-            coursesList.forEach((course) => {
-              (course?.lectures || []).forEach((l) => studentLectureIds.add(String(l.id)));
-              (course?.sections || []).forEach((s) => studentSectionIds.add(String(s.id)));
-            });
-
-            const allQuizzesList = await getQuizzesList({}, token);
-            const rawQuizzes =
-              (Array.isArray(allQuizzesList?.quizzes) && allQuizzesList.quizzes) ||
-              (Array.isArray(allQuizzesList?.data) && allQuizzesList.data) ||
-              (Array.isArray(allQuizzesList) ? allQuizzesList : []);
-
-            const allQuizzes = rawQuizzes.filter((quiz) => {
-              if (quiz.lecture_id) return studentLectureIds.has(String(quiz.lecture_id));
-              if (quiz.section_id) return studentSectionIds.has(String(quiz.section_id));
-              return false;
-            });
-
-            allQuizzes.forEach((q) => {
-              const attempts = q.attempts || [];
-              const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
-              const firstAttemptScore = hasAttempts ? attempts[0]?.score : null;
-              
-              const rawScore = q.score ?? q.percentage ?? firstAttemptScore;
-              const score = (rawScore !== null && rawScore !== undefined && rawScore !== "") ? Number(rawScore) : null;
-              
-              const rawStatus = String(q.status || "").trim().toLowerCase();
-              const isDone = hasAttempts || ["done", "completed", "complete", "submitted"].includes(rawStatus);
-
-              if (score !== null && !isNaN(score)) {
-                quizScoresSum += score;
-                gradedQuizzesCount++;
-              }
-              if (!isDone && (rawStatus === "missed" || rawStatus === "expired" || rawStatus === "closed")) {
-                missedQuizzesCount++;
-              }
-            });
-          } catch (err) {
-            console.error("Failed to fetch quizzes for metrics:", err);
-          }
-
-          const calculatedAvg = gradedQuizzesCount > 0 ? Math.round(quizScoresSum / gradedQuizzesCount) : 0;
-
+          if (!isMounted) return;
           setStudentStats({
-            avgQuizScore: gradedQuizzesCount > 0 ? calculatedAvg : 0,
-            assignmentsDone: completedAssignments,
-            missedItems: missedQuizzesCount + missedAssignments,
+            avgQuizScore: quizMetrics.avgQuizScore,
+            assignmentsDone: assignmentMetrics.assignmentsDone,
+            missedItems: quizMetrics.missedQuizzes + assignmentMetrics.missedAssignments,
             ctfPoints: ctfPointsCount,
           });
         } else {
-          // Lecturer or TA
-          const totalCourses = coursesList.length;
-          const totalStudents = coursesList.reduce((sum, c) => sum + (c.memberCount || c.member_count || 0), 0);
+          const dashboardRes = await withTimeout(
+            apiRequest("/api/dr-ta/dashboard", { token }),
+            null,
+            "Dashboard"
+          );
+          const dashboardMetrics = getInstructorDashboardMetrics(
+            dashboardRes?.data,
+            coursesList
+          );
 
+          if (!isMounted) return;
           setInstructorStats({
-            coursesCount: totalCourses,
-            avgSubmission: 0,
-            avgQuizScore: 0,
-            studentsCount: totalStudents,
+            ...dashboardMetrics,
+            studentsCount:
+              dashboardMetrics.studentsCount ||
+              coursesList.reduce(
+                (sum, course) => sum + toNumber(course.memberCount ?? course.member_count),
+                0
+              ),
           });
         }
       } catch (err) {
-        console.error("Failed to load metrics, using realistic fallbacks.", err);
-      } finally {
-        setStatsLoading(false);
+        console.error("Failed to load AI assistant metrics.", err);
       }
     };
 
     fetchMetrics();
+
+    return () => {
+      isMounted = false;
+    };
   }, [token, role]);
 
   const roleConfig = {
@@ -241,12 +324,16 @@ const AIAssistant = ({ role = "student" }) => {
         ? "/api/dr-ta/ai-recommendations"
         : "/api/student/ai-recommendations";
 
-      const res = await axios.post(
+      const res = await apiRequest(
         endpoint,
         {
-          focus_area: focus.trim() || undefined,
-        },
-        { headers: buildApiHeaders(token) }
+          method: "POST",
+          token,
+          data: {
+            focus_area: focus.trim() || undefined,
+          },
+          cache: false,
+        }
       );
 
       let responseData = null;

@@ -45,6 +45,8 @@ async function requestQuizApi(path, options = {}) {
     params,
     body,
     headers,
+    timeout,
+    cache,
   } = options;
   const normalizedMethod = method.toUpperCase();
 
@@ -55,7 +57,8 @@ async function requestQuizApi(path, options = {}) {
       params,
       data: body,
       headers: body !== undefined ? { "Content-Type": "application/json", ...headers } : headers,
-      cache: normalizedMethod === "GET",
+      cache: cache ?? normalizedMethod === "GET",
+      timeout,
     });
 
     return response.data;
@@ -82,10 +85,11 @@ export async function createQuiz(data, token) {
   });
 }
 
-export async function getQuizzesList({ lecture_id, section_id } = {}, token) {
+export async function getQuizzesList({ lecture_id, section_id } = {}, token, options = {}) {
   return requestQuizApi("/get-quizzes-list", {
     token,
     params: { lecture_id, section_id },
+    ...options,
   });
 }
 

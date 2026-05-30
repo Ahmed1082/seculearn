@@ -1,6 +1,7 @@
 import axios from "axios";
 
 const DEFAULT_RETRY_DELAY_MS = 1200;
+const DEFAULT_TIMEOUT_MS = 12000;
 const MAX_RETRIES = 2;
 const CACHE_TTL_MS = 5 * 1000;
 const STALE_FALLBACK_TTL_MS = 60 * 60 * 1000;
@@ -115,6 +116,7 @@ export async function apiRequest(url, options = {}) {
     data,
     headers,
     cache = true,
+    timeout = DEFAULT_TIMEOUT_MS,
   } = options;
   const normalizedMethod = method.toUpperCase();
   const resolvedToken = token || getStoredToken();
@@ -149,6 +151,7 @@ export async function apiRequest(url, options = {}) {
     method: normalizedMethod,
     params,
     data,
+    timeout,
     headers: buildApiHeaders(resolvedToken, headers),
   })
     .then((response) => {
