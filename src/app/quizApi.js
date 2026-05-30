@@ -1,28 +1,6 @@
+import { apiRequest } from "./apiClient";
+
 const QUIZ_API_BASE_URL = "/api";
-
-const getStoredToken = () => {
-  if (typeof window === "undefined") return "";
-  return localStorage.getItem("token") || "";
-};
-
-const buildHeaders = ({ token, hasJsonBody = false, headers = {} } = {}) => {
-  const resolvedToken = token || getStoredToken();
-
-  return {
-    Accept: "application/json",
-    "ngrok-skip-browser-warning": "true",
-    ...(hasJsonBody ? { "Content-Type": "application/json" } : {}),
-    ...(resolvedToken ? { Authorization: `Bearer ${resolvedToken}` } : {}),
-    ...headers,
-  };
-};
-
-const appendQueryParams = (url, params = {}) => {
-  Object.entries(params).forEach(([key, value]) => {
-    if (value === undefined || value === null || value === "") return;
-    url.searchParams.set(key, String(value));
-  });
-};
 
 const extractErrorMessage = (payload, fallbackMessage) => {
   if (typeof payload === "string" && payload.trim()) return payload.trim();
@@ -68,44 +46,32 @@ async function requestQuizApi(path, options = {}) {
     body,
     headers,
   } = options;
+  const normalizedMethod = method.toUpperCase();
 
-  const url = new URL(
-    `${QUIZ_API_BASE_URL}${path}`,
-    typeof window !== "undefined" ? window.location.origin : undefined
-  );
-  appendQueryParams(url, params);
-
-  const response = await fetch(url.toString(), {
-    method,
-    headers: buildHeaders({
+  try {
+    const response = await apiRequest(`${QUIZ_API_BASE_URL}${path}`, {
+      method: normalizedMethod,
       token,
-      hasJsonBody: body !== undefined,
-      headers,
-    }),
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  });
+      params,
+      data: body,
+      headers: body !== undefined ? { "Content-Type": "application/json", ...headers } : headers,
+      cache: normalizedMethod === "GET",
+    });
 
-  const rawText = await response.text();
-  let payload = null;
+    return response.data;
+  } catch (requestError) {
+    const payload = requestError?.response?.data;
+    const status = requestError?.response?.status;
 
-  if (rawText) {
-    try {
-      payload = JSON.parse(rawText);
-    } catch {
-      payload = rawText;
-    }
-  }
+    if (!status) throw requestError;
 
-  if (!response.ok) {
     const error = new Error(
-      extractErrorMessage(payload, `Request failed with status ${response.status}.`)
+      extractErrorMessage(payload, `Request failed with status ${status}.`)
     );
-    error.status = response.status;
+    error.status = status;
     error.data = payload;
     throw error;
   }
-
-  return payload;
 }
 
 export async function createQuiz(data, token) {

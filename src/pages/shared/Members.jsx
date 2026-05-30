@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import axios from "axios";
+import { useCallback, useEffect, useState } from "react";
+import { apiRequest } from "../../app/apiClient";
 import { FaUserShield, FaUserGraduate, FaUser } from "react-icons/fa";
 import "../../styles/Members.css";
 
@@ -20,7 +20,7 @@ const Members = () => {
 
   const getInitials = (name) => {
     const cleanedName = name
-      .replace(/^(dr|eng|prof|mr|mrs|ms)[\.\:\/]?\s+/i, "")
+      .replace(/^(dr|eng|prof|mr|mrs|ms)[.:/]?\s+/i, "")
       .trim();
 
     const words = cleanedName.split(" ").filter(Boolean);
@@ -37,7 +37,18 @@ const Members = () => {
     );
   };
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
+    if (!token) {
+      setMembers([]);
+      setCounts({
+        lecturers: 0,
+        tas: 0,
+        students: 0,
+        total: 0,
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -46,11 +57,9 @@ const Members = () => {
       if (search) params.search = search;
       if (roleFilter !== "all") params.role = roleFilter;
 
-      const response = await axios.get("/api/get-members", {
+      const response = await apiRequest("/api/get-members", {
         params,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        token,
       });
 
       setMembers(response.data.members);
@@ -60,11 +69,11 @@ const Members = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [roleFilter, search, token]);
 
   useEffect(() => {
     fetchMembers();
-  }, [search, roleFilter]);
+  }, [fetchMembers]);
 
   return (
     <div className="members">

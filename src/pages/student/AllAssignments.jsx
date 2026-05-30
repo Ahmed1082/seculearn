@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { apiRequest } from "../../app/apiClient";
 import {
   FiAlertCircle,
   FiBookOpen,
@@ -12,10 +12,6 @@ import {
   FiXCircle,
 } from "react-icons/fi";
 import "../../styles/AllAssignments.css";
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
 
 const statusConfig = {
   done: {
@@ -31,17 +27,6 @@ const statusConfig = {
     icon: FiXCircle,
   },
 };
-
-const toAbsoluteApiUrl = (path = "") => {
-  if (!path) return "";
-  if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_URL}/${String(path).replace(/^\/+/, "")}`;
-};
-
-const buildApiHeaders = (token) => ({
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  "ngrok-skip-browser-warning": "true",
-});
 
 const normalizeStatus = (value, dueDate) => {
   const status = String(value || "")
@@ -179,9 +164,7 @@ const StudentAllAssignments = () => {
       setCoursesError("");
 
       try {
-        const response = await axios.get("/api/get-courses", {
-          headers: buildApiHeaders(token),
-        });
+        const response = await apiRequest("/api/get-courses", { token });
 
         if (!isMounted) return;
         setCourses(Array.isArray(response?.data?.courses) ? response.data.courses : []);
@@ -214,11 +197,9 @@ const StudentAllAssignments = () => {
       setAssignmentsError("");
 
       try {
-        const response = await axios.get(
+        const response = await apiRequest(
           activeCourse === "all" ? getTrackerEndpoint() : getTrackerEndpoint(activeCourse),
-          {
-          headers: buildApiHeaders(token),
-          }
+          { token }
         );
 
         if (!isMounted) return;

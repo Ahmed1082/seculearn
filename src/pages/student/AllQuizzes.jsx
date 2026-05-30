@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
+import { apiRequest } from "../../app/apiClient";
 import { getQuizzesList } from "../../app/quizApi";
 import {
   FiBookOpen,
@@ -15,14 +15,7 @@ import {
 } from "react-icons/fi";
 import "../../styles/AllQuizzes.css";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "https://cary-nontumorous-unimpedingly.ngrok-free.dev";
-
-const buildApiHeaders = (token) => ({
-  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  "ngrok-skip-browser-warning": "true",
-});
+const QUIZ_REQUEST_CONCURRENCY = 4;
 
 const toNumberOrNull = (value) => {
   const numericValue = Number(value);
@@ -70,6 +63,27 @@ const statusConfig = {
   done: { label: "Completed", icon: FiCheckCircle },
   pending: { label: "Upcoming", icon: FiClock },
   missed: { label: "Missed", icon: FiXCircle },
+};
+
+const mapWithConcurrency = async (
+  items,
+  mapper,
+  concurrency = QUIZ_REQUEST_CONCURRENCY
+) => {
+  const results = [];
+  let nextIndex = 0;
+  const workerCount = Math.min(concurrency, items.length);
+
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(items[currentIndex]);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
 };
 
 const normalizeApiQuiz = (apiQuiz, content, course) => {
@@ -130,96 +144,62 @@ const StudentAllQuizzes = () => {
     setErrorMsg("");
 
     try {
-      const coursesResponse = await axios.get("/api/get-courses", {
-        headers: buildApiHeaders(token),
-      });
+      const coursesResponse = await apiRequest("/api/get-courses", { token });
 
       const rawCourses = Array.isArray(coursesResponse?.data?.courses)
         ? coursesResponse.data.courses
         : [];
       setCourses(rawCourses);
 
-      const quizCollections = await Promise.all(
-        rawCourses.map(async (course) => {
-          const lectureEntries = Array.isArray(course?.lectures)
-            ? course.lectures
-            : [];
-          const sectionEntries = Array.isArray(course?.sections)
-            ? course.sections
-            : [];
+      const quizTargets = rawCourses.flatMap((course) => {
+        const courseSummary = {
+          id: String(course.id),
+          name: course.title || course.name || `Course ${course.id}`,
+        };
+        const lectureEntries = Array.isArray(course?.lectures) ? course.lectures : [];
+        const sectionEntries = Array.isArray(course?.sections) ? course.sections : [];
 
-          const lectureQuizzes = await Promise.all(
-            lectureEntries.map(async (lecture) => {
-              try {
-                const quizList = await getQuizzesList(
-                  { lecture_id: lecture.id },
-                  token
-                );
-                const rawItems =
-                  (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
-                  (Array.isArray(quizList?.data) && quizList.data) ||
-                  (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
-                  (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
-                  (Array.isArray(quizList) ? quizList : []);
+        return [
+          ...lectureEntries.map((lecture) => ({
+            params: { lecture_id: lecture.id },
+            content: {
+              id: String(lecture.id),
+              title: lecture.title || `Lecture ${lecture.id}`,
+              courseId: String(course.id),
+              type: "lecture",
+            },
+            course: courseSummary,
+          })),
+          ...sectionEntries.map((section) => ({
+            params: { section_id: section.id },
+            content: {
+              id: String(section.id),
+              title: section.title || `Section ${section.id}`,
+              courseId: String(course.id),
+              type: "section",
+            },
+            course: courseSummary,
+          })),
+        ];
+      });
 
-                return rawItems.map((quiz) =>
-                  normalizeApiQuiz(
-                    quiz,
-                    {
-                      id: String(lecture.id),
-                      title: lecture.title || `Lecture ${lecture.id}`,
-                      courseId: String(course.id),
-                      type: "lecture",
-                    },
-                    {
-                      id: String(course.id),
-                      name: course.title || course.name || `Course ${course.id}`,
-                    }
-                  )
-                );
-              } catch {
-                return [];
-              }
-            })
-          );
+      const quizCollections = await mapWithConcurrency(
+        quizTargets,
+        async ({ params, content, course }) => {
+          try {
+            const quizList = await getQuizzesList(params, token);
+            const rawItems =
+              (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
+              (Array.isArray(quizList?.data) && quizList.data) ||
+              (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
+              (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
+              (Array.isArray(quizList) ? quizList : []);
 
-          const sectionQuizzes = await Promise.all(
-            sectionEntries.map(async (section) => {
-              try {
-                const quizList = await getQuizzesList(
-                  { section_id: section.id },
-                  token
-                );
-                const rawItems =
-                  (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
-                  (Array.isArray(quizList?.data) && quizList.data) ||
-                  (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
-                  (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
-                  (Array.isArray(quizList) ? quizList : []);
-
-                return rawItems.map((quiz) =>
-                  normalizeApiQuiz(
-                    quiz,
-                    {
-                      id: String(section.id),
-                      title: section.title || `Section ${section.id}`,
-                      courseId: String(course.id),
-                      type: "section",
-                    },
-                    {
-                      id: String(course.id),
-                      name: course.title || course.name || `Course ${course.id}`,
-                    }
-                  )
-                );
-              } catch {
-                return [];
-              }
-            })
-          );
-
-          return [...lectureQuizzes.flat(), ...sectionQuizzes.flat()];
-        })
+            return rawItems.map((quiz) => normalizeApiQuiz(quiz, content, course));
+          } catch {
+            return [];
+          }
+        }
       );
 
       setQuizzes(
@@ -244,7 +224,11 @@ const StudentAllQuizzes = () => {
   }, [token]);
 
   useEffect(() => {
-    fetchAllQuizzes();
+    const loadTimer = window.setTimeout(() => {
+      fetchAllQuizzes();
+    }, 0);
+
+    return () => window.clearTimeout(loadTimer);
   }, [fetchAllQuizzes]);
 
   const stats = useMemo(() => {

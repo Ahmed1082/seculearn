@@ -136,51 +136,29 @@ const AIAssistant = ({ role = "student" }) => {
             console.error("Failed to fetch assignments for metrics:", err);
           }
 
-          // Fetch Quizzes to compute avg score and missed quizzes
           let quizScoresSum = 0;
           let gradedQuizzesCount = 0;
           let missedQuizzesCount = 0;
           try {
-            const quizCollections = await Promise.all(
-              coursesList.map(async (course) => {
-                const lectureEntries = course?.lectures || [];
-                const sectionEntries = course?.sections || [];
+            const studentLectureIds = new Set();
+            const studentSectionIds = new Set();
+            coursesList.forEach((course) => {
+              (course?.lectures || []).forEach((l) => studentLectureIds.add(String(l.id)));
+              (course?.sections || []).forEach((s) => studentSectionIds.add(String(s.id)));
+            });
 
-                const lectureQuizzes = await Promise.all(
-                  lectureEntries.map(async (lecture) => {
-                    try {
-                      const quizList = await getQuizzesList({ lecture_id: lecture.id }, token);
-                      const rawItems =
-                        (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
-                        (Array.isArray(quizList?.data) && quizList.data) ||
-                        (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
-                        (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
-                        (Array.isArray(quizList) ? quizList : []);
-                      return rawItems;
-                    } catch { return []; }
-                  })
-                );
+            const allQuizzesList = await getQuizzesList({}, token);
+            const rawQuizzes =
+              (Array.isArray(allQuizzesList?.quizzes) && allQuizzesList.quizzes) ||
+              (Array.isArray(allQuizzesList?.data) && allQuizzesList.data) ||
+              (Array.isArray(allQuizzesList) ? allQuizzesList : []);
 
-                const sectionQuizzes = await Promise.all(
-                  sectionEntries.map(async (section) => {
-                    try {
-                      const quizList = await getQuizzesList({ section_id: section.id }, token);
-                      const rawItems =
-                        (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
-                        (Array.isArray(quizList?.data) && quizList.data) ||
-                        (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
-                        (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
-                        (Array.isArray(quizList) ? quizList : []);
-                      return rawItems;
-                    } catch { return []; }
-                  })
-                );
+            const allQuizzes = rawQuizzes.filter((quiz) => {
+              if (quiz.lecture_id) return studentLectureIds.has(String(quiz.lecture_id));
+              if (quiz.section_id) return studentSectionIds.has(String(quiz.section_id));
+              return false;
+            });
 
-                return [...lectureQuizzes.flat(), ...sectionQuizzes.flat()];
-              })
-            );
-
-            const allQuizzes = quizCollections.flat().filter((q) => q && q.id);
             allQuizzes.forEach((q) => {
               const attempts = q.attempts || [];
               const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
