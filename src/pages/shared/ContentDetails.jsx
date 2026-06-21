@@ -1547,7 +1547,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                       )}
                   </div>
 
-                  {canManageAssignmentsViaApi ? (
+                  {canManageLecture ? (
                     <div className="lecture-details-status-row">
                       <p className="status done">
                         <FiCheckCircle />
@@ -1682,7 +1682,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                         <>
                     <div className="lecture-details-card-head">
                       <h3>
-                        {canManageLecture ? (
+                        {canManageAssignmentsViaApi ? (
                           <button
                             type="button"
                             className="lecture-details-title-btn"
@@ -1700,7 +1700,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                         )}
                       </h3>
 
-                      {canManageLecture &&
+                      {canManageAssignmentsViaApi &&
                         !(quizDialogOpen && quizDialogMode === "edit" && quizEditingId === quiz.id) && (
                           <button
                             type="button"
@@ -1772,7 +1772,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
               })}
             </div>
 
-            {canManageLecture && (
+            {canManageAssignmentsViaApi && (
               <div className="lecture-details-actions-row">
                 <div className="lecture-details-inline-add">
                   <button
