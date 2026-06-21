@@ -341,7 +341,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const location = useLocation();
   const fileInputRef = useRef(null);
   const objectUrlsRef = useRef(new Set());
-  const { assignmentId, lectureId, sectionId } = useParams();
+  const { assignmentId, lectureId, sectionId, courseId } = useParams();
   const token = localStorage.getItem("token");
   const displayName = useMemo(() => getDisplayName(), []);
   const currentUserId = useMemo(() => getCurrentUserId(), []);
@@ -353,7 +353,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const contentId = isSection ? sectionId : lectureId;
   const stateLectureTitle = location.state?.lectureTitle || location.state?.title || "";
   const stateSectionTitle = location.state?.sectionTitle || location.state?.title || "";
-  const stateCourseId = location.state?.courseId || "";
+  const stateCourseId = location.state?.courseId || courseId || "";
   const submissionCacheKey = useMemo(
     () =>
       `student-submission:${scope}:${String(contentId || "unknown")}:${String(
@@ -606,6 +606,11 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const handleNavigateToUnit = () => {
     if (!contentId) {
       handleNavigateToAssignments();
+      return;
+    }
+
+    if (stateCourseId) {
+      navigate(`/student/courses/${stateCourseId}/${scope}/${contentId}`);
       return;
     }
 
@@ -1015,6 +1020,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     ? String(assignment.due_date).replace("T", " ").split(" ")[0]
     : "";
   const assignmentTitle = assignment?.title || `${unitLabel} Assignment`;
+  const unitCrumbLabel = `${unitLabel} ${contentId || ""}`.trim();
   const assignmentPoints = Number(assignment?.points) || 100;
   const gradeMeta = useMemo(() => extractGradeMeta(assignment), [assignment]);
   const hasGrade = gradeMeta.value !== null;
@@ -1058,11 +1064,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
         <div className="assignment-path">
           <button type="button" onClick={handleNavigateToUnit}>
-            {unitLabel} {contentId || 1}
-          </button>
-          <span>&gt;</span>
-          <button type="button" onClick={handleNavigateToAssignments}>
-            Assignments
+            {unitCrumbLabel}
           </button>
           <span>&gt;</span>
           <button type="button" aria-current="page">

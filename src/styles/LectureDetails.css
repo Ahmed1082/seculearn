@@ -618,13 +618,6 @@
   text-decoration: underline;
 }
 
-.lecture-details-role-note {
-  margin-top: 14px;
-  color: var(--text-muted);
-  font-size: 12px;
-  text-transform: capitalize;
-}
-
 .lecture-assignment-dialog-overlay {
   position: fixed;
   inset: 0;

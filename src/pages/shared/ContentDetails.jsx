@@ -34,12 +34,6 @@ const lectureSeed = {
   quizzes: [],
 };
 
-const roleCopy = {
-  lecturer: "lecturer",
-  ta: "TA",
-  student: "student",
-};
-
 const getDefaultAssignmentForm = () => ({
   title: "",
   description: "",
@@ -2195,9 +2189,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
           </div>
         )}
 
-        <p className="lecture-details-role-note">
-          Viewing as {roleCopy[role] || role}.
-        </p>
       </div>
     </section>
   );
