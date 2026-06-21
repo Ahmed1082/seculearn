@@ -305,6 +305,19 @@
   color: var(--text-muted);
 }
 
+.lecture-details-due-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #f59e42;
+  background: rgba(245, 158, 66, 0.12);
+  border: 1px solid rgba(245, 158, 66, 0.3);
+  border-radius: 6px;
+  padding: 2px 8px;
+}
+
 .lecture-details-quiz-meta {
   margin-top: 9px;
   padding-top: 9px;

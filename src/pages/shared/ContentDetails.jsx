@@ -1570,15 +1570,18 @@ const ContentDetails = ({ role = "lecturer" }) => {
                   )}
 
                   {(assignment.maxScore ||
-                    assignment.dueDate ||
+                    assignment.dueDate !== undefined ||
                     assignment.attachments?.length > 0) && (
                     <div className="lecture-details-assignment-meta">
                       {assignment.maxScore && (
                         <span>Max Score: {assignment.maxScore}</span>
                       )}
-                      {assignment.dueDate && (
-                        <span>Due: {formatDueDate(assignment.dueDate)}</span>
-                      )}
+                      <span className="lecture-details-due-date">
+                        <FiCalendar size={12} />
+                        {assignment.dueDate
+                          ? formatDueDate(assignment.dueDate)
+                          : "No due date"}
+                      </span>
                       {assignment.attachments?.length > 0 && (
                         <span>
                           Files:{" "}

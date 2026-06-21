@@ -28,22 +28,15 @@ const statusConfig = {
   },
 };
 
-const normalizeStatus = (value, dueDate) => {
-  const status = String(value || "")
-    .trim()
-    .toLowerCase();
-
+const normalizeStatus = (value) => {
+  const status = String(value || "").trim().toLowerCase();
   if (status === "submitted" || status === "done") return "done";
   if (status === "missed") return "missed";
-  if (!dueDate) return "pending";
   return "pending";
 };
 
 const normalizeSource = (value) => {
-  const source = String(value || "")
-    .trim()
-    .toLowerCase();
-
+  const source = String(value || "").trim().toLowerCase();
   if (source === "section") return "section";
   return "lecture";
 };
@@ -55,11 +48,9 @@ const toNumber = (value, fallback = 0) => {
 
 const formatDueDate = (value) => {
   if (!value) return "No due date";
-
   const normalized = String(value).replace(" ", "T");
   const parsed = new Date(normalized);
   if (Number.isNaN(parsed.getTime())) return String(value);
-
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
@@ -67,23 +58,6 @@ const formatDueDate = (value) => {
     hour: "numeric",
     minute: "2-digit",
   }).format(parsed);
-};
-
-const getAssignmentId = (assignment) =>
-  String(assignment?.id ?? assignment?.assignment_id ?? "");
-
-const getContentId = (assignment, source) => {
-  const sourceKey = source === "section" ? "section" : "lecture";
-
-  return (
-    assignment?.[`${sourceKey}_id`] ??
-    assignment?.[`${sourceKey}Id`] ??
-    assignment?.content_id ??
-    assignment?.contentId ??
-    assignment?.unit_id ??
-    assignment?.unitId ??
-    null
-  );
 };
 
 const getTrackerEndpoint = (courseId) =>
@@ -125,13 +99,64 @@ const extractStats = (payload, assignments) => {
         ? Math.round((submitted / total) * 100)
         : 0;
 
-  return {
-    total,
-    done: submitted,
-    pending,
-    missed,
-    progress,
-  };
+  return { total, done: submitted, pending, missed, progress };
+};
+
+/**
+ * Build a map: assignmentId -> { courseId, contentId, source }
+ * by fetching assignments for each lecture/section in each course.
+ */
+const buildAssignmentRouteMap = async (courses, token) => {
+  const map = {}; // key: String(assignmentId)
+
+  const fetches = [];
+
+  for (const course of courses) {
+    const courseId = course.id;
+
+    for (const lecture of course.lectures || []) {
+      fetches.push(
+        apiRequest(`/api/get-lecture-assignments/${lecture.id}`, { token })
+          .then((res) => {
+            const items = Array.isArray(res?.data?.data)
+              ? res.data.data
+              : Array.isArray(res?.data)
+                ? res.data
+                : [];
+            for (const item of items) {
+              const aid = String(item?.id ?? "");
+              if (aid) {
+                map[aid] = { courseId, contentId: lecture.id, source: "lecture" };
+              }
+            }
+          })
+          .catch(() => {})
+      );
+    }
+
+    for (const section of course.sections || []) {
+      fetches.push(
+        apiRequest(`/api/get-section-assignments/${section.id}`, { token })
+          .then((res) => {
+            const items = Array.isArray(res?.data?.data)
+              ? res.data.data
+              : Array.isArray(res?.data)
+                ? res.data
+                : [];
+            for (const item of items) {
+              const aid = String(item?.id ?? "");
+              if (aid) {
+                map[aid] = { courseId, contentId: section.id, source: "section" };
+              }
+            }
+          })
+          .catch(() => {})
+      );
+    }
+  }
+
+  await Promise.all(fetches);
+  return map;
 };
 
 const StudentAllAssignments = () => {
@@ -154,42 +179,33 @@ const StudentAllAssignments = () => {
   const [coursesError, setCoursesError] = useState("");
   const [assignmentsError, setAssignmentsError] = useState("");
 
+  // Fetch courses (needed for route map + filter dropdown)
   useEffect(() => {
     if (!token) return;
-
     let isMounted = true;
 
     const fetchCourses = async () => {
       setIsLoadingCourses(true);
       setCoursesError("");
-
       try {
         const response = await apiRequest("/api/get-courses", { token });
-
         if (!isMounted) return;
         setCourses(Array.isArray(response?.data?.courses) ? response.data.courses : []);
       } catch (error) {
         if (!isMounted) return;
-        setCoursesError(
-          error?.response?.data?.message || "Failed to load courses."
-        );
+        setCoursesError(error?.response?.data?.message || "Failed to load courses.");
       } finally {
-        if (isMounted) {
-          setIsLoadingCourses(false);
-        }
+        if (isMounted) setIsLoadingCourses(false);
       }
     };
 
     fetchCourses();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [token]);
 
+  // Fetch assignments + enrich with courseId/contentId from route map
   useEffect(() => {
-    if (!token) return;
-
+    if (!token || isLoadingCourses) return;
     let isMounted = true;
 
     const fetchAssignments = async () => {
@@ -197,34 +213,53 @@ const StudentAllAssignments = () => {
       setAssignmentsError("");
 
       try {
-        const response = await apiRequest(
-          activeCourse === "all" ? getTrackerEndpoint() : getTrackerEndpoint(activeCourse),
-          { token }
-        );
+        // Fetch tracker and route map in parallel
+        const [trackerResponse, routeMap] = await Promise.all([
+          apiRequest(
+            activeCourse === "all" ? getTrackerEndpoint() : getTrackerEndpoint(activeCourse),
+            { token }
+          ),
+          buildAssignmentRouteMap(courses, token),
+        ]);
 
         if (!isMounted) return;
 
-        const normalizedAssignments = extractAssignments(response?.data).map((assignment) => {
+        const normalizedAssignments = extractAssignments(trackerResponse?.data).map((assignment) => {
+          const assignmentId = String(assignment?.id ?? assignment?.assignment_id ?? "");
+          const source = normalizeSource(assignment?.source);
+          const dueDate = assignment?.due_date || assignment?.dueDate || null;
+
+          // Look up route info from map
+          const routeInfo = routeMap[assignmentId] || {};
+          const courseId =
+            routeInfo.courseId ??
+            assignment?.course_id ??
+            assignment?.courseId ??
+            assignment?.course?.id ??
+            null;
+          const contentId =
+            routeInfo.contentId ??
+            assignment?.lecture_id ??
+            assignment?.section_id ??
+            assignment?.content_id ??
+            null;
+          const resolvedSource = routeInfo.source || source;
+
           const courseName =
             assignment?.course_name ||
             assignment?.course?.title ||
             assignment?.course?.name ||
             "Course";
-          const source = normalizeSource(assignment?.source);
-          const dueDate = assignment?.due_date || assignment?.dueDate || null;
 
           return {
             ...assignment,
-            id: getAssignmentId(assignment),
-            courseId:
-              assignment?.course_id ??
-              assignment?.courseId ??
-              assignment?.course?.id ??
-              null,
+            id: assignmentId,
+            courseId,
+            contentId,
+            source: resolvedSource,
             courseName,
-            status: normalizeStatus(assignment?.status, dueDate),
-            source,
-            sourceLabel: source === "section" ? "Section" : "Lecture",
+            status: normalizeStatus(assignment?.status),
+            sourceLabel: resolvedSource === "section" ? "Section" : "Lecture",
             dueDate,
             points: toNumber(assignment?.points, 100),
             originalName:
@@ -232,39 +267,24 @@ const StudentAllAssignments = () => {
               assignment?.original_file_name ||
               assignment?.file_name ||
               "",
-            contentId: getContentId(assignment, source),
           };
         });
 
         setAssignments(normalizedAssignments);
-        setStats(extractStats(response?.data, normalizedAssignments));
+        setStats(extractStats(trackerResponse?.data, normalizedAssignments));
       } catch (error) {
         if (!isMounted) return;
-
         setAssignments([]);
-        setStats({
-          total: 0,
-          done: 0,
-          pending: 0,
-          missed: 0,
-          progress: 0,
-        });
-        setAssignmentsError(
-          error?.response?.data?.message || "Failed to load assignments."
-        );
+        setStats({ total: 0, done: 0, pending: 0, missed: 0, progress: 0 });
+        setAssignmentsError(error?.response?.data?.message || "Failed to load assignments.");
       } finally {
-        if (isMounted) {
-          setIsLoadingAssignments(false);
-        }
+        if (isMounted) setIsLoadingAssignments(false);
       }
     };
 
     fetchAssignments();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeCourse, token]);
+    return () => { isMounted = false; };
+  }, [activeCourse, token, courses, isLoadingCourses]);
 
   const filteredAssignments = useMemo(() => {
     if (activeFilter === "all") return assignments;
@@ -285,13 +305,16 @@ const StudentAllAssignments = () => {
     { label: "Missed", value: stats.missed, className: "all-assignments-stat-missed" },
   ];
 
+  // Navigate to the assignment submission/view page
   const handleOpenAssignment = (assignment) => {
-    if (!assignment?.contentId || !assignment?.id) return;
-    navigate(`/student/${assignment.source}/${assignment.contentId}/${assignment.id}`);
+    if (!assignment?.courseId || !assignment?.contentId || !assignment?.id) return;
+    navigate(
+      `/student/courses/${assignment.courseId}/${assignment.source}/${assignment.contentId}/assignment/${assignment.id}`
+    );
   };
 
   const getPendingActionLabel = (assignment) =>
-    assignment?.contentId ? "Submit Now" : "Pending";
+    assignment?.courseId && assignment?.contentId ? "Submit Now" : "Pending";
 
   return (
     <section className="all-assignments-page">
@@ -300,7 +323,6 @@ const StudentAllAssignments = () => {
           <div className="all-assignments-header-icon">
             <FiFileText size={16} />
           </div>
-
           <div>
             <h1>Assignments</h1>
             <p>Track and submit your course assignments</p>
@@ -321,20 +343,15 @@ const StudentAllAssignments = () => {
             <h2>Overall Progress</h2>
             <span>{stats.progress}%</span>
           </div>
-
           <div className="all-assignments-progress-track">
             <div className="all-assignments-progress-fill" style={{ width: `${stats.progress}%` }} />
           </div>
-
-          <p>
-            {stats.done} of {stats.total} assignments submitted
-          </p>
+          <p>{stats.done} of {stats.total} assignments submitted</p>
         </section>
 
         <section className="all-assignments-filters-row">
           <div className="all-assignments-filter-group">
             <FiFilter size={14} />
-
             {filterItems.map((filter) => (
               <button
                 key={filter.key}
@@ -350,7 +367,6 @@ const StudentAllAssignments = () => {
 
           <div className="all-assignments-course-filter">
             <FiBookOpen size={14} />
-
             <select
               value={activeCourse}
               onChange={(event) => setActiveCourse(event.target.value)}
@@ -374,7 +390,7 @@ const StudentAllAssignments = () => {
           </section>
         )}
 
-        {isLoadingAssignments ? (
+        {isLoadingAssignments || isLoadingCourses ? (
           <section className="all-assignments-empty-state">
             <FiRefreshCw size={24} className="all-assignments-spin" />
             <p>Loading assignments...</p>
@@ -393,12 +409,13 @@ const StudentAllAssignments = () => {
             {filteredAssignments.map((assignment) => {
               const status = statusConfig[assignment.status] || statusConfig.pending;
               const StatusIcon = status.icon;
-              const canOpen = Boolean(assignment.contentId && assignment.id);
+              const canOpen = Boolean(assignment.courseId && assignment.contentId && assignment.id);
 
               return (
                 <article
                   key={assignment.id}
-                  className={`all-assignments-item ${canOpen ? "" : "is-static"}`}
+                  className={`all-assignments-item ${canOpen ? "is-clickable" : "is-static"}`}
+                  style={{ cursor: canOpen ? "pointer" : "default" }}
                   onClick={() => canOpen && handleOpenAssignment(assignment)}
                 >
                   <div className={`all-assignments-item-icon status-${assignment.status}`}>
@@ -409,7 +426,6 @@ const StudentAllAssignments = () => {
                     <div className="all-assignments-item-head">
                       <div>
                         <h3>{assignment.title || "Untitled assignment"}</h3>
-
                         <div className="all-assignments-item-meta">
                           <span>{assignment.courseName}</span>
                           <span className="all-assignments-dot">&middot;</span>
@@ -442,9 +458,7 @@ const StudentAllAssignments = () => {
                           className="all-assignments-submit-btn"
                           onClick={(event) => {
                             event.stopPropagation();
-                            if (canOpen) {
-                              handleOpenAssignment(assignment);
-                            }
+                            if (canOpen) handleOpenAssignment(assignment);
                           }}
                           disabled={!canOpen}
                         >

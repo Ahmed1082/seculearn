@@ -1017,7 +1017,18 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
       : [];
 
   const dueDateValue = assignment?.due_date
-    ? String(assignment.due_date).replace("T", " ").split(" ")[0]
+    ? (() => {
+        const normalized = String(assignment.due_date).replace(" ", "T");
+        const parsed = new Date(normalized);
+        if (Number.isNaN(parsed.getTime())) return String(assignment.due_date);
+        return new Intl.DateTimeFormat("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+        }).format(parsed);
+      })()
     : "";
   const assignmentTitle = assignment?.title || `${unitLabel} Assignment`;
   const unitCrumbLabel = `${unitLabel} ${contentId || ""}`.trim();
@@ -1076,11 +1087,83 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
           <div className="assignment-card large">
             <div className="card-header">
               <h2>{assignmentTitle}</h2>
-              <span className="due-date">{dueDateValue ? `Due ${dueDateValue}` : ""}</span>
+              <span className="due-date">{dueDateValue ? `Due ${dueDateValue}` : "No due date"}</span>
             </div>
 
             <p>Assigned: {assignmentPoints} points</p>
-            <p>
+
+            {dueDateValue && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginTop: "6px",
+                  padding: "8px 12px",
+                  borderRadius: "10px",
+                  background: isDueDatePassed
+                    ? "rgba(255, 100, 100, 0.08)"
+                    : "rgba(84, 244, 252, 0.07)",
+                  border: `1px solid ${
+                    isDueDatePassed
+                      ? "rgba(255, 100, 100, 0.35)"
+                      : "rgba(84, 244, 252, 0.28)"
+                  }`,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "16px",
+                    lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                >
+                  {isDueDatePassed ? "⏰" : "📅"}
+                </span>
+                <div style={{ minWidth: 0 }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: "10px",
+                      letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      color: "var(--members-muted)",
+                    }}
+                  >
+                    Due Date
+                  </p>
+                  <p
+                    style={{
+                      margin: "2px 0 0",
+                      fontSize: "13px",
+                      fontWeight: 700,
+                      color: isDueDatePassed ? "#ff7d8b" : "var(--members-accent)",
+                    }}
+                  >
+                    {dueDateValue}
+                    {isDueDatePassed && (
+                      <span
+                        style={{
+                          marginLeft: "8px",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          color: "#ff7d8b",
+                          background: "rgba(255,125,139,0.15)",
+                          border: "1px solid rgba(255,125,139,0.4)",
+                          borderRadius: "999px",
+                          padding: "1px 7px",
+                          verticalAlign: "middle",
+                        }}
+                      >
+                        Overdue
+                      </span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <p style={{ marginTop: "6px" }}>
               Assignment last updated:{" "}
               {assignment?.updated_at
                 ? String(assignment.updated_at).replace("T", " ").split(" ")[0]

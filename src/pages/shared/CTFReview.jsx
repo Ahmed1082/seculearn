@@ -58,6 +58,12 @@ const CTFReview = () => {
 
         if (cancelled) return;
 
+        const mappedCourseId = challengeData.courseId || localStorage.getItem(`ctf_course_${challengeData.id}`);
+        if (mappedCourseId && String(mappedCourseId) !== String(courseId)) {
+          setError("This CTF challenge does not belong to the selected course.");
+          return;
+        }
+
         setChallenge(challengeData);
         setSolvedStudents(
           (statsData.solved_students || []).map(normalizeStudent),

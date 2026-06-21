@@ -142,9 +142,15 @@ const OverviewDashboard = ({ coursesPath, userFallbackName }) => {
   const instructorName = data?.instructor?.name || displayName;
   
   const cards = data?.cards || {};
+  const isTA = data?.role === "ta" || coursesPath?.includes("/ta");
   const statCards = [
     { label: "TOTAL COURSES", value: cards.total_courses ?? "0", icon: <FiBookOpen />, tone: "courses" },
-    { label: "TOTAL LECTURES", value: cards.total_lectures ?? "0", icon: <FiBarChart2 />, tone: "lectures" },
+    { 
+      label: isTA ? "TOTAL SECTIONS" : "TOTAL LECTURES", 
+      value: isTA ? (cards.total_sections ?? cards.total_lectures ?? "0") : (cards.total_lectures ?? "0"), 
+      icon: <FiBarChart2 />, 
+      tone: "lectures" 
+    },
     { label: "AVG QUIZ SCORE", value: cards.avg_quiz_score ?? "0%", icon: <FiTrendingUp />, tone: "score" },
     { label: "ENROLLED STUDENTS", value: cards.enrolled_students ?? "0", icon: <FiUsers />, tone: "students" },
   ];

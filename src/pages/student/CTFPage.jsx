@@ -106,9 +106,10 @@ const CTFPage = () => {
 
         if (cancelled) return;
 
-        if (!selected) {
+        const mappedCourseId = selected ? (selected.courseId || localStorage.getItem(`ctf_course_${selected.id}`)) : null;
+        if (!selected || (mappedCourseId && String(mappedCourseId) !== String(courseId))) {
           setChallenge(null);
-          setLoadError("The CTF challenge you opened is not available.");
+          setLoadError("The CTF challenge you opened is not available for this course.");
           return;
         }
 
