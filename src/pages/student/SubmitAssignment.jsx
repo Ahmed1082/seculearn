@@ -386,6 +386,44 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
   const [assignment, setAssignment] = useState(null);
 
+  const [fetchedSectionTitle, setFetchedSectionTitle] = useState("");
+  const [fetchedLectureTitle, setFetchedLectureTitle] = useState("");
+
+  useEffect(() => {
+    const fetchCourseData = async () => {
+      if (!stateCourseId || !token) return;
+      try {
+        const res = await axios.get("/api/get-courses", {
+          headers: buildApiHeaders(token),
+        });
+        const selectedCourse = res.data.courses.find(
+          (c) => c.id === Number(stateCourseId)
+        );
+        if (selectedCourse) {
+          if (isSection) {
+            const foundSection = selectedCourse.sections?.find(
+              (s) => Number(s.id) === Number(contentId)
+            );
+            if (foundSection) {
+              setFetchedSectionTitle(foundSection.title);
+            }
+          } else {
+            const foundLecture = selectedCourse.lectures?.find(
+              (l) => Number(l.id) === Number(contentId)
+            );
+            if (foundLecture) {
+              setFetchedLectureTitle(foundLecture.title);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching course in SubmitAssignment:", error);
+      }
+    };
+
+    fetchCourseData();
+  }, [stateCourseId, token, isSection, contentId]);
+
   const isCommentOwnedByCurrentUser = useCallback((comment) => {
     if (!comment) return false;
 
@@ -610,7 +648,13 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     }
 
     if (stateCourseId) {
-      navigate(`/student/courses/${stateCourseId}/${scope}/${contentId}`);
+      navigate(`/student/courses/${stateCourseId}/${scope}/${contentId}`, {
+        state: {
+          sectionTitle: isSection ? stateSectionTitle || fetchedSectionTitle || undefined : undefined,
+          lectureTitle: !isSection ? stateLectureTitle || fetchedLectureTitle || undefined : undefined,
+          courseId: stateCourseId,
+        }
+      });
       return;
     }
 
@@ -1031,7 +1075,20 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
       })()
     : "";
   const assignmentTitle = assignment?.title || `${unitLabel} Assignment`;
-  const unitCrumbLabel = `${unitLabel} ${contentId || ""}`.trim();
+  const resolvedUnitTitle = isSection
+    ? stateSectionTitle || fetchedSectionTitle
+    : stateLectureTitle || fetchedLectureTitle;
+
+  const getUnitCrumbLabel = (title, label, id) => {
+    if (!title) return `${label} ${id || ""}`.trim();
+    const match = title.match(/^(sec(tion)?|lec(ture)?)\s*(\d+)/i);
+    if (match) {
+      return `${label} ${match[4]}`;
+    }
+    return title.length > 25 ? `${label} ${id}` : title;
+  };
+
+  const unitCrumbLabel = getUnitCrumbLabel(resolvedUnitTitle, unitLabel, contentId);
   const assignmentPoints = Number(assignment?.points) || 100;
   const gradeMeta = useMemo(() => extractGradeMeta(assignment), [assignment]);
   const hasGrade = gradeMeta.value !== null;

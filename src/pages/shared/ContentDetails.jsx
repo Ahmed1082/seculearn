@@ -300,6 +300,21 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
         if (selectedCourse) {
           setCourseTitle(selectedCourse.title);
+          if (isSectionView) {
+            const foundSection = selectedCourse.sections?.find(
+              (s) => Number(s.id) === Number(sectionId)
+            );
+            if (foundSection) {
+              setFetchedUnitTitle(foundSection.title);
+            }
+          } else {
+            const foundLecture = selectedCourse.lectures?.find(
+              (l) => Number(l.id) === Number(lectureId)
+            );
+            if (foundLecture) {
+              setFetchedUnitTitle(foundLecture.title);
+            }
+          }
         }
       } catch (err) {
         console.error("Error fetching course:", err);
@@ -309,13 +324,14 @@ const ContentDetails = ({ role = "lecturer" }) => {
     if (stateCourseId && token) {
       fetchCourse();
     }
-  }, [stateCourseId, token]);
+  }, [stateCourseId, token, isSectionView, sectionId, lectureId]);
 
   const canManageLecture = role === "lecturer" || role === "ta";
   const isTA = role === "ta";
   const isLecturer = role === "lecturer";
 
   const [courseTitle, setCourseTitle] = useState("");
+  const [fetchedUnitTitle, setFetchedUnitTitle] = useState("");
 
   const [lectureData, setLectureData] = useState(() => {
     return {
@@ -463,10 +479,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
       ...prev,
       id: lectureId || prev.id || "",
       title: isSectionView
-        ? stateSectionTitle || `Section ${sectionId}`
-        : lectureTitleFromState || `Lecture ${lectureId}`,
+        ? stateSectionTitle || fetchedUnitTitle || `Section ${sectionId}`
+        : lectureTitleFromState || fetchedUnitTitle || `Lecture ${lectureId}`,
     }));
-  }, [isSectionView, lectureId, lectureTitleFromState, sectionId, stateSectionTitle]);
+  }, [isSectionView, lectureId, lectureTitleFromState, sectionId, stateSectionTitle, fetchedUnitTitle]);
 
   // Fetch quizzes from backend (API #40)
   useEffect(() => {
@@ -1442,8 +1458,16 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     if (role === "student") {
                       const base = isSectionView ? "section" : "lecture";
                       navigate(
-                      `/student/courses/${courseId}/${base}/${contentApiId}/assignment/${targetId}`
-                    );
+                        `/student/courses/${courseId}/${base}/${contentApiId}/assignment/${targetId}`,
+                        {
+                          state: {
+                            sectionTitle: isSectionView ? pageTitle : undefined,
+                            lectureTitle: !isSectionView ? pageTitle : undefined,
+                            courseId,
+                            courseTitle,
+                          }
+                        }
+                      );
                     } else if (role === "lecturer") {
                       navigate(`/lecturer/assignmentreview/${targetId}`, {
                         state: {
