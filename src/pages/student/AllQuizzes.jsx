@@ -502,7 +502,11 @@ const StudentAllQuizzes = () => {
               const isMissed = quiz.status === "missed";
 
               return (
-                <article key={quiz.id} className="all-quizzes-item">
+                <article
+                  key={quiz.id}
+                  className="all-quizzes-item"
+                  onClick={() => openQuiz(quiz)}
+                >
                   <div className={`all-quizzes-item-icon status-${quiz.status}`}>
                     <StatusIcon size={14} />
                   </div>
@@ -570,7 +574,10 @@ const StudentAllQuizzes = () => {
                         <button
                           type="button"
                           className="all-quizzes-start-btn"
-                          onClick={() => openQuiz(quiz)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            openQuiz(quiz);
+                          }}
                         >
                           {isDone ? "View Result" : "Start Quiz"}
                         </button>
