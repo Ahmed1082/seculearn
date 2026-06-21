@@ -14,6 +14,23 @@ const AddCourse = ({ onClose, onSave, editingCourse }) => {
     }
   }, [editingCourse]);
 
+  const resolveImageUrl = (path = "") => {
+    if (!path) return "";
+    if (path.startsWith("blob:") || path.startsWith("data:")) return path;
+
+    let cleanPath = path;
+    try {
+      if (/^https?:\/\//i.test(path)) {
+        const urlObj = new URL(path);
+        cleanPath = urlObj.pathname + urlObj.search;
+      }
+    } catch (e) {
+      cleanPath = path.replace(/^https?:\/\/[^/]+/, "");
+    }
+
+    return "/" + cleanPath.replace(/^\/+/, "");
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {

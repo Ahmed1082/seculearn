@@ -1665,8 +1665,16 @@ const ContentDetails = ({ role = "lecturer" }) => {
                 return (
                   <article
                     key={quiz.id}
-                    className={`lecture-details-card ${role === "student" ? "is-clickable" : ""}`}
-                    onClick={role === "student" ? () => navigate(studentExamPath) : undefined}
+                    className="lecture-details-card is-clickable"
+                    onClick={() => {
+                      if (role === "student") {
+                        navigate(studentExamPath);
+                      } else if (role === "lecturer" || role === "ta") {
+                        navigate(quizReviewPath, {
+                          state: { quizTitle: displayQuizTitle },
+                        });
+                      }
+                    }}
                   >
                     {(() => {
                       const personalStatus = getPersonalQuizStatus(quiz);
@@ -1682,17 +1690,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                         <>
                     <div className="lecture-details-card-head">
                       <h3>
-                        {canManageAssignmentsViaApi ? (
-                          <button
-                            type="button"
-                            className="lecture-details-title-btn"
-                            onClick={() => openQuizBuilderPage(quiz)}
-                          >
-                            {displayQuizTitle}
-                          </button>
-                        ) : (
-                          displayQuizTitle
-                        )}
+                        {displayQuizTitle}
                         {!canManageLecture && personalScore !== null && (
                           <span className="lecture-details-student-score">
                             Score: {personalScore}%
@@ -1705,7 +1703,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           <button
                             type="button"
                             className="lecture-details-icon-btn"
-                            onClick={() => openQuizBuilderPage(quiz)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openQuizBuilderPage(quiz);
+                            }}
                             aria-label={`Edit ${displayQuizTitle}`}
                           >
                             <FaRegEdit size={12} />
@@ -1752,10 +1753,12 @@ const ContentDetails = ({ role = "lecturer" }) => {
                         className={`lecture-details-link-btn ${role !== "lecturer" && role !== "ta" ? "disabled" : ""}`}
                         onClick={
                           canManageLecture
-                            ? () =>
+                            ? (event) => {
+                                event.stopPropagation();
                                 navigate(quizReviewPath, {
                                   state: { quizTitle: displayQuizTitle },
-                                })
+                                });
+                              }
                             : (event) => event.stopPropagation()
                         }
                         disabled={!canManageLecture}

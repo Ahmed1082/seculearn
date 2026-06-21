@@ -101,15 +101,25 @@ const QuizReview = ({ role = "lecturer" }) => {
     fetchStudentDetail(studentId);
   };
 
-  // ── derived data from dashboard ────────────────────────
   const stats = useMemo(() => {
     if (!dashboard) return null;
     const s = dashboard.stats || dashboard.statistics || null;
+    
+    const rawAverage = s?.average ?? dashboard.average ?? dashboard.avg_score ?? null;
+    let parsedAverage = null;
+    if (rawAverage !== null && rawAverage !== undefined) {
+      const cleaned = String(rawAverage).replace("%", "").trim();
+      const num = Number(cleaned);
+      if (!isNaN(num)) {
+        parsedAverage = num;
+      }
+    }
+
     return {
       completed: s?.completed ?? dashboard.completed ?? dashboard.done ?? 0,
       missed: s?.missed ?? dashboard.missed ?? 0,
       pending: s?.pending ?? dashboard.pending ?? 0,
-      average: s?.average ?? dashboard.average ?? dashboard.avg_score ?? null,
+      average: parsedAverage,
       high: s?.high ?? dashboard.high ?? dashboard.highest_score ?? null,
       low: s?.low ?? dashboard.low ?? dashboard.lowest_score ?? null,
     };
@@ -117,13 +127,24 @@ const QuizReview = ({ role = "lecturer" }) => {
 
   const studentList = useMemo(() => {
     if (!dashboard) return [];
-    return (dashboard.students || []).map((s) => ({
-      id: String(s.id || s.student_id),
-      name: s.name || s.student_name || `Student ${s.id}`,
-      studentCode: s.student_id || s.code || "",
-      status: s.status || "pending",
-      score: s.score ?? s.percentage ?? null,
-    }));
+    return (dashboard.students || []).map((s) => {
+      const rawScore = s.score ?? s.percentage ?? null;
+      let parsedScore = null;
+      if (rawScore !== null && rawScore !== undefined) {
+        const cleaned = String(rawScore).replace("%", "").trim();
+        const num = Number(cleaned);
+        if (!isNaN(num)) {
+          parsedScore = num;
+        }
+      }
+      return {
+        id: String(s.id || s.student_id),
+        name: s.name || s.student_name || `Student ${s.id}`,
+        studentCode: s.student_id || s.code || "",
+        status: s.status || "pending",
+        score: parsedScore,
+      };
+    });
   }, [dashboard]);
 
   const questionStats = useMemo(() => {
