@@ -1,0 +1,134 @@
+const fs = require('fs');
+const http = require('http');
+
+const tokens = [
+  '6|a68be635cb164f9d83a1f700758365bd',
+  '6|b83557c8c904446f8b06899d249ae1d5',
+  '18|9kdWN0X2FuYWx5dGljc19waXBlbGluZRrP',
+  '4|dGV4dHVyZV9jb21wcmVzc2lvbl9yZ3Rj',
+  '0|vtoBs5VcgCq3gS3o76IEnz1A0JvOOhfpBt9CQygBc38b4d10',
+  '19|dHm6rmlUoxKSSJUmUcyN03verH5W3tR2Xfkw7Rog93a03e83',
+  '21|Kfyh9Qdqj9u9YbObu5EKtOyvGcRfZGejmmuRHzCK2b646748',
+  '22|dddzPX0tvSv0Fnj34JIw6GvsnPX8xHFu2f8LYIMZcc20f09e',
+  '9|ziLa2JTIfjcAvCtdonBvyaKo6sTy3WkKIr3fRCFkb486eb64',
+  '1|e1582200eef72ccf330c87f7a3c154c3',
+  '1|4504559ada754bcb4eddc256c34ff09eB1',
+  '1|98760b5811a4ad8ece99d4a5871c934b',
+  '1|e745c36058ccc9e62647d58e5eacf5ab',
+  '1|ca55621bc4acdba05fcbff6070598879B1',
+  '1|53d8c651fd52c3351c149d532f41a3b5',
+  '1|07d816d5e9ebec04fbb4b2a27dae848aB1',
+  '1|a3ea5899dcf1df7581599c6c22e7e34b',
+  '1|3209978cb16576d6a1436d578c04d528B1',
+  '1|4a59d5dca71003b8768db0f5f2602a6b',
+  '1|98c83803e4195d7b7ec9c4ff54fcb701B1',
+  '1|191a40c4178ed1a3826b3e699575c49fB1',
+  '1|9dd8e630d032b29afce3d8a2ac56a2b3B1',
+  '1|e414adc988100f870ccd92a79751ae7d',
+  '1|2a877cf4ede45e1a5cafd9b91eb10d39F1',
+  '1|53d2bfeff3973cf519a649b335bb7143',
+  '1|8c22446809c381686052acc7da4332dbF1',
+  '1|b099f2358f2877a0f07593c511c2535f',
+  '1|499b4e49edee6b791a09766988e135a0B1',
+  '1|ababa94dbf5a143c9bff5c7f5f9688f7',
+  '1|35f63d7a5a2677ba25fdf0c3271262e5B1',
+  '1|064b802c343a2fcf10a33165925ea270',
+  '1|7f7b56d526ad5d49defc4beed50fcd5dB1',
+  '11|ff7ad92d5c6618eb52d1077d06e6d6a8B',
+  '1|da0e456b6dad71a8b43b008124c6dbc7',
+  '1|d73b52582beb055a67fedaacbe4ddfed',
+  '1|9eb566f029f3e0a5ddd4632165a6c408B1',
+  '4|e1392fb93c254661bb2a838004d75abf',
+  '4|QADSDE2ZmE4MzNhLTE3OTItNGJkNC1iY',
+  '8|QADSDE2ZmE4MzNhLTE3OTItNGJkNC1iY'
+];
+
+const localBase = 'http://localhost:5173';
+
+function testToken(token) {
+  return new Promise((resolve) => {
+    const url = `${localBase}/api/get-courses`;
+    const options = {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json' // Crucial to prevent Laravel redirecting to login route!
+      },
+      timeout: 1000
+    };
+    
+    const req = http.get(url, options, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        resolve({
+          statusCode: res.statusCode,
+          data
+        });
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      resolve({ error: 'Timeout' });
+    });
+
+    req.on('error', err => {
+      resolve({ error: err.message });
+    });
+  });
+}
+
+function fetchChallenges(token) {
+  return new Promise((resolve) => {
+    const url = `${localBase}/api/get-my-challenges`;
+    const req = http.get(url, { 
+      headers: { 
+        'Authorization': `Bearer ${token}`, 
+        'Accept': 'application/json'
+      },
+      timeout: 2000
+    }, (res) => {
+      let d = '';
+      res.on('data', chunk => { d += chunk; });
+      res.on('end', () => {
+        resolve(d);
+      });
+    });
+    req.on('error', () => resolve(null));
+  });
+}
+
+async function run() {
+  console.log(`Testing ${tokens.length} Sanctum tokens...`);
+  for (const token of tokens) {
+    const res = await testToken(token);
+    if (res.statusCode === 200) {
+      console.log(`SUCCESS! Valid token: ${token}`);
+      
+      try {
+        const courses = JSON.parse(res.data);
+        fs.writeFileSync('courses_response.json', JSON.stringify(courses, null, 2));
+        console.log('Saved courses response to courses_response.json');
+      } catch (err) {
+        console.log('Courses data is not JSON:', res.data.slice(0, 100));
+      }
+      
+      const challenges = await fetchChallenges(token);
+      if (challenges) {
+        try {
+          const ch = JSON.parse(challenges);
+          fs.writeFileSync('challenges_response.json', JSON.stringify(ch, null, 2));
+          console.log('Saved challenges response to challenges_response.json');
+        } catch (err) {
+          console.log('Challenges data is not JSON:', challenges.slice(0, 100));
+        }
+      }
+      return;
+    } else {
+      console.log(`Token ${token} failed with status: ${res.statusCode}. Error: ${res.data || res.error}`);
+    }
+  }
+  console.log('No valid token found.');
+}
+
+run();

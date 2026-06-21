@@ -1,0 +1,47 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "id": 9,
+      "title": "xss",
+      "description": "feewfeefergerg",
+      "category": "Web Exploitation",
+      "difficulty": "medium",
+      "points": 250,
+      "flag": "flag{sfdbsdfbsdfb}",
+      "is_case_sensitive": true,
+      "docker_image": null,
+      "external_url": null,
+      "max_attempts": 0,
+      "challenge_file": null,
+      "file_original_name": null,
+      "instructor_id": 1,
+      "created_at": "2026-06-21 17:50:40",
+      "updated_at": "2026-06-21 17:50:40",
+      "solves_count": 0,
+      "file_url": null,
+      "determined_image": "ctf-sql-medium"
+    },
+    {
+      "id": 7,
+      "title": "sql injection",
+      "description": "test test test test",
+      "category": "Web Exploitation",
+      "difficulty": "medium",
+      "points": 250,
+      "flag": "flag{test test test}",
+      "is_case_sensitive": true,
+      "docker_image": null,
+      "external_url": null,
+      "max_attempts": 0,
+      "challenge_file": null,
+      "file_original_name": null,
+      "instructor_id": 1,
+      "created_at": "2026-06-04 02:41:37",
+      "updated_at": "2026-06-04 02:41:37",
+      "solves_count": 1,
+      "file_url": null,
+      "determined_image": "ctf-sql-medium"
+    }
+  ]
+}

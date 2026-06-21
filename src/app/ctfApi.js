@@ -117,6 +117,7 @@ export const normalizeCTFChallenge = (challenge = {}) => {
   return {
     raw: challenge,
     id: challenge.id ?? challenge.challenge_id,
+    courseId: challenge.course_id ?? challenge.courseId ?? null,
     title: challenge.title || "Untitled Challenge",
     description: challenge.description || "",
     shortDescription: challenge.shortDescription || challenge.description || "",
@@ -172,19 +173,21 @@ export async function getChallengeStats(id, token) {
   return payload || {};
 }
 
-export async function createCTFChallenge(data, token) {
+export async function createCTFChallenge(data, token, courseId) {
   return requestCTFApi("/create-ctf-challenge", {
     method: "POST",
     token,
     body: data,
+    headers: courseId ? { "x-course-id": String(courseId) } : {},
   });
 }
 
-export async function updateCTFChallenge(id, data, token) {
+export async function updateCTFChallenge(id, data, token, courseId) {
   return requestCTFApi(`/edit-ctf-challenge/${id}`, {
     method: "POST",
     token,
     body: data,
+    headers: courseId ? { "x-course-id": String(courseId) } : {},
   });
 }
 
@@ -250,6 +253,7 @@ export function buildCTFFormData(values) {
       is_case_sensitive: values.isCaseSensitive,
       max_attempts: values.maxAttempts,
       hints: values.hints,
+      course_id: values.courseId ? Number(values.courseId) : null,
     };
   }
 
@@ -264,6 +268,9 @@ export function buildCTFFormData(values) {
   formData.append("external_url", externalUrl || "");
   formData.append("is_case_sensitive", values.isCaseSensitive ? "1" : "0");
   formData.append("max_attempts", String(values.maxAttempts || 0));
+  if (values.courseId) {
+    formData.append("course_id", String(values.courseId));
+  }
 
   values.files.forEach((file) => {
     if (typeof File !== "undefined" && file.file instanceof File) {

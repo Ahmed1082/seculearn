@@ -63,7 +63,19 @@ const CourseDetails = ({ role }) => {
         const challenges = permissions.canManageCTF
           ? await getInstructorChallenges(token)
           : await getStudentChallenges(token);
-        setCtfs(challenges);
+
+        // Debug write
+        fetch('/debug-log', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ challenges, courseId })
+        }).catch(err => console.error("Debug write failed:", err));
+
+        const filtered = challenges.filter((ctf) => {
+          const mappedCourseId = ctf.courseId || localStorage.getItem(`ctf_course_${ctf.id}`);
+          return String(mappedCourseId) === String(courseId);
+        });
+        setCtfs(filtered);
       } catch (err) {
         console.error("Error fetching CTF challenges:", err);
         setCtfError(err.message || "Could not load CTF challenges.");
@@ -73,7 +85,7 @@ const CourseDetails = ({ role }) => {
     };
 
     if (token) fetchCTFs();
-  }, [permissions.canManageCTF, token]);
+  }, [permissions.canManageCTF, token, courseId]);
 
   /* ================= AUTO NUMBERING ================= */
   const getNextLectureNumber = () => {
