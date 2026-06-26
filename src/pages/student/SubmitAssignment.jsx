@@ -119,11 +119,13 @@ const extractSubmissionMeta = (payload) => {
   for (const candidate of candidates) {
     const filePath =
       candidate?.submission_file_path ||
+      candidate?.submitted_file_path ||
       candidate?.file_path ||
       candidate?.submission_path ||
       candidate?.path ||
       candidate?.submission_file ||
       candidate?.file_url ||
+      candidate?.fileUrl ||
       candidate?.url ||
       "";
 
@@ -143,6 +145,60 @@ const extractSubmissionMeta = (payload) => {
 
   return null;
 };
+
+const extractTrackerAssignments = (payload) => {
+  if (Array.isArray(payload?.assignments)) return payload.assignments;
+  if (Array.isArray(payload?.data?.assignments)) return payload.data.assignments;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload)) return payload;
+  return [];
+};
+
+const isSubmittedStatus = (value) => {
+  const status = String(value || "").trim().toLowerCase();
+  return ["submitted", "done", "turned_in", "turned-in", "turned in"].includes(status);
+};
+
+const extractTrackerSubmissionMeta = (assignment) => {
+  if (!assignment) return null;
+
+  const nestedMeta = extractExistingSubmissionMeta(assignment);
+  if (nestedMeta?.url || nestedMeta?.id || nestedMeta?.name) return nestedMeta;
+
+  const filePath =
+    assignment?.submission_file_path ||
+    assignment?.submitted_file_path ||
+    assignment?.submission_path ||
+    assignment?.file_url ||
+    assignment?.fileUrl ||
+    "";
+  const fileName =
+    assignment?.submission_file_name ||
+    assignment?.file_name ||
+    assignment?.filename ||
+    getNameFromPath(filePath) ||
+    "";
+  const id =
+    assignment?.submission_id ||
+    assignment?.assignment_submission_id ||
+    assignment?.student_submission_id ||
+    null;
+
+  if (filePath || fileName || id) {
+    return {
+      id,
+      url: filePath ? toAbsoluteApiUrl(filePath) : "",
+      name: fileName,
+    };
+  }
+
+  return null;
+};
+
+const findTrackerAssignmentById = (payload, assignmentId) =>
+  extractTrackerAssignments(payload).find(
+    (entry) => String(entry?.id ?? entry?.assignment_id ?? "") === String(assignmentId)
+  ) || null;
 
 const extractExistingSubmissionMeta = (assignment) => {
   if (!assignment) return null;
@@ -165,12 +221,6 @@ const extractExistingSubmissionMeta = (assignment) => {
 
   return null;
 };
-
-const hasSubmissionBinding = (assignment) =>
-  !!assignment &&
-  (Object.prototype.hasOwnProperty.call(assignment, "submission") ||
-    Object.prototype.hasOwnProperty.call(assignment, "student_submission") ||
-    Object.prototype.hasOwnProperty.call(assignment, "my_submission"));
 
 const isReturnedSubmission = (assignment) => {
   if (!assignment) return false;
@@ -354,13 +404,6 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const stateLectureTitle = location.state?.lectureTitle || location.state?.title || "";
   const stateSectionTitle = location.state?.sectionTitle || location.state?.title || "";
   const stateCourseId = location.state?.courseId || courseId || "";
-  const submissionCacheKey = useMemo(
-    () =>
-      `student-submission:${scope}:${String(contentId || "unknown")}:${String(
-        assignmentId || "unknown"
-      )}:${currentUserId}`,
-    [assignmentId, contentId, currentUserId, scope]
-  );
 
   const [privateComment, setPrivateComment] = useState("");
   const [privateComments, setPrivateComments] = useState([]);
@@ -385,9 +428,17 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
   const [editedClassText, setEditedClassText] = useState("");
 
   const [assignment, setAssignment] = useState(null);
+  const [nowMs, setNowMs] = useState(0);
 
   const [fetchedSectionTitle, setFetchedSectionTitle] = useState("");
   const [fetchedLectureTitle, setFetchedLectureTitle] = useState("");
+
+  useEffect(() => {
+    const updateNow = () => setNowMs(Date.now());
+    updateNow();
+    const intervalId = window.setInterval(updateNow, 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const fetchCourseData = async () => {
@@ -516,16 +567,9 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     }
   }, [assignmentId, currentUserRole, displayName, token]);
 
-  const readCachedSubmission = useCallback(() => {
-    return null;
+  const cacheSubmittedFile = useCallback(() => {
+    // No-op - removed localStorage caching
   }, []);
-
-  const cacheSubmittedFile = useCallback(
-    (entry, id = null) => {
-      // No-op - removed localStorage caching
-    },
-    []
-  );
 
   const clearCachedSubmission = useCallback(() => {
     // No-op - removed localStorage caching
@@ -566,6 +610,45 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
         });
 
         const loadedAssignment = findAssignmentById(res?.data, assignmentId);
+
+        let realStudentId = currentUserId;
+        if (loadedAssignment && token) {
+          try {
+            const userRes = await axios.get("/api/user", {
+              headers: buildApiHeaders(token),
+            });
+            if (userRes.data?.id) {
+              realStudentId = String(userRes.data.id);
+            }
+          } catch (userErr) {
+            console.error("Error fetching real student user ID:", userErr);
+          }
+        }
+
+        if (loadedAssignment && realStudentId) {
+          try {
+            const subRes = await axios.get(
+              `/api/dr-ta/assignment/${assignmentId}/student/${realStudentId}`,
+              { headers: buildApiHeaders(token) }
+            );
+            if (subRes.data?.status === "success" && subRes.data?.submission) {
+              const sub = subRes.data.submission;
+              loadedAssignment.my_submission = {
+                id: sub.id,
+                submission_file_path: sub.file_url,
+                file_path: sub.file_url,
+                original_name: sub.file_name,
+                file_name: sub.file_name,
+                submission_file_name: sub.file_name,
+                grade: sub.grade,
+                submitted_at: sub.submitted_at,
+              };
+            }
+          } catch (subErr) {
+            console.error("Error fetching student submission details:", subErr);
+          }
+        }
+
         setAssignment(loadedAssignment);
 
         const existingSubmission = extractExistingSubmissionMeta(loadedAssignment);
@@ -588,26 +671,48 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
             setIsSubmitted(true);
             cacheSubmittedFile(nextSubmittedFile, existingSubmission.id);
           }
-        } else if (!token) {
-          const cachedSubmission = readCachedSubmission();
-          if (cachedSubmission?.url || cachedSubmission?.name || cachedSubmission?.id) {
-            if (cachedSubmission?.id) setSubmissionId(cachedSubmission.id);
-            setSubmittedFile({
-              name: cachedSubmission.name || "Submitted file",
-              url: cachedSubmission.url || "",
-              isLocal: false,
+        } else {
+          let restoredFromTracker = false;
+
+          try {
+            const trackerEndpoint = stateCourseId
+              ? `/api/student/assignments-tracker/${stateCourseId}`
+              : "/api/student/assignments-tracker";
+            const trackerRes = await axios.get(trackerEndpoint, {
+              headers: buildApiHeaders(token),
             });
-            setIsSubmitted(true);
-          } else {
+            const trackerAssignment = findTrackerAssignmentById(
+              trackerRes?.data,
+              assignmentId
+            );
+            const trackerMeta = extractTrackerSubmissionMeta(trackerAssignment);
+
+            if (
+              isSubmittedStatus(trackerAssignment?.status) ||
+              trackerMeta?.url ||
+              trackerMeta?.id ||
+              trackerMeta?.name
+            ) {
+              if (trackerMeta?.id) setSubmissionId(trackerMeta.id);
+              const nextSubmittedFile = {
+                name: trackerMeta?.name || "Submitted file",
+                url: trackerMeta?.url || "",
+                isLocal: false,
+              };
+              setSubmittedFile(nextSubmittedFile);
+              setIsSubmitted(true);
+              restoredFromTracker = true;
+            }
+          } catch (trackerError) {
+            console.error("Error fetching assignment tracker:", trackerError);
+          }
+
+          if (!restoredFromTracker) {
+            clearCachedSubmission();
             setSubmittedFile(null);
             setSubmissionId(null);
             setIsSubmitted(false);
           }
-        } else {
-          clearCachedSubmission();
-          setSubmittedFile(null);
-          setSubmissionId(null);
-          setIsSubmitted(false);
         }
 
         await fetchAssignmentComments();
@@ -622,9 +727,10 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     cacheSubmittedFile,
     clearCachedSubmission,
     contentId,
+    currentUserId,
     fetchAssignmentComments,
-    readCachedSubmission,
     scope,
+    stateCourseId,
     token,
     unitLabel,
   ]);
@@ -1111,7 +1217,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
 
   const parsedDueDate = parseAssignmentDate(assignment?.due_date);
   const isDueDatePassed = parsedDueDate
-    ? parsedDueDate.getTime() < Date.now()
+    ? nowMs > 0 && parsedDueDate.getTime() < nowMs
     : false;
 
   const isOpenFromApi = assignment?.is_open;
