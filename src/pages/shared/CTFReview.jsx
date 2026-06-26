@@ -58,7 +58,7 @@ const CTFReview = () => {
 
         if (cancelled) return;
 
-        const mappedCourseId = challengeData.courseId || localStorage.getItem(`ctf_course_${challengeData.id}`);
+        const mappedCourseId = challengeData.courseId;
         if (mappedCourseId && String(mappedCourseId) !== String(courseId)) {
           setError("This CTF challenge does not belong to the selected course.");
           return;

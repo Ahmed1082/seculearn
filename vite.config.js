@@ -9,26 +9,6 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
 const TARGET_HOST = 'cary-nontumorous-unimpedingly.ngrok-free.dev';
-const MAPPING_FILE = path.join(__dirname, 'ctf_course_mapping.json');
-
-function readMapping() {
-  try {
-    if (fs.existsSync(MAPPING_FILE)) {
-      return JSON.parse(fs.readFileSync(MAPPING_FILE, 'utf8'));
-    }
-  } catch (err) {
-    console.error("Error reading mapping file:", err);
-  }
-  return {};
-}
-
-function writeMapping(mapping) {
-  try {
-    fs.writeFileSync(MAPPING_FILE, JSON.stringify(mapping, null, 2), 'utf8');
-  } catch (err) {
-    console.error("Error writing mapping file:", err);
-  }
-}
 
 function forwardToBackend(req, res, targetPath, options = {}) {
   return new Promise((resolve, reject) => {
@@ -76,130 +56,6 @@ function forwardToBackend(req, res, targetPath, options = {}) {
 }
 
 async function handleCtfProxy(req, res) {
-  // 1. GET /api/get-my-challenges or GET /api/student/get-ctf-challenges
-  const isGetChallenges = (req.url.startsWith('/api/get-my-challenges') || req.url.startsWith('/api/student/get-ctf-challenges')) && req.method === 'GET';
-  if (isGetChallenges) {
-    const result = await forwardToBackend(req, res, req.url);
-    if (result.statusCode === 200) {
-      const resBody = JSON.parse(result.body.toString('utf8'));
-      const mapping = readMapping();
-      
-      const inject = (item) => {
-        if (item && item.id) {
-          const mappedCourseId = mapping[String(item.id)];
-          if (mappedCourseId) {
-            item.course_id = Number(mappedCourseId);
-          }
-        }
-      };
-
-      if (Array.isArray(resBody)) {
-        resBody.forEach(inject);
-      } else if (resBody && Array.isArray(resBody.data)) {
-        resBody.data.forEach(inject);
-      } else if (resBody && Array.isArray(resBody.challenges)) {
-        resBody.challenges.forEach(inject);
-      }
-
-      const modifiedBody = JSON.stringify(resBody);
-      const headers = { ...result.headers };
-      delete headers['transfer-encoding'];
-      headers['content-length'] = Buffer.byteLength(modifiedBody);
-      res.writeHead(result.statusCode, headers);
-      res.end(modifiedBody);
-    } else {
-      res.writeHead(result.statusCode, result.headers);
-      res.end(result.body);
-    }
-    return;
-  }
-
-  // 2. GET /api/get-ctf-challenge-data/:id
-  const getMatch = req.url.match(/^\/api\/get-ctf-challenge-data\/(\d+)/);
-  if (getMatch && req.method === 'GET') {
-    const result = await forwardToBackend(req, res, req.url);
-    if (result.statusCode === 200) {
-      const resBody = JSON.parse(result.body.toString('utf8'));
-      const mapping = readMapping();
-      const challengeId = getMatch[1];
-      const mappedCourseId = mapping[String(challengeId)];
-      
-      if (mappedCourseId) {
-        if (resBody.data) {
-          resBody.data.course_id = Number(mappedCourseId);
-        } else if (resBody.challenge) {
-          resBody.challenge.course_id = Number(mappedCourseId);
-        } else if (resBody) {
-          resBody.course_id = Number(mappedCourseId);
-        }
-      }
-
-      const modifiedBody = JSON.stringify(resBody);
-      const headers = { ...result.headers };
-      delete headers['transfer-encoding'];
-      headers['content-length'] = Buffer.byteLength(modifiedBody);
-      res.writeHead(result.statusCode, headers);
-      res.end(modifiedBody);
-    } else {
-      res.writeHead(result.statusCode, result.headers);
-      res.end(result.body);
-    }
-    return;
-  }
-
-  // 3. POST /api/create-ctf-challenge
-  if (req.url === '/api/create-ctf-challenge' && req.method === 'POST') {
-    const courseId = req.headers['x-course-id'];
-    const result = await forwardToBackend(req, res, req.url);
-    if (result.statusCode === 200 || result.statusCode === 201) {
-      try {
-        const resBody = JSON.parse(result.body.toString('utf8'));
-        const challenge = resBody.data || resBody.challenge || resBody;
-        const challengeId = challenge?.id;
-        if (challengeId && courseId) {
-          const mapping = readMapping();
-          mapping[String(challengeId)] = String(courseId);
-          writeMapping(mapping);
-        }
-      } catch (e) {
-        console.error("Failed to parse create response:", e);
-      }
-    }
-    res.writeHead(result.statusCode, result.headers);
-    res.end(result.body);
-    return;
-  }
-
-  // 4. POST /api/edit-ctf-challenge/:id
-  const editMatch = req.url.match(/^\/api\/edit-ctf-challenge\/(\d+)/);
-  if (editMatch && req.method === 'POST') {
-    const challengeId = editMatch[1];
-    const courseId = req.headers['x-course-id'];
-    if (challengeId && courseId) {
-      const mapping = readMapping();
-      mapping[String(challengeId)] = String(courseId);
-      writeMapping(mapping);
-    }
-    const result = await forwardToBackend(req, res, req.url);
-    res.writeHead(result.statusCode, result.headers);
-    res.end(result.body);
-    return;
-  }
-
-  // 5. DELETE /api/delete-ctf-challenge/:id
-  const deleteMatch = req.url.match(/^\/api\/delete-ctf-challenge\/(\d+)/);
-  if (deleteMatch && req.method === 'DELETE') {
-    const challengeId = deleteMatch[1];
-    if (challengeId) {
-      const mapping = readMapping();
-      delete mapping[String(challengeId)];
-      writeMapping(mapping);
-    }
-    const result = await forwardToBackend(req, res, req.url);
-    res.writeHead(result.statusCode, result.headers);
-    res.end(result.body);
-    return;
-  }
 
   // 6. GET /api/dr-ta/dashboard
   if (req.url.startsWith('/api/dr-ta/dashboard') && req.method === 'GET') {
@@ -490,13 +346,7 @@ export default defineConfig({
       name: 'debug-logger',
       configureServer(server) {
         server.middlewares.use((req, res, next) => {
-          const isTargetUrl = req.url.startsWith('/api/get-my-challenges') ||
-                              req.url.startsWith('/api/student/get-ctf-challenges') ||
-                              req.url.match(/^\/api\/get-ctf-challenge-data\/\d+/) ||
-                              req.url === '/api/create-ctf-challenge' ||
-                              req.url.match(/^\/api\/edit-ctf-challenge\/\d+/) ||
-                              req.url.match(/^\/api\/delete-ctf-challenge\/\d+/) ||
-                              req.url.startsWith('/api/dr-ta/dashboard');
+          const isTargetUrl = req.url.startsWith('/api/dr-ta/dashboard');
 
           if (!isTargetUrl) {
             return next();

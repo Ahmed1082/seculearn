@@ -252,16 +252,8 @@ const CTFCreate = () => {
       const payload = buildPayload();
       if (isEditMode) {
         await updateCTFChallenge(ctfId, payload, token, courseId);
-        if (courseId) {
-          localStorage.setItem(`ctf_course_${ctfId}`, String(courseId));
-        }
       } else {
-        const response = await createCTFChallenge(payload, token, courseId);
-        const newChallenge = response?.data || response?.challenge || response;
-        const newChallengeId = newChallenge?.id;
-        if (newChallengeId && courseId) {
-          localStorage.setItem(`ctf_course_${newChallengeId}`, String(courseId));
-        }
+        await createCTFChallenge(payload, token, courseId);
       }
       navigate(coursePath);
     } catch (err) {
@@ -281,7 +273,6 @@ const CTFCreate = () => {
 
     try {
       await deleteCTFChallenge(ctfId, token);
-      localStorage.removeItem(`ctf_course_${ctfId}`);
       navigate(coursePath);
     } catch (err) {
       setError(err.message || "Could not delete the CTF challenge.");

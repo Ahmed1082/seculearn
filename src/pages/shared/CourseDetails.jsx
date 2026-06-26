@@ -72,8 +72,7 @@ const CourseDetails = ({ role }) => {
         }).catch(err => console.error("Debug write failed:", err));
 
         const filtered = challenges.filter((ctf) => {
-          const mappedCourseId = ctf.courseId || localStorage.getItem(`ctf_course_${ctf.id}`);
-          return String(mappedCourseId) === String(courseId);
+          return !ctf.courseId || String(ctf.courseId) === String(courseId);
         });
         setCtfs(filtered);
       } catch (err) {
