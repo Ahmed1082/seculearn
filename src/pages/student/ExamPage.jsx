@@ -266,14 +266,34 @@ const ExamPage = () => {
 
   // ── result / review view (after submission, uses API #47 data) ──
   if (loadState === "result" || (loadState === "submitted" && myResult)) {
-    const score =
+    const rawScore =
       submitResult?.score ??
       myResult?.score ??
       myResult?.student_score ??
       myResult?.percentage ??
       null;
+
+    const correctCount = myResult?.correct_answers_count ?? 0;
+    const totalCount = myResult?.total_questions_count ?? 0;
+
+    let score = rawScore;
+    if (totalCount > 0) {
+      if (correctCount === totalCount) {
+        score = 100;
+      } else if (correctCount === 0 && rawScore !== null && rawScore > totalCount) {
+        score = rawScore;
+      } else {
+        score = Math.round((correctCount / totalCount) * 100);
+      }
+    }
+
     const passing = quizMeta?.passing_percentage || myResult?.passing_percentage || 60;
-    const passed = score !== null && score >= passing;
+    const passed =
+      typeof myResult?.is_passed === "boolean"
+        ? myResult.is_passed
+        : myResult?.is_passed === 1 || myResult?.is_passed === "1"
+          ? true
+          : score !== null && score >= passing;
 
     return (
       <section className="exam-page">

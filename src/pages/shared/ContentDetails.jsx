@@ -142,6 +142,8 @@ const mapApiQuizToCard = (quiz) => ({
     toNumberOrNull(quiz?.percentage) ??
     null,
   questions: Array.isArray(quiz?.questions) ? quiz.questions : [],
+  attempts: quiz?.attempts || [],
+  is_passed: quiz?.is_passed ?? null,
 });
 
 const createClientId = (prefix) =>
@@ -652,6 +654,10 @@ const ContentDetails = ({ role = "lecturer" }) => {
         [],
       missedStudentIds:
         assignment?.missed_students || assignment?.missedStudentIds || [],
+      submission: assignment?.submission || null,
+      student_submission: assignment?.student_submission || null,
+      my_submission: assignment?.my_submission || null,
+      status: assignment?.status || null,
     };
   }, []);
 
@@ -707,20 +713,104 @@ const ContentDetails = ({ role = "lecturer" }) => {
   }, [fetchSectionAssignments]);
 
   const getPersonalStatus = (item) => {
-    if (item.doneStudentIds?.includes(currentStudentId)) return "done";
-    if (item.missedStudentIds?.includes(currentStudentId)) return "missed";
+    const status = String(item.status || "").trim().toLowerCase();
+    if (status === "submitted" || status === "done") return "done";
+    if (status === "missed") return "missed";
+
+    if (item.submission || item.student_submission || item.my_submission) {
+      const sub = item.submission || item.student_submission || item.my_submission;
+      if (sub && !sub.is_returned && sub.status !== "returned") {
+        return "done";
+      }
+    }
+
+    if (Array.isArray(item.doneStudentIds)) {
+      const isDone = item.doneStudentIds.some((student) => {
+        const id = typeof student === "object" ? (student?.id || student?.student_id) : student;
+        return String(id) === String(currentStudentId);
+      });
+      if (isDone) return "done";
+    }
+
+    if (Array.isArray(item.missedStudentIds)) {
+      const isMissed = item.missedStudentIds.some((student) => {
+        const id = typeof student === "object" ? (student?.id || student?.student_id) : student;
+        return String(id) === String(currentStudentId);
+      });
+      if (isMissed) return "missed";
+    }
+
     return "pending";
   };
 
   const getPersonalQuizStatus = (quiz) => {
-    if (quiz?.status) return normalizeQuizStatus(quiz.status);
-    if (quiz?.doneStudentIds?.includes(currentStudentId)) return "done";
-    if (quiz?.missedStudentIds?.includes(currentStudentId)) return "missed";
+    const rawStatus = quiz?.status;
+    const isDone = quiz?.attempts?.length > 0 || [
+      "done", "completed", "complete", "submitted"
+    ].includes(String(rawStatus || "").trim().toLowerCase());
+
+    if (isDone) return "done";
+    if (normalizeQuizStatus(rawStatus) === "missed") return "missed";
+
+    if (Array.isArray(quiz?.doneStudentIds)) {
+      const isDoneStudent = quiz.doneStudentIds.some((student) => {
+        const id = typeof student === "object" ? (student?.id || student?.student_id) : student;
+        return String(id) === String(currentStudentId);
+      });
+      if (isDoneStudent) return "done";
+    }
+
+    if (Array.isArray(quiz?.missedStudentIds)) {
+      const isMissedStudent = quiz.missedStudentIds.some((student) => {
+        const id = typeof student === "object" ? (student?.id || student?.student_id) : student;
+        return String(id) === String(currentStudentId);
+      });
+      if (isMissedStudent) return "missed";
+    }
+
     return "pending";
   };
 
-  const getPersonalQuizScore = (quiz) =>
-    quiz?.score ?? quiz?.results?.[currentStudentId] ?? null;
+  const getPersonalQuizScore = (quiz) => {
+    const attempts = quiz?.attempts || [];
+    const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
+    const firstAttempt = hasAttempts ? attempts[0] : null;
+
+    const isPassed =
+      quiz?.is_passed ??
+      quiz?.isPassed ??
+      firstAttempt?.is_passed ??
+      firstAttempt?.isPassed ??
+      null;
+
+    const rawScore =
+      toNumberOrNull(quiz?.score) ??
+      toNumberOrNull(quiz?.results?.[currentStudentId]) ??
+      toNumberOrNull(firstAttempt?.score) ??
+      null;
+
+    if (rawScore === null) return null;
+
+    const passing = toNumberOrNull(quiz?.passing_percentage) ?? toNumberOrNull(quiz?.passingScore) ?? 60;
+
+    if (rawScore >= passing) {
+      return rawScore;
+    }
+
+    if (quiz?.questionCount > 0 && rawScore <= quiz.questionCount) {
+      return Math.round((rawScore / quiz.questionCount) * 100);
+    }
+
+    if (isPassed === true || isPassed === 1 || isPassed === "1") {
+      return 100;
+    }
+
+    if (isPassed === false || isPassed === 0 || isPassed === "0") {
+      return 0;
+    }
+
+    return rawScore;
+  };
 
   const toggleSection = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -1718,11 +1808,6 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     <div className="lecture-details-card-head">
                       <h3>
                         {displayQuizTitle}
-                        {!canManageLecture && personalScore !== null && (
-                          <span className="lecture-details-student-score">
-                            Score: {personalScore}%
-                          </span>
-                        )}
                       </h3>
 
                       {canManageAssignmentsViaApi &&

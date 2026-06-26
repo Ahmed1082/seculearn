@@ -2,6 +2,49 @@
   "status": "success",
   "data": [
     {
+      "id": 12,
+      "title": "Test Test",
+      "description": "Test Test Test Test",
+      "category": "Web Exploitation",
+      "difficulty": "medium",
+      "points": 250,
+      "flag": "flag{Test Test Test }",
+      "is_case_sensitive": true,
+      "docker_image": null,
+      "external_url": null,
+      "max_attempts": 1,
+      "challenge_file": null,
+      "file_original_name": null,
+      "instructor_id": 1,
+      "created_at": "2026-06-26 16:47:35",
+      "updated_at": "2026-06-26 16:47:35",
+      "solves_count": 1,
+      "file_url": null,
+      "determined_image": "ctf-sql-medium"
+    },
+    {
+      "id": 10,
+      "title": "fwefwf",
+      "description": "wefweffwefwefe",
+      "category": "Web Exploitation",
+      "difficulty": "medium",
+      "points": 250,
+      "flag": "flag{efrfefwfw}",
+      "is_case_sensitive": true,
+      "docker_image": null,
+      "external_url": null,
+      "max_attempts": 0,
+      "challenge_file": null,
+      "file_original_name": null,
+      "instructor_id": 1,
+      "created_at": "2026-06-21 18:09:35",
+      "updated_at": "2026-06-21 18:09:35",
+      "solves_count": 0,
+      "file_url": null,
+      "determined_image": "ctf-sql-medium",
+      "course_id": 1
+    },
+    {
       "id": 9,
       "title": "xss",
       "description": "feewfeefergerg",
@@ -18,9 +61,10 @@
       "instructor_id": 1,
       "created_at": "2026-06-21 17:50:40",
       "updated_at": "2026-06-21 17:50:40",
-      "solves_count": 0,
+      "solves_count": 1,
       "file_url": null,
-      "determined_image": "ctf-sql-medium"
+      "determined_image": "ctf-sql-medium",
+      "course_id": 2
     },
     {
       "id": 7,
@@ -41,7 +85,8 @@
       "updated_at": "2026-06-04 02:41:37",
       "solves_count": 1,
       "file_url": null,
-      "determined_image": "ctf-sql-medium"
+      "determined_image": "ctf-sql-medium",
+      "course_id": 3
     }
   ]
 }

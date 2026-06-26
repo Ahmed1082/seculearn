@@ -95,10 +95,46 @@ const mapWithConcurrency = async (
   return results;
 };
 
+const getNormalizedScore = (apiQuiz) => {
+  const attempts = apiQuiz?.attempts || [];
+  const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
+  const firstAttempt = hasAttempts ? attempts[0] : null;
+
+  const isPassed =
+    apiQuiz?.is_passed ??
+    apiQuiz?.isPassed ??
+    firstAttempt?.is_passed ??
+    firstAttempt?.isPassed ??
+    null;
+
+  const rawScore =
+    toNumberOrNull(apiQuiz?.score) ??
+    toNumberOrNull(apiQuiz?.percentage) ??
+    toNumberOrNull(firstAttempt?.score) ??
+    null;
+
+  if (rawScore === null) return null;
+
+  const passing = toNumberOrNull(apiQuiz?.passing_percentage) ?? 60;
+
+  if (rawScore >= passing) {
+    return rawScore;
+  }
+
+  if (isPassed === true || isPassed === 1 || isPassed === "1") {
+    return 100;
+  }
+
+  if (isPassed === false || isPassed === 0 || isPassed === "0") {
+    return 0;
+  }
+
+  return rawScore;
+};
+
 const normalizeApiQuiz = (apiQuiz, content, course) => {
   const attempts = apiQuiz?.attempts || [];
   const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
-  const firstAttemptScore = hasAttempts ? attempts[0]?.score : null;
   const rawStatus = apiQuiz?.status;
   const isDone = hasAttempts || [
     "done", "completed", "complete", "submitted"
@@ -120,11 +156,7 @@ const normalizeApiQuiz = (apiQuiz, content, course) => {
       toNumberOrNull(apiQuiz?.passingScore) ??
       60,
     status: isDone ? "done" : normalizeQuizStatus(rawStatus),
-    score:
-      toNumberOrNull(apiQuiz?.score) ??
-      toNumberOrNull(apiQuiz?.percentage) ??
-      toNumberOrNull(firstAttemptScore) ??
-      null,
+    score: getNormalizedScore(apiQuiz),
     content,
     course,
   };
@@ -166,72 +198,105 @@ const StudentAllQuizzes = () => {
         : [];
       setCourses(rawCourses);
 
-      const quizTargets = rawCourses.flatMap((course) => {
-        const courseSummary = {
-          id: String(course.id),
-          name: course.title || course.name || `Course ${course.id}`,
-        };
-        const lectureEntries = Array.isArray(course?.lectures) ? course.lectures : [];
-        const sectionEntries = Array.isArray(course?.sections) ? course.sections : [];
+      const trackerPath =
+        activeCourse === "all"
+          ? "/api/student/quizzes-tracker"
+          : `/api/student/quizzes-tracker/${activeCourse}`;
 
-        return [
-          ...lectureEntries.map((lecture) => ({
-            params: { lecture_id: lecture.id },
-            content: {
-              id: String(lecture.id),
-              title: lecture.title || `Lecture ${lecture.id}`,
-              courseId: String(course.id),
-              type: "lecture",
-            },
-            course: courseSummary,
-          })),
-          ...sectionEntries.map((section) => ({
-            params: { section_id: section.id },
-            content: {
-              id: String(section.id),
-              title: section.title || `Section ${section.id}`,
-              courseId: String(course.id),
-              type: "section",
-            },
-            course: courseSummary,
-          })),
-        ];
-      });
+      const trackerResponse = await apiRequest(trackerPath, { token });
+      if (activeLoadRef.current !== loadId) return;
 
-      if (quizTargets.length === 0) {
-        setLoadState("ready");
-        return;
-      }
+      const rawQuizzes =
+        trackerResponse?.data?.quizzes ||
+        trackerResponse?.data?.data?.quizzes ||
+        trackerResponse?.quizzes ||
+        [];
 
-      const quizCollections = await mapWithConcurrency(
-        quizTargets,
-        async ({ params, content, course }) => {
-          try {
-            const quizList = await getQuizzesList(params, token);
-            if (activeLoadRef.current !== loadId) return [];
+      const normalized = rawQuizzes.map((quiz) => {
+        const foundCourse = rawCourses.find(
+          (c) =>
+            (c.title || c.name || "").trim().toLowerCase() ===
+            (quiz.course_name || "").trim().toLowerCase()
+        );
 
-            const rawItems =
-              (Array.isArray(quizList?.quizzes) && quizList.quizzes) ||
-              (Array.isArray(quizList?.data) && quizList.data) ||
-              (Array.isArray(quizList?.quizzes_list) && quizList.quizzes_list) ||
-              (Array.isArray(quizList?.quizzesList) && quizList.quizzesList) ||
-              (Array.isArray(quizList) ? quizList : []);
+        const courseId = foundCourse ? String(foundCourse.id) : (activeCourse !== "all" ? activeCourse : "");
+        const courseName = foundCourse ? (foundCourse.title || foundCourse.name) : (quiz.course_name || "Course");
 
-            const normalized = rawItems
-              .map((quiz) => normalizeApiQuiz(quiz, content, course))
-              .filter((quiz) => quiz.id);
+        let contentType = String(quiz.source || "").toLowerCase() === "section" ? "section" : "lecture";
+        let contentId = "";
+        let contentTitle = quiz.content_title || "";
 
-            return normalized;
-          } catch {
-            return [];
+        if (foundCourse) {
+          if (contentType === "section") {
+            const sect = (foundCourse.sections || []).find(
+              (s) =>
+                (s.title || "").trim().toLowerCase() ===
+                (quiz.content_title || "").trim().toLowerCase()
+            );
+            if (sect) {
+              contentId = String(sect.id);
+              contentTitle = sect.title;
+            }
+          } else {
+            const lect = (foundCourse.lectures || []).find(
+              (l) =>
+                (l.title || "").trim().toLowerCase() ===
+                (quiz.content_title || "").trim().toLowerCase()
+            );
+            if (lect) {
+              contentId = String(lect.id);
+              contentTitle = lect.title;
+            }
           }
         }
-      );
 
-      if (activeLoadRef.current === loadId) {
-        setQuizzes(sortQuizzes(quizCollections.flat()));
-        setLoadState("ready");
-      }
+        const isPassed =
+          quiz.is_passed ??
+          quiz.isPassed ??
+          null;
+
+        const rawScore = toNumberOrNull(quiz.score);
+        const qCount = toNumberOrNull(quiz.questions_count) ?? 0;
+        const passing = 60;
+
+        let score = rawScore;
+        if (rawScore !== null) {
+          if (rawScore >= passing) {
+            score = rawScore;
+          } else if (qCount > 0 && rawScore <= qCount) {
+            score = Math.round((rawScore / qCount) * 100);
+          } else if (isPassed === true || isPassed === 1 || isPassed === "1") {
+            score = 100;
+          } else if (isPassed === false || isPassed === 0 || isPassed === "0") {
+            score = 0;
+          }
+        }
+
+        const status = normalizeQuizStatus(quiz.status);
+
+        return {
+          id: String(quiz.id || ""),
+          title: quiz.title || `Quiz ${quiz.id || ""}`,
+          duration_minutes: toNumberOrNull(quiz.duration_minutes) ?? 30,
+          question_count: toNumberOrNull(quiz.questions_count) ?? 0,
+          passing_percentage: passing,
+          status,
+          score,
+          content: {
+            id: contentId,
+            title: contentTitle,
+            courseId,
+            type: contentType,
+          },
+          course: {
+            id: courseId,
+            name: courseName,
+          },
+        };
+      });
+
+      setQuizzes(sortQuizzes(normalized));
+      setLoadState("ready");
     } catch (error) {
       if (activeLoadRef.current !== loadId) return;
       setCourses([]);
@@ -239,7 +304,7 @@ const StudentAllQuizzes = () => {
       setErrorMsg(error?.message || "Failed to load quizzes.");
       setLoadState("error");
     }
-  }, [token]);
+  }, [token, activeCourse]);
 
   useEffect(() => {
     const loadTimer = window.setTimeout(() => {
