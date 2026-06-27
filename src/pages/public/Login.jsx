@@ -235,8 +235,6 @@ const Login = () => {
           {/* Error Message */}
           {error && <p className="error-message">{error}</p>}
 
-          <p className="forgot">Forgot Password ?</p>
-
           <button 
             type="submit"
             className="login-submit-btn" 
