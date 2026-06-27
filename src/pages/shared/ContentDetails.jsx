@@ -170,18 +170,108 @@ const ALLOWED_ASSIGNMENT_FILE_EXTENSIONS = new Set(
 const toAbsoluteApiUrl = (path = "") => {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_URL}/${String(path).replace(/^\/+/, "")}`;
+  let normalized = String(path).replace(/^\/+/, "");
+  if (normalized.startsWith("uploads/")) {
+    normalized = `storage/${normalized}`;
+  }
+  return `${API_BASE_URL}/${normalized}`;
 };
 
 const resolveFileHref = (fileLike = {}) => {
   const dataUrl = fileLike?.dataUrl || "";
   if (dataUrl) return dataUrl;
 
-  const raw = String(fileLike?.url || fileLike?.path || "").trim();
+  const raw = String(
+    fileLike?.file_url ||
+    fileLike?.fileUrl ||
+    fileLike?.url ||
+    fileLike?.path ||
+    ""
+  ).trim();
   if (!raw) return "";
   if (/^(https?:\/\/|blob:|data:)/i.test(raw)) return raw;
 
   return toAbsoluteApiUrl(raw);
+};
+
+const handleDownloadFile = async (e, url, fileName) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!url) return;
+
+  if (/^(blob:|data:)/i.test(url)) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName || "file";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    return;
+  }
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
+    if (!response.ok) throw new Error("Network response was not ok");
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = fileName || "file";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    console.error("Direct download failed, falling back to standard link:", error);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName || "file";
+    link.target = "_blank";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};
+
+const handleOpenFile = (e, url, fileName) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!url) return;
+
+  const cleanName = String(fileName || "").trim();
+  const isViewable = /\.(pdf|png|jpe?g|gif|svg|webp)$/i.test(cleanName || url);
+  if (isViewable) {
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${cleanName || "File Viewer"}</title>
+            <style>
+              body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #323639; }
+              iframe { width: 100%; height: 100%; border: none; }
+            </style>
+          </head>
+          <body>
+            <iframe src="${url}"></iframe>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+      return;
+    }
+  }
+
+  window.open(url, "_blank");
 };
 
 const toApiDateTime = (dateTimeLocalValue) => {
@@ -573,6 +663,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
       mimeType: upload?.mime_type || "",
       dataUrl: "",
       url: resolveFileHref({
+        file_url: upload?.file_url || upload?.fileUrl,
         path: upload?.file_path || upload?.path || upload?.url || "",
       }),
     };
@@ -638,12 +729,15 @@ const ContentDetails = ({ role = "lecturer" }) => {
           "close_on_deadline",
           "close_submissions_after_due_date"
         ) ?? false,
-      attachments: attachmentPath
+      attachments: attachmentPath || assignment?.file_url || assignment?.fileUrl
         ? [
             {
               name: attachmentName,
-              url: resolveFileHref({ path: attachmentPath }),
-              path: attachmentPath,
+              url: resolveFileHref({
+                file_url: assignment?.file_url || assignment?.fileUrl,
+                path: attachmentPath,
+              }),
+              path: attachmentPath || assignment?.file_url || assignment?.fileUrl || "",
             },
           ]
         : [],
@@ -1454,6 +1548,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                             <a
                               className="lecture-details-file-link"
                               href={fileHref}
+                              onClick={(e) => handleDownloadFile(e, fileHref, file.name)}
                               download={file.name}
                               target="_blank"
                               rel="noopener noreferrer"
@@ -1481,6 +1576,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                           <>
                             <a
                               href={fileHref}
+                              onClick={(e) => handleOpenFile(e, fileHref, file.name)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="lecture-file-action-btn"
@@ -1491,6 +1587,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                             </a>
                             <a
                               href={fileHref}
+                              onClick={(e) => handleDownloadFile(e, fileHref, file.name)}
                               download={file.name}
                               className="lecture-file-action-btn"
                               title={`Download ${file.name}`}
@@ -1713,6 +1810,7 @@ const ContentDetails = ({ role = "lecturer" }) => {
                                   <a
                                     className="lecture-details-file-link"
                                     href={attachmentHref}
+                                    onClick={(e) => handleDownloadFile(e, attachmentHref, normalizedAttachment.name)}
                                     download={normalizedAttachment.name}
                                     target="_blank"
                                     rel="noopener noreferrer"

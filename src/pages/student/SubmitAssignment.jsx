@@ -11,7 +11,46 @@ const API_BASE_URL =
 const toAbsoluteApiUrl = (path = "") => {
   if (!path) return "";
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_URL}/${String(path).replace(/^\/+/, "")}`;
+  let normalized = String(path).replace(/^\/+/, "");
+  if (normalized.startsWith("uploads/")) {
+    normalized = `storage/${normalized}`;
+  }
+  return `${API_BASE_URL}/${normalized}`;
+};
+
+const handleOpenFile = (e, url, fileName) => {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!url) return;
+
+  const cleanName = String(fileName || "").trim();
+  const isViewable = /\.(pdf|png|jpe?g|gif|svg|webp)$/i.test(cleanName || url);
+  if (isViewable) {
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${cleanName || "File Viewer"}</title>
+            <style>
+              body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #323639; }
+              iframe { width: 100%; height: 100%; border: none; }
+            </style>
+          </head>
+          <body>
+            <iframe src="${url}"></iframe>
+          </body>
+        </html>
+      `);
+      newWindow.document.close();
+      return;
+    }
+  }
+
+  window.open(url, "_blank");
 };
 
 const getNameFromPath = (path = "") => {
@@ -99,7 +138,10 @@ const toAssignmentFileUrl = (path = "") => {
   if (!cleanPath) return "";
   if (/^https?:\/\//i.test(cleanPath)) return cleanPath;
   const normalized = cleanPath.replace(/^\/+/, "");
-  if (normalized.startsWith("storage/") || normalized.startsWith("uploads/")) {
+  if (normalized.startsWith("uploads/")) {
+    return toAbsoluteApiUrl(normalized);
+  }
+  if (normalized.startsWith("storage/")) {
     return toAbsoluteApiUrl(normalized);
   }
   return toAbsoluteApiUrl(`storage/${normalized}`);
@@ -1205,7 +1247,11 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
     ? `${Math.round((gradeMeta.value || 0) * 10) / 10}/${assignmentPoints}`
     : `--/${assignmentPoints}`;
   const gradeDateLabel = formatGradeDate(gradeMeta.gradedAt);
-  const assignmentFilePath = assignment?.file_path || "";
+  const assignmentFilePath =
+    assignment?.file_url ||
+    assignment?.fileUrl ||
+    assignment?.file_path ||
+    "";
   const assignmentFileName = getApiFileDisplayName(assignment, assignmentFilePath);
   const assignmentFileUrl = toAssignmentFileUrl(assignmentFilePath);
   const closeOnDeadline =
@@ -1338,6 +1384,7 @@ const SubmitAssignment = ({ unitType = "lecture" }) => {
             {assignmentFileUrl ? (
               <a
                 href={assignmentFileUrl}
+                onClick={(e) => handleOpenFile(e, assignmentFileUrl, assignmentFileName || "Assignment file")}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="file-link"
