@@ -97,8 +97,8 @@ const mapWithConcurrency = async (
 
 const getNormalizedScore = (apiQuiz) => {
   const attempts = apiQuiz?.attempts || [];
-  const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
-  const firstAttempt = hasAttempts ? attempts[0] : null;
+  const hasAttempts = Array.isArray(attempts) && attempts.some((a) => a.submitted_at !== null);
+  const firstAttempt = hasAttempts ? attempts.find((a) => a.submitted_at !== null) : null;
 
   const isPassed =
     apiQuiz?.is_passed ??
@@ -134,7 +134,7 @@ const getNormalizedScore = (apiQuiz) => {
 
 const normalizeApiQuiz = (apiQuiz, content, course) => {
   const attempts = apiQuiz?.attempts || [];
-  const hasAttempts = Array.isArray(attempts) && attempts.length > 0;
+  const hasAttempts = Array.isArray(attempts) && attempts.some((a) => a.submitted_at !== null);
   const rawStatus = apiQuiz?.status;
   const isDone = hasAttempts || [
     "done", "completed", "complete", "submitted"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { startQuiz as apiStartQuiz, submitQuiz, getMyQuizResult } from "../../app/quizApi";
 import {
   FiArrowLeft,
@@ -67,6 +67,7 @@ const shuffleArray = (array) => {
 
 const ExamPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { courseId, lectureId, sectionId, quizId } = useParams();
   const isSectionView = Boolean(sectionId);
   const backPath = `/student/courses/${courseId}/${isSectionView ? `section/${sectionId}` : `lecture/${lectureId}`}`;
@@ -130,7 +131,10 @@ const ExamPage = () => {
         passing_percentage: data.passing_percentage || 60,
       });
       setQuestions(normalized);
-      setTimeLeft(Number(data.remaining_seconds) > 0 ? Number(data.remaining_seconds) : (data.duration_minutes || 30) * 60);
+      const remainingSeconds = Number(data.remaining_seconds) > 0
+        ? Math.floor(Number(data.remaining_seconds))
+        : (data.duration_minutes || 30) * 60;
+      setTimeLeft(remainingSeconds);
       setSelectedAnswers({});
       setCurrentIndex(0);
       setLoadState("ready");
@@ -146,11 +150,16 @@ const ExamPage = () => {
   }, [loadMyResult, quizId, token]);
 
   useEffect(() => {
-    startQuiz();
+    const isCompleted = location.state?.personalStatus === "done" || location.state?.status === "done";
+    if (isCompleted) {
+      loadMyResult();
+    } else {
+      startQuiz();
+    }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [startQuiz]);
+  }, [startQuiz, loadMyResult, location.state]);
 
   const handleAutoSubmit = useCallback(() => {
     if (loadState !== "ready" || isSubmitting) return;
@@ -204,8 +213,9 @@ const ExamPage = () => {
   };
 
   const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
+    const totalSeconds = Math.max(0, Math.floor(seconds));
+    const m = Math.floor(totalSeconds / 60);
+    const s = totalSeconds % 60;
     return `${m}:${String(s).padStart(2, "0")}`;
   };
 

@@ -875,9 +875,14 @@ const ContentDetails = ({ role = "lecturer" }) => {
 
   const getPersonalQuizStatus = (quiz) => {
     const rawStatus = quiz?.status;
-    const isDone = quiz?.attempts?.length > 0 || [
-      "done", "completed", "complete", "submitted"
-    ].includes(String(rawStatus || "").trim().toLowerCase());
+    const isDone =
+      (Array.isArray(quiz?.attempts) && quiz.attempts.some((a) => a.submitted_at !== null)) ||
+      [
+        "done",
+        "completed",
+        "complete",
+        "submitted",
+      ].includes(String(rawStatus || "").trim().toLowerCase());
 
     if (isDone) return "done";
     if (normalizeQuizStatus(rawStatus) === "missed") return "missed";
@@ -1919,7 +1924,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
                     className="lecture-details-card is-clickable"
                     onClick={() => {
                       if (role === "student") {
-                        navigate(studentExamPath);
+                        const status = getPersonalQuizStatus(quiz);
+                        navigate(studentExamPath, { state: { personalStatus: status } });
                       } else if (role === "lecturer" || role === "ta") {
                         navigate(quizReviewPath, {
                           state: { quizTitle: displayQuizTitle },
@@ -1929,12 +1935,15 @@ const ContentDetails = ({ role = "lecturer" }) => {
                   >
                     {(() => {
                       const personalStatus = getPersonalQuizStatus(quiz);
+                      const hasStarted = Array.isArray(quiz?.attempts) && quiz.attempts.some((a) => a.submitted_at === null);
                       const personalStatusLabel =
                         personalStatus === "done"
                           ? "Completed"
                           : personalStatus === "missed"
                             ? "Missed"
-                            : "Upcoming";
+                            : hasStarted
+                              ? "In Progress"
+                              : "Upcoming";
                       const personalScore = getPersonalQuizScore(quiz);
 
                       return (
@@ -1993,22 +2002,20 @@ const ContentDetails = ({ role = "lecturer" }) => {
                       </div>
                     )}
 
-                    {(canManageLecture || personalScore !== null) && (
+                    {(canManageLecture || personalScore !== null || personalStatus === "done") && (
                       <button
                         type="button"
-                        className={`lecture-details-link-btn ${role !== "lecturer" && role !== "ta" ? "disabled" : ""}`}
-                        onClick={
-                          canManageLecture
-                            ? (event) => {
-                                event.stopPropagation();
-                                navigate(quizReviewPath, {
-                                  state: { quizTitle: displayQuizTitle },
-                                });
-                              }
-                            : (event) => event.stopPropagation()
-                        }
-                        disabled={!canManageLecture}
-                        aria-disabled={!canManageLecture}
+                        className="lecture-details-link-btn"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (canManageLecture) {
+                            navigate(quizReviewPath, {
+                              state: { quizTitle: displayQuizTitle },
+                            });
+                          } else {
+                            navigate(studentExamPath, { state: { personalStatus: "done" } });
+                          }
+                        }}
                       >
                         View Results <span>&rarr;</span>
                       </button>
