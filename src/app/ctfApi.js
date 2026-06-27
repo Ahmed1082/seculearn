@@ -157,8 +157,9 @@ export async function getInstructorChallenges(token) {
   return Array.isArray(data) ? data.map(normalizeCTFChallenge) : [];
 }
 
-export async function getStudentChallenges(token) {
-  const payload = await requestCTFApi("/student/get-ctf-challenges", { token });
+export async function getStudentChallenges(token, courseId) {
+  const path = courseId ? `/student/ctf-challenges/${courseId}` : "/student/get-ctf-challenges";
+  const payload = await requestCTFApi(path, { token });
   const data = unwrapPayload(payload);
   return Array.isArray(data) ? data.map(normalizeCTFChallenge) : [];
 }

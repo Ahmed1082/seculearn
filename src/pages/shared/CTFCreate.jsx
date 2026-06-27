@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Eye,
-  EyeOff,
   FileText,
   Flag,
   Lightbulb,
@@ -88,7 +87,6 @@ const CTFCreate = () => {
   const [difficulty, setDifficulty] = useState("easy");
   const [points, setPoints] = useState(100);
   const [flag, setFlag] = useState("flag{}");
-  const [showFlag, setShowFlag] = useState(false);
   const [isCaseSensitive, setIsCaseSensitive] = useState(true);
   const [maxAttempts, setMaxAttempts] = useState(0);
   const [labType, setLabType] = useState("docker");
@@ -460,10 +458,7 @@ const CTFCreate = () => {
               <div className="ctf-space-y-3 mt-4">
                 <label className="ctf-helper block">Students must submit this exact flag. Format: <code className="text-primary ctf-mono">flag{"{...}"}</code> or <code className="text-primary ctf-mono">FLAG{"{...}"}</code></label>
                 <div className="ctf-rel">
-                  <input type={showFlag ? "text" : "password"} value={flag} onChange={(event) => setFlag(event.target.value)} placeholder="flag{your_secret_here}" className="ctf-input ctf-mono pr-10" />
-                  <button type="button" onClick={() => setShowFlag((value) => !value)} className="ctf-eye-btn">
-                    {showFlag ? <EyeOff className="ctf-icon-sm" /> : <Eye className="ctf-icon-sm" />}
-                  </button>
+                  <input type="text" value={flag} onChange={(event) => setFlag(event.target.value)} placeholder="flag{your_secret_here}" className="ctf-input ctf-mono" />
                 </div>
                 {!flagValid && flag.length > 0 && (
                   <p className="ctf-warn-text"><AlertTriangle className="ctf-icon-xs" /> Flag must follow the format flag{"{...}"} or FLAG{"{...}"}</p>

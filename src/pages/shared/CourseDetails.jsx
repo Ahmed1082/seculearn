@@ -62,7 +62,7 @@ const CourseDetails = ({ role }) => {
       try {
         const challenges = permissions.canManageCTF
           ? await getInstructorChallenges(token)
-          : await getStudentChallenges(token);
+          : await getStudentChallenges(token, courseId);
 
         // Debug write
         fetch('/debug-log', {

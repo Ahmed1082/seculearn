@@ -235,7 +235,21 @@ const AIAssistant = ({ role = "student" }) => {
               { avgQuizScore: 0, missedQuizzes: 0 },
               "Quiz"
             ),
-            withTimeout(getStudentChallenges(token), [], "CTF"),
+            withTimeout(
+              (async () => {
+                const results = await Promise.all(
+                  coursesList.map((course) =>
+                    getStudentChallenges(token, course.id).catch((err) => {
+                      console.error(`Failed to fetch CTF challenges for course ${course.id}:`, err);
+                      return [];
+                    })
+                  )
+                );
+                return results.flat();
+              })(),
+              [],
+              "CTF"
+            ),
           ]);
 
           const assignmentMetrics =

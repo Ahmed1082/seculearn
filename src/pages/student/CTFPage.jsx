@@ -101,7 +101,7 @@ const CTFPage = () => {
       setLoadError("");
 
       try {
-        const challenges = await getStudentChallenges(token);
+        const challenges = await getStudentChallenges(token, courseId);
         const selected = challenges.find((item) => String(item.id) === String(ctfId));
 
         if (cancelled) return;
