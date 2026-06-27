@@ -56,6 +56,15 @@ const shouldLoadResultFromStartError = (err) => {
   );
 };
 
+const shuffleArray = (array) => {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+};
+
 const ExamPage = () => {
   const navigate = useNavigate();
   const { courseId, lectureId, sectionId, quizId } = useParams();
@@ -99,7 +108,22 @@ const ExamPage = () => {
     try {
       const data = unwrapApiData(await apiStartQuiz(quizId, token));
       const rawQuestions = data.questions || [];
-      const normalized = rawQuestions.map(normalizeApiQuestion);
+      let normalized = rawQuestions.map(normalizeApiQuestion);
+
+      const shouldShuffleQuestions = Boolean(data.shuffle_questions) || Boolean(data.shuffleQuestions);
+      const shouldShuffleOptions = Boolean(data.shuffle_options) || Boolean(data.shuffleOptions);
+
+      if (shouldShuffleOptions) {
+        normalized = normalized.map((q) => ({
+          ...q,
+          options: shuffleArray(q.options),
+        }));
+      }
+
+      if (shouldShuffleQuestions) {
+        normalized = shuffleArray(normalized);
+      }
+
       setQuizMeta({
         title: data.quiz_title || data.title || `Quiz ${quizId}`,
         duration_minutes: data.duration_minutes || 30,

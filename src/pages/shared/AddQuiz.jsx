@@ -470,6 +470,10 @@ const AddQuiz = ({ role = "lecturer" }) => {
       title: title.trim(),
       duration_minutes: sanitizeNumber(timeLimit, 1, 180, 30),
       passing_percentage: sanitizeNumber(passingScore, 0, 100, 60),
+      shuffle_questions: shuffleQuestions,
+      shuffle_options: shuffleOptions,
+      shuffleQuestions: shuffleQuestions,
+      shuffleOptions: shuffleOptions,
       ...(sectionId
         ? { section_id: Number(sectionId) }
         : { lecture_id: Number(lectureId) }),
