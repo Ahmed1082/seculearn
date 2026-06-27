@@ -778,7 +778,41 @@ const ContentDetails = ({ role = "lecturer" }) => {
       const payload = Array.isArray(response?.data?.data)
         ? response.data.data
         : [];
-      const mappedAssignments = payload.map(mapSectionAssignmentToCard);
+      let mappedAssignments = payload.map(mapSectionAssignmentToCard);
+
+      if (role === "student") {
+        try {
+          const trackerEndpoint = courseId
+            ? `/api/student/assignments-tracker/${courseId}`
+            : "/api/student/assignments-tracker";
+          const trackerResponse = await axios.get(trackerEndpoint, {
+            headers: buildApiHeaders(token),
+          });
+          const trackerAssignments = Array.isArray(trackerResponse?.data?.assignments)
+            ? trackerResponse.data.assignments
+            : Array.isArray(trackerResponse?.data?.data?.assignments)
+            ? trackerResponse.data.data.assignments
+            : Array.isArray(trackerResponse?.data?.data)
+            ? trackerResponse.data.data
+            : [];
+
+          mappedAssignments = mappedAssignments.map((assignment) => {
+            const match = trackerAssignments.find(
+              (ta) => String(ta.id || ta.assignment_id || "") === String(assignment.apiId)
+            );
+            if (match) {
+              return {
+                ...assignment,
+                status: match.status,
+                submission: match.submission || assignment.submission || null,
+              };
+            }
+            return assignment;
+          });
+        } catch (trackerErr) {
+          console.error("Failed to fetch student assignments tracker:", trackerErr);
+        }
+      }
 
       setLectureData((prev) => ({
         ...prev,
@@ -800,6 +834,8 @@ const ContentDetails = ({ role = "lecturer" }) => {
     contentApiId,
     mapSectionAssignmentToCard,
     token,
+    role,
+    courseId,
   ]);
 
   useEffect(() => {
